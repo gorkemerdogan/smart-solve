@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { LibSmartSolve } from "../libraries/LibSmartSolve.sol";
-import { LibNumericConfig } from "../storagelibs/LibNumericConfig.sol";
+import "../../libraries/LibSmartSolve.sol";
+import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 
 contract NumericConfigFacet {
     /**
