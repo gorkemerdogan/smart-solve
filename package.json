@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@prb/math": "^4.1.0",
     "adm-zip": "^0.4.16",
     "ansi-colors": "^4.1.3",
     "ansi-regex": "^5.0.1",
