@@ -76,16 +76,13 @@ library LibSmartSolve {
 
     // ---------------- Ownership ----------------
 
-    /// @notice Emitted when ownership changes
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
     /// @notice Sets the contract owner
     /// @param newOwner The address of the new owner
-    function setContractOwner(address newOwner) internal {
+    function setContractOwner(address newOwner) internal returns (address prevOwner) {
         DiamondStorage storage ds = diamondStorage();
-        address prevOwner = ds.contractOwner;
+        prevOwner = ds.contractOwner;
         ds.contractOwner = newOwner;
-        emit OwnershipTransferred(prevOwner, newOwner);
+        return prevOwner;
     }
 
     /// @notice Returns the current contract owner
@@ -164,9 +161,9 @@ library LibSmartSolve {
     }
 
     /// @notice Removes function selectors from the diamond
-    /// @param _facet Ignored (kept for event compatibility)
+    // @param _facet Ignored (kept for event compatibility)
     /// @param _selectors Function selectors to remove
-    function removeFunctions(address _facet, bytes4[] memory _selectors) internal {
+    function removeFunctions(address /*_facet*/, bytes4[] memory _selectors) internal {
         // _facet param is unused but kept for event consistency
         for (uint256 i; i < _selectors.length; i++) {
             removeFunction(_selectors[i]);

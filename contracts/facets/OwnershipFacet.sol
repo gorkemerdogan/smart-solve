@@ -26,6 +26,8 @@ contract OwnershipFacet is IERC173 {
     /// @param newOwner The address of the new owner
     function transferOwnership(address newOwner) external override {
         LibSmartSolve.enforceIsContractOwner();
-        LibSmartSolve.setContractOwner(newOwner);
+        
+        address prevOwner = LibSmartSolve.setContractOwner(newOwner);        
+        emit OwnershipTransferred(prevOwner, newOwner);
     }
 }
