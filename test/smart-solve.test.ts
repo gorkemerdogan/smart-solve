@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { FunctionFragment } from "ethers";
 
 /*
  * =============== smart-solve.test.ts ===============
@@ -8,6 +9,13 @@ import { ethers } from "hardhat";
  * Ensure OwnershipFacet + DiamondLoupeFacet are attached.
  * Test basic functionality: owner, facet discovery.
  */
+
+// Helper enum for readability
+const FacetCutAction = {
+  Add: 0,
+  Replace: 1,
+  Remove: 2,
+};
 
 describe("SmartSolve Diamond", function () {
   it("deploys and initializes facets", async function () {
@@ -18,7 +26,7 @@ describe("SmartSolve Diamond", function () {
     const diamondCutFacet = await DiamondCutFacetFactory.deploy();
     await diamondCutFacet.waitForDeployment();
 
-    // 2. Deploy SmartSolve
+    // 2. Deploy the Diamond - SmartSolve
     const SmartSolveFactory = await ethers.getContractFactory("SmartSolve");
     const smartSolve = await SmartSolveFactory.deploy(
       deployer.address,
@@ -36,20 +44,16 @@ describe("SmartSolve Diamond", function () {
     const diamondLoupeFacet = await DiamondLoupeFacetFactory.deploy();
     await diamondLoupeFacet.waitForDeployment();
 
-    // 5. Build selectors from factories (safe in ethers v6)
-    // OwnershipFacet selectors
-    const ownershipSelectors = Object.values(OwnershipFacetFactory.interface.fragments)
-      .filter((frag) => frag.type === "function")
-      .map((frag) =>
-        OwnershipFacetFactory.interface.getFunction(frag.format("sighash")).selector
-      );
+    // 5. Build selectors (Simplified)
+    const ownershipSelectors = OwnershipFacetFactory.interface
+      .fragments
+      .filter(FunctionFragment.isFragment)
+      .map(frag => frag.selector);
 
-    // LoupeFacet selectors
-    const loupeSelectors = Object.values(DiamondLoupeFacetFactory.interface.fragments)
-      .filter((frag) => frag.type === "function")
-      .map((frag) =>
-        DiamondLoupeFacetFactory.interface.getFunction(frag.format("sighash")).selector
-      );
+    const loupeSelectors = DiamondLoupeFacetFactory.interface
+      .fragments
+      .filter(FunctionFragment.isFragment)
+      .map(frag => frag.selector);
 
     // 6. Use diamondCut to add facets
     const diamondCut = await ethers.getContractAt("IDiamondCut", await smartSolve.getAddress());
@@ -57,12 +61,12 @@ describe("SmartSolve Diamond", function () {
     const cut = [
       {
         facetAddress: await ownershipFacet.getAddress(),
-        action: 0, // Add
+        action: FacetCutAction.Add, // Use enum for clarity
         functionSelectors: ownershipSelectors,
       },
       {
         facetAddress: await diamondLoupeFacet.getAddress(),
-        action: 0, // Add
+        action: FacetCutAction.Add, // Use enum for clarity
         functionSelectors: loupeSelectors,
       },
     ];
@@ -78,11 +82,24 @@ describe("SmartSolve Diamond", function () {
     await ownerFacet.transferOwnership(other.address);
     expect(await ownerFacet.owner()).to.equal(other.address);
 
-    // 9. Check Loupe facet
+    // 9. Check Loupe facet (Strengthened Assertions)
     const loupe = await ethers.getContractAt("IDiamondLoupe", await smartSolve.getAddress());
     const facetAddresses = await loupe.facetAddresses();
 
-    expect(facetAddresses).to.include(await ownershipFacet.getAddress());
-    expect(facetAddresses).to.include(await diamondLoupeFacet.getAddress());
+    // 10. Check that the array contains exactly the 3 facets we expect
+    expect(facetAddresses).to.have.lengthOf(3);
+
+    const expectedFacetAddrs = [
+      await diamondCutFacet.getAddress(),
+      await ownershipFacet.getAddress(),
+      await diamondLoupeFacet.getAddress(),
+    ];
+
+    expect(
+      facetAddresses.map(a => a.toLowerCase())
+    ).to.have.members(
+      expectedFacetAddrs.map(a => a.toLowerCase())
+    );
+
   });
 });
