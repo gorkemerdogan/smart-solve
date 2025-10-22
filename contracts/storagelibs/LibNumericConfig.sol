@@ -29,7 +29,7 @@ library LibNumericConfig {
     }
 
     // Update epsilon (tolerance) in storage
-    function setEps(int256 eps) external {
+    function setEps(int256 eps) internal {
         cfg().eps = eps;
     }
 
