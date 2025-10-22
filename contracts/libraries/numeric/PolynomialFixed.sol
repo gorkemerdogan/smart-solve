@@ -9,19 +9,18 @@ import { FixedPoint as FP } from "./FixedPoint.sol";
  * coeffs[i] corresponds to coefficient of x^i. All coeffs and x are SD59x18.
  */
 library PolynomialFixed {
-    using FP for int256;
 
     /**
      * Evaluate a polynomial at point x using Horner’s method
      * @param coeffs Array of coefficients, where coeffs[i] is the coefficient of x^i
-     *        Example: for f(x) = 3x^2 + 2x + 5, coeffs = [5, 2, 3]
+     * Example: for f(x) = 3x^2 + 2x + 5, coeffs = [5, 2, 3]
      * @param x The input value at which to evaluate the polynomial
      * @return y The computed value f(x)
      *
      * Horner’s method rewrites the polynomial:
-     *   a_n*x^n + a_{n-1}*x^{n-1} + ... + a_1*x + a_0
+     * a_n*x^n + a_{n-1}*x^{n-1} + ... + a_1*x + a_0
      * into a nested form:
-     *   (((a_n * x + a_{n-1}) * x + a_{n-2}) * x + ...) * x + a_0
+     * (((a_n * x + a_{n-1}) * x + a_{n-2}) * x + ...) * x + a_0
      *
      * This reduces the number of multiplications (more gas-efficient).
      */
@@ -36,8 +35,7 @@ library PolynomialFixed {
 
         // Loop down from the second highest degree (n-1) to the constant term (0)
         for (uint256 i = coeffs.length - 1; i > 0; i--) {
-            // Multiply current result by x and add next coefficient
-            y = y.mul(x).add(coeffs[i - 1]);
+            y = FP.fpAdd(FP.fpMul(y, x), coeffs[i - 1]);
         }
     }
 
@@ -51,8 +49,8 @@ library PolynomialFixed {
      * - Each coefficient is multiplied by its power index i.
      *
      * Example:
-     *   f(x) = 5 + 2x + 3x^2  -> coeffs = [5, 2, 3]
-     *   f’(x) = 2 + 6x        -> derivative = [2, 6]
+     * f(x) = 5 + 2x + 3x^2  -> coeffs = [5, 2, 3]
+     * f’(x) = 2 + 6x        -> derivative = [2, 6]
      */
     function derivative(int256[] memory coeffs) internal pure returns (int256[] memory d) {
         if (coeffs.length <= 1) {
@@ -69,8 +67,7 @@ library PolynomialFixed {
             // Scale the integer 'i' to SD59x18 format
             int256 i_fp = FP.fromInt(i_int);
             
-            // Perform fixed-point multiplication: d[i-1] = coeffs[i] * i
-            d[i - 1] = coeffs[i].mul(i_fp);
+            d[i - 1] = FP.fpMul(coeffs[i], i_fp);
         }
     }
 }
