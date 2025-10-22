@@ -19,10 +19,4 @@ library Scalar {
     function clamp(int256 x, int256 lo, int256 hi) internal pure returns (int256) {
         return x < lo ? lo : (x > hi ? hi : x);
     }
-
-    // Absolute function to return absolute value of a
-    function abs(int256 a) internal pure returns (int256) {
-        // Standard non-fixed-point absolute value
-        return a >= 0 ? a : -a; 
-    }
 }
