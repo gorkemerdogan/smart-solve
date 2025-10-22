@@ -25,7 +25,7 @@ library PolynomialFixed {
      *
      * This reduces the number of multiplications (more gas-efficient).
      */
-    function evaluate(int256[] memory coeffs, int256 x) internal pure returns (int256 y) {
+    function evaluateHorners(int256[] memory coeffs, int256 x) internal pure returns (int256 y) {
         // Handle empty array case
         if (coeffs.length == 0) {
             return 0;
