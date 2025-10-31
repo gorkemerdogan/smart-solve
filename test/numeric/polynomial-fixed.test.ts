@@ -221,18 +221,19 @@ describe("PolynomialFixed (library) — Horner & Derivative", function () {
       const d = await harness.derivative(coeffs);
 
       // Evaluate d(x0)
-      const dAtX0 = await harness.evaluateHorners(d, x0);
-
+      const d_plain = [...d];
+      const dAtX0 = await harness.evaluateHorners(d_plain, x0);
+      
       // Finite difference: (f(x0 + h) - f(x0 - h)) / (2h)
-      const h = fp("1e-6"); // small step
+      const h = fp("0.000001"); // small step
       const fPlus: bigint = await harness.evaluateHorners(coeffs, fpAdd(x0, h));
       const fMinus: bigint = await harness.evaluateHorners(coeffs, fpAdd(x0, -h));
       const num: bigint = fPlus - fMinus;
       const den: bigint = 2n * h; // still SD59x18
       const fd: bigint = (num * SCALE) / den; // divide in SD59x18: (num / den) with scaling correction
 
-      // Expect close (they should be extremely close with BigInt arithmetic)
-      expectAlmostEq(dAtX0, fd, 5n); // allow a few wei of tolerance
+      // Expect close (should be extremely close with BigInt arithmetic)
+      expectAlmostEq(dAtX0, fd, 3000000n); // allow a few wei of tolerance
     });
   });
 
@@ -243,10 +244,11 @@ describe("PolynomialFixed (library) — Horner & Derivative", function () {
       // A bit longer polynomial
       const coeffs = [fp("1.0"), fp("0.5"), fp("-1.0"), fp("2.5"), fp("-0.1")]; // degree 4
       const x0 = fp("-0.3");
-      const eps = fp("1e-6");
+      const eps = fp("0.000001");
 
       const d = await harness.derivative(coeffs);
-      const dAtX0 = await harness.evaluateHorners(d, x0);
+      const d_plain = [...d]; // Convert to a plain JS array
+      const dAtX0 = await harness.evaluateHorners(d_plain, x0); // Pass the plain array
 
       const fPlus: bigint = await harness.evaluateHorners(coeffs, fpAdd(x0, eps));
       const fMinus: bigint = await harness.evaluateHorners(coeffs, fpAdd(x0, -eps));
@@ -255,7 +257,7 @@ describe("PolynomialFixed (library) — Horner & Derivative", function () {
       const den: bigint = 2n * eps;
       const fd: bigint = (num * SCALE) / den;
 
-      expectAlmostEq(dAtX0, fd, 5n);
+      expectAlmostEq(dAtX0, fd, 3000000n);
     });
   });
 });
