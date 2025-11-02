@@ -10,6 +10,7 @@ import { AbdkQuad as Quad } from "./AbdkQuad.sol";
  */
 library Polynomial {
     using Quad for bytes16;
+    bytes16 private constant QZERO = bytes16(0x00000000000000000000000000000000);
 
     /**
      * @notice Evaluate a polynomial at point x using Horner’s method
@@ -70,5 +71,159 @@ library Polynomial {
             // d[i-1] = coeffs[i] * i
             d[i - 1] = coeffs[i].mul(i_quad);
         }
+    }
+
+
+    /**
+    * @notice Polynomial addition: out[i] = a[i] + b[i]
+    * @param a coeffs of first polynomial (bytes16[])
+    * @param b coeffs of second polynomial (bytes16[])
+    */
+    function add(bytes16[] memory a, bytes16[] memory b) internal pure returns (bytes16[] memory out) {
+        if (a.length == 0 && b.length == 0) return _zeroPoly();
+        if (a.length == 0) return b;
+        if (b.length == 0) return a;
+
+        uint256 n = a.length > b.length ? a.length : b.length;
+        out = new bytes16[](n);
+        for (uint256 i = 0; i < n; i++) {
+            bytes16 ai = i < a.length ? a[i] : Quad.fromInt(0);
+            bytes16 bi = i < b.length ? b[i] : Quad.fromInt(0);
+            out[i] = ai.add(bi);
+        }
+        // return trimTrailingZeros(out); // enable if you want canonical form
+    }
+
+    /**
+    * @notice Polynomial subtraction: out[i] = a[i] - b[i]
+    */
+    function sub(bytes16[] memory a, bytes16[] memory b) internal pure returns (bytes16[] memory out) {
+        if (a.length == 0 && b.length == 0) return _zeroPoly();
+        if (a.length == 0) {
+            // 0 - b
+            out = new bytes16[](b.length);
+            for (uint256 i = 0; i < b.length; i++) out[i] = Quad.fromInt(0).sub(b[i]);
+            return out;
+        }
+        if (b.length == 0) return a;
+
+        uint256 n = a.length > b.length ? a.length : b.length;
+        out = new bytes16[](n);
+        for (uint256 i = 0; i < n; i++) {
+            bytes16 ai = i < a.length ? a[i] : Quad.fromInt(0);
+            bytes16 bi = i < b.length ? b[i] : Quad.fromInt(0);
+            out[i] = ai.sub(bi);
+        }
+        // return trimTrailingZeros(out);
+    }
+
+    /**
+    * @notice Scalar multiplication: out[i] = a[i] * k
+    */
+    function mulScalar(bytes16[] memory a, bytes16 k) internal pure returns (bytes16[] memory out) {
+        if (a.length == 0) return _zeroPoly();
+        // If k == 0 => zero polynomial
+        if (_isZero(k)) return _zeroPoly();
+
+        out = new bytes16[](a.length);
+        for (uint256 i = 0; i < a.length; i++) {
+            out[i] = a[i].mul(k);
+        }
+        // return trimTrailingZeros(out);
+    }
+
+    /**
+    * @notice Polynomial convolution: (a * b)
+    * @dev If either is zero, returns [0]
+    */
+    function mul(bytes16[] memory a, bytes16[] memory b) internal pure returns (bytes16[] memory out) {
+        if (a.length == 0 || b.length == 0) return _zeroPoly();
+        // quick zero checks (optional)
+        if (a.length == 1 && _isZero(a[0])) return _zeroPoly();
+        if (b.length == 1 && _isZero(b[0])) return _zeroPoly();
+
+        out = new bytes16[](a.length + b.length - 1);
+        for (uint256 i = 0; i < a.length; i++) {
+            for (uint256 j = 0; j < b.length; j++) {
+                // out[i+j] += a[i]*b[j]
+                bytes16 term = a[i].mul(b[j]);
+                out[i + j] = out[i + j].add(term);
+            }
+        }
+        // return trimTrailingZeros(out);
+    }
+
+    // --- calculus ---
+
+    /**
+    * @notice Indefinite integral with constant C: q'(x)=p(x), q(0)=C
+    * @param a polynomial coefficients a[i] for x^i
+    * @param C constant term for the integral (bytes16)
+    * @return out coefficients for q(x)
+    */
+    function integral(bytes16[] memory a, bytes16 C) internal pure returns (bytes16[] memory out) {
+        if (a.length == 0) {
+            out = new bytes16[](1);
+            out[0] = C;
+            return out;
+        }
+        out = new bytes16[](a.length + 1);
+        out[0] = C;
+        for (uint256 i = 0; i < a.length; i++) {
+            bytes16 denom = Quad.fromInt(int256(i + 1));
+            out[i + 1] = a[i].div(denom);
+        }
+    }
+
+    /**
+    * @notice Extended Horner: compute p(x) and p’(x) in one pass.
+    * @return px = p(x), dpx = p’(x)
+    */
+    function evaluateWithDerivative(bytes16[] memory a, bytes16 x)
+        internal
+        pure
+        returns (bytes16 px, bytes16 dpx)
+    {
+        px = Quad.fromInt(0);
+        dpx = Quad.fromInt(0);
+        if (a.length == 0) return (px, dpx);
+
+        for (uint256 i = a.length; i > 0; i--) {
+            dpx = dpx.mul(x).add(px);
+            px  = px.mul(x).add(a[i - 1]);
+        }
+    }
+
+    // --- Helpers ---
+
+    function _zeroPoly() private pure returns (bytes16[] memory z) {
+        z = new bytes16[](1);
+        z[0] = Quad.fromInt(0);
+    }
+
+    function _isZero(bytes16 c) private pure returns (bool) {
+        // For IEEE-754 quad, exact zero check is ok
+        return c == QZERO;
+    }
+
+    /**
+    * @notice Returns degree (highest i with non-zero coeff); zero poly -> 0
+    */
+    function degree(bytes16[] memory a) internal pure returns (uint256) {
+        if (a.length == 0) return 0;
+        for (uint256 i = a.length; i > 0; i--) {
+            if (!_isZero(a[i - 1])) return i - 1;
+        }
+        return 0;
+    }
+
+    /**
+    * @notice Optionally trim trailing zeros to canonical length.
+    */
+    function trimTrailingZeros(bytes16[] memory a) internal pure returns (bytes16[] memory out) {
+        if (a.length == 0) return _zeroPoly();
+        uint256 deg = degree(a);
+        out = new bytes16[](deg + 1);
+        for (uint256 i = 0; i <= deg; i++) out[i] = a[i];
     }
 }
