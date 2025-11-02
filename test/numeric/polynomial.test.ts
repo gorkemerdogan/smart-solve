@@ -10,22 +10,22 @@ import type { Contract } from "ethers";
 
 // Minimal typing for the methods we call in tests
 // This defines what we expect our test harness contract to have.
-type PolynomialQuadHarness = Contract & {
+type PolynomialHarness = Contract & {
   evaluateHorners(coeffs: string[], x: string): Promise<string>; // bytes16[] and bytes16
   derivative(coeffs: string[]): Promise<string[]>; // bytes16[]
   getAddress(): Promise<string>;
 };
 
 /**
- * Deploys a new instance of the PolynomialQuadHarness contract.
+ * Deploys a new instance of the PolynomialHarness contract.
  * @returns A promise that resolves to the deployed contract instance.
  */
-async function newHarness(): Promise<PolynomialQuadHarness> {
+async function newHarness(): Promise<PolynomialHarness> {
   // Deploy the new, updated test harness
-  const Factory = await ethers.getContractFactory("PolynomialQuadHarness");
+  const Factory = await ethers.getContractFactory("PolynomialHarness");
   const harness = await Factory.deploy();
   await harness.waitForDeployment();
-  return harness as unknown as PolynomialQuadHarness;
+  return harness as unknown as PolynomialHarness;
 }
 
 /**
