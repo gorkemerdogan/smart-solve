@@ -2,24 +2,26 @@
 pragma solidity ^0.8.20;
 
 /**
- * LibNumericConfig
- * Global numeric configuration stored in diamond storage.
- * @dev eps (tolerance) is SD59x18 when using fixed-point. maxIter is a hard cap for loops.
+ * @title LibNumericConfig
+ * @notice Global numeric configuration stored in diamond storage.
+ * @dev eps (tolerance) is bytes16 when using ABDKMathQuad. maxIter is a hard cap for loops.
  */
 library LibNumericConfig {
     // Fixed storage slot for numeric config (unique hash key)
     bytes32 internal constant SLOT = keccak256("smart-solve.numeric.config.v1");
 
-    // Struct holding global numeric configuration values.
-    // - eps: numerical tolerance (e.g., 1e9 meaning 1e-9 in SD59x18 fixed-point)
-    // - maxIter: maximum iterations allowed for loops (e.g., 500)
+    /**
+     * @notice Struct holding global numeric configuration values.
+     * @param eps: numerical tolerance as ABDKMathQuad (bytes16)
+     * @param maxIter: maximum iterations allowed for loops (e.g., 500)
+     */
     struct NumericConfig {
-        int256 eps;
+        bytes16 eps;
         uint256 maxIter;
     }
 
     /**
-     * Returns a pointer to NumericConfig in storage
+     * @notice Returns a pointer to NumericConfig in storage
      * @dev Uses inline assembly to assign SLOT as the storage location.
      * This is the standard EIP-2535 diamond storage pattern.
      */
@@ -28,12 +30,18 @@ library LibNumericConfig {
         assembly { c.slot := position }
     }
 
-    // Update epsilon (tolerance) in storage
-    function setEps(int256 eps) internal {
+    /**
+     * @notice Update epsilon (tolerance) in storage
+     * @param eps The new tolerance value as ABDKMathQuad (bytes16)
+     */
+    function setEps(bytes16 eps) internal {
         cfg().eps = eps;
     }
 
-    // Update maxIter (maximum iteration count) in storage
+    /**
+     * @notice Update maxIter (maximum iteration count) in storage
+     * @param m The new maximum iteration count
+     */
     function setMaxIter(uint256 m) internal {
         cfg().maxIter = m;
     }

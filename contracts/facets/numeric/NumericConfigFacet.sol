@@ -8,9 +8,10 @@ contract NumericConfigFacet {
     /**
      * Set numerical tolerance (eps)
      * Only callable by the contract owner (diamond owner).
-     * Example: eps = 1e9 to represent 1e-9 in SD59x18 fixed-point
+     * @param eps The tolerance value as an ABDKMathQuad (bytes16).
+     * Example: 0x3E2386F26FC0948A0000000000000000 represents 1e-9
      */
-    function setEps(int256 eps) external {
+    function setEps(bytes16 eps) external {
         LibSmartSolve.enforceIsContractOwner();
         LibNumericConfig.setEps(eps);
     }
@@ -23,7 +24,7 @@ contract NumericConfigFacet {
     }
 
     // Get current numerical tolerance (eps)
-    function getEps() external view returns (int256) {
+    function getEps() external view returns (bytes16) {
         return LibNumericConfig.cfg().eps;
     }
 
