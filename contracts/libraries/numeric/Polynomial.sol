@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { AbdkQuad as Quad } from "./AbdkQuad.sol";
+import "abdk-libraries-solidity/ABDKMathQuad.sol";
 
 /**
  * @title Polynomial
@@ -9,13 +9,13 @@ import { AbdkQuad as Quad } from "./AbdkQuad.sol";
  * coeffs[i] corresponds to coefficient of x^i. All coeffs and x are bytes16.
  */
 library Polynomial {
-    using Quad for bytes16;
+    using ABDKMathQuad for bytes16;
     bytes16 private constant QZERO = bytes16(0x00000000000000000000000000000000);
 
     /**
      * @notice Evaluate a polynomial at point x using Horner’s method
      * @param coeffs Array of coefficients, where coeffs[i] is the coefficient of x^i
-     * Example: for f(x) = 3x^2 + 2x + 5, coeffs = [Quad.fromInt(5), Quad.fromInt(2), Quad.fromInt(3)]
+     * Example: for f(x) = 3x^2 + 2x + 5, coeffs = [ABDKMathQuad.fromInt(5), ABDKMathQuad.fromInt(2), ABDKMathQuad.fromInt(3)]
      * @param x The input value (bytes16) at which to evaluate the polynomial
      * @return y The computed value f(x) (bytes16)
      *
@@ -27,7 +27,7 @@ library Polynomial {
     function evaluateHorners(bytes16[] memory coeffs, bytes16 x) internal pure returns (bytes16 y) {
         // Handle empty array case
         if (coeffs.length == 0) {
-            return Quad.fromInt(0); // Return 0 in ABDK bytes16 format
+            return ABDKMathQuad.fromInt(0); // Return 0 in ABDK bytes16 format
         }
 
         // Initialize result 'y' with the highest-degree coefficient
@@ -56,7 +56,7 @@ library Polynomial {
     function derivative(bytes16[] memory coeffs) internal pure returns (bytes16[] memory d) {
         if (coeffs.length <= 1) {
             d = new bytes16[](1);
-            d[0] = Quad.fromInt(0); // Derivative of a constant is 0
+            d[0] = ABDKMathQuad.fromInt(0); // Derivative of a constant is 0
             return d;
         }
 
@@ -66,7 +66,7 @@ library Polynomial {
             int256 i_int = int256(i);
             
             // Convert the integer 'i' to ABDK bytes16 format
-            bytes16 i_quad = Quad.fromInt(i_int);
+            bytes16 i_quad = ABDKMathQuad.fromInt(i_int);
             
             // d[i-1] = coeffs[i] * i
             d[i - 1] = coeffs[i].mul(i_quad);
@@ -87,8 +87,8 @@ library Polynomial {
         uint256 n = a.length > b.length ? a.length : b.length;
         out = new bytes16[](n);
         for (uint256 i = 0; i < n; i++) {
-            bytes16 ai = i < a.length ? a[i] : Quad.fromInt(0);
-            bytes16 bi = i < b.length ? b[i] : Quad.fromInt(0);
+            bytes16 ai = i < a.length ? a[i] : ABDKMathQuad.fromInt(0);
+            bytes16 bi = i < b.length ? b[i] : ABDKMathQuad.fromInt(0);
             out[i] = ai.add(bi);
         }
         // return trimTrailingZeros(out); // enable if you want canonical form
@@ -102,7 +102,7 @@ library Polynomial {
         if (a.length == 0) {
             // 0 - b
             out = new bytes16[](b.length);
-            for (uint256 i = 0; i < b.length; i++) out[i] = Quad.fromInt(0).sub(b[i]);
+            for (uint256 i = 0; i < b.length; i++) out[i] = ABDKMathQuad.fromInt(0).sub(b[i]);
             return out;
         }
         if (b.length == 0) return a;
@@ -110,8 +110,8 @@ library Polynomial {
         uint256 n = a.length > b.length ? a.length : b.length;
         out = new bytes16[](n);
         for (uint256 i = 0; i < n; i++) {
-            bytes16 ai = i < a.length ? a[i] : Quad.fromInt(0);
-            bytes16 bi = i < b.length ? b[i] : Quad.fromInt(0);
+            bytes16 ai = i < a.length ? a[i] : ABDKMathQuad.fromInt(0);
+            bytes16 bi = i < b.length ? b[i] : ABDKMathQuad.fromInt(0);
             out[i] = ai.sub(bi);
         }
         // return trimTrailingZeros(out);
@@ -170,7 +170,7 @@ library Polynomial {
         out = new bytes16[](a.length + 1);
         out[0] = C;
         for (uint256 i = 0; i < a.length; i++) {
-            bytes16 denom = Quad.fromInt(int256(i + 1));
+            bytes16 denom = ABDKMathQuad.fromInt(int256(i + 1));
             out[i + 1] = a[i].div(denom);
         }
     }
@@ -184,8 +184,8 @@ library Polynomial {
         pure
         returns (bytes16 px, bytes16 dpx)
     {
-        px = Quad.fromInt(0);
-        dpx = Quad.fromInt(0);
+        px = ABDKMathQuad.fromInt(0);
+        dpx = ABDKMathQuad.fromInt(0);
         if (a.length == 0) return (px, dpx);
 
         for (uint256 i = a.length; i > 0; i--) {
@@ -198,7 +198,7 @@ library Polynomial {
 
     function _zeroPoly() private pure returns (bytes16[] memory z) {
         z = new bytes16[](1);
-        z[0] = Quad.fromInt(0);
+        z[0] = ABDKMathQuad.fromInt(0);
     }
 
     function _isZero(bytes16 c) private pure returns (bool) {
