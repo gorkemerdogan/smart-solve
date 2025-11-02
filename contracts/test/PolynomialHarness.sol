@@ -5,15 +5,14 @@ import { Polynomial } from "../libraries/numeric/Polynomial.sol";
 
 /**
  * @title PolynomialHarness
- * @notice Minimal harness to expose internal library functions of PolynomialQuad for testing.
+ * @notice Minimal harness to expose internal library functions of Polynomial for testing.
  * The library functions are `internal`, so we wrap them in `public` functions.
+ * All functions are simple passthroughs to the library.
  */
 contract PolynomialHarness {
+
     /**
-     * @notice Evaluate a polynomial at point x via Horner’s method (library passthrough).
-     * @param coeffs Array where coeffs[i] is the coefficient of x^i, in ABDKMathQuad (bytes16).
-     * @param x The input point (bytes16).
-     * @return y The value f(x) (bytes16).
+     * @notice Passthrough for Polynomial.evaluateHorners
      */
     function evaluateHorners(bytes16[] memory coeffs, bytes16 x)
         public
@@ -24,9 +23,64 @@ contract PolynomialHarness {
     }
 
     /**
-     * @notice Compute the derivative polynomial coefficients (library passthrough).
-     * @param coeffs Original polynomial coefficients (bytes16).
-     * @return d Derivative coefficients (bytes16), where d[i] corresponds to x^i.
+     * @notice Passthrough for Polynomial.evaluateWithDerivative
+     */
+    function evaluateWithDerivative(bytes16[] memory a, bytes16 x)
+        public
+        pure
+        returns (bytes16 px, bytes16 dpx)
+    {
+        return Polynomial.evaluateWithDerivative(a, x);
+    }
+
+    /**
+     * @notice Passthrough for Polynomial.add
+     */
+    function add(bytes16[] memory a, bytes16[] memory b)
+        public
+        pure
+        returns (bytes16[] memory out)
+    {
+        return Polynomial.add(a, b);
+    }
+
+    /**
+     * @notice Passthrough for Polynomial.sub
+     */
+    function sub(bytes16[] memory a, bytes16[] memory b)
+        public
+        pure
+        returns (bytes16[] memory out)
+    {
+        return Polynomial.sub(a, b);
+    }
+
+    /**
+     * @notice Passthrough for Polynomial.mulScalar
+     */
+    function mulScalar(bytes16[] memory a, bytes16 k)
+        public
+        pure
+        returns (bytes16[] memory out)
+    {
+        return Polynomial.mulScalar(a, k);
+    }
+
+    /**
+     * @notice Passthrough for Polynomial.mul (convolution)
+     */
+    function mul(bytes16[] memory a, bytes16[] memory b)
+        public
+        pure
+        returns (bytes16[] memory out)
+    {
+        return Polynomial.mul(a, b);
+    }
+
+    // --- CALCULUS ---
+
+    /**
+     * @notice Passthrough for Polynomial.derivative
      */
     function derivative(bytes16[] memory coeffs)
         public
@@ -34,5 +88,36 @@ contract PolynomialHarness {
         returns (bytes16[] memory d)
     {
         return Polynomial.derivative(coeffs);
+    }
+
+    /**
+     * @notice Passthrough for Polynomial.integral
+     */
+    function integral(bytes16[] memory a, bytes16 C)
+        public
+        pure
+        returns (bytes16[] memory out)
+    {
+        return Polynomial.integral(a, C);
+    }
+
+    // --- UTILS ---
+
+    /**
+     * @notice Passthrough for Polynomial.degree
+     */
+    function degree(bytes16[] memory a) public pure returns (uint256) {
+        return Polynomial.degree(a);
+    }
+
+    /**
+     * @notice Passthrough for Polynomial.trimTrailingZeros
+     */
+    function trimTrailingZeros(bytes16[] memory a)
+        public
+        pure
+        returns (bytes16[] memory out)
+    {
+        return Polynomial.trimTrailingZeros(a);
     }
 }
