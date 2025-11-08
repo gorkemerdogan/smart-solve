@@ -5,103 +5,118 @@ import "abdk-libraries-solidity/ABDKMathQuad.sol";
 
 /**
  * @title RootFinding
- * @notice High-precision numerical root-finding algorithms implemented in quadruple precision (bytes16).
- * @dev This library provides pure functional implementations of:
- *      - Bisection method (guaranteed convergence for sign-changing intervals)
- *      - Newton–Raphson method (requires derivative)
- *      - Secant method (derivative-free, uses two initial points)
- *
- * All arithmetic is performed using ABDKMathQuad to achieve IEEE-754 binary128 precision.
- * The library is stateless and suitable for pure/view use in smart contracts or Diamond facets.
+ * @notice High-precision numerical root-finding algorithms (Bisection, Newton, Secant)
+ *         implemented with IEEE-754 binary128 (bytes16) via ABDKMathQuad.
+ * @dev Stateless, pure/parametric library. Facets (or other contracts) should inject
+ *      tolerance (eps) and maxIter from configuration (e.g., LibNumericConfig).
  */
 library RootFinding {
     using ABDKMathQuad for bytes16;
 
-    bytes16 private constant ZERO     = 0x00000000000000000000000000000000; // 0.0
-    bytes16 private constant ONE = 0x3FFF0000000000000000000000000000; // 1.0
-    bytes16 private constant TWO      = 0x40000000000000000000000000000000; // 2.0
-    bytes16 private constant MIN_TOL  = 0x3DAB7349B82000000000000000000000; // ≈1e-15
+    // ---- constants (quad literals) ----
+    bytes16 private constant ZERO = 0x00000000000000000000000000000000; // 0.0
+    bytes16 private constant TWO  = 0x40000000000000000000000000000000; // 2.0
 
-    // ------------------------------------------------------------------------
-    // INTERNAL HELPER
-    // ------------------------------------------------------------------------
+    // ================================================================
+    // Result & internal working-state structs
+    // ================================================================
 
     /**
-     * @notice Evaluates an external function f(x) implemented in another contract.
-     * @dev The external target must expose `f(bytes16) → bytes16`.
-     *
-     * @param target   Address of the target contract exposing f(x)
-     * @param selector Function selector for f(bytes16)
-     * @param x        Evaluation point in ABDK quad precision
-     * @return fx      Evaluated function value f(x)
-     *
-     * Reverts if the call fails or returns a payload not exactly 16 bytes.
+     * @notice Result container for any root-finding algorithm.
+     * @param root       Final root approximation (bytes16)
+     * @param iterations Number of iterations performed
+     * @param converged  True if tolerance satisfied
+     * @param fAtRoot    f(root) at termination
      */
-    function _eval(address target, bytes4 selector, bytes16 x)
-        private
-        view
-        returns (bytes16 fx)
-    {
-        (bool ok, bytes memory ret) = target.staticcall(abi.encodeWithSelector(selector, x));
-        require(ok && ret.length == 16, "f(x) call failed");
-        fx = abi.decode(ret, (bytes16));
+    struct RootResult {
+        bytes16 root;
+        uint256 iterations;
+        bool converged;
+        bytes16 fAtRoot;
     }
 
-    /**
-     * @notice Returns true if `a` is strictly less than `b`.
-     * @dev Uses ABDKMathQuad.cmp(a, b) < 0 for quadruple-precision comparison.
-     * @param a The first operand (bytes16, IEEE-754 quadruple precision)
-     * @param b The second operand (bytes16, IEEE-754 quadruple precision)
-     * @return True if a < b, otherwise false
-     */
-    function _lt(bytes16 a, bytes16 b) private pure returns (bool) { 
+    /// @notice Transient state for Newton–Raphson.
+    struct NewtonState {
+        bytes16 x;     // current iterate
+        bytes16 fx;    // f(x)
+        bytes16 atTol; // active tolerance (max(requested, MIN))
+    }
+
+    /// @notice Working state for Bisection.
+    struct BisectionState {
+        bytes16 left;
+        bytes16 right;
+        bytes16 fa;
+        bytes16 fb;
+        bytes16 mid;
+        bytes16 fm;
+        bytes16 atTol;
+    }
+
+    /// @notice Transient state for Secant.
+    struct SecantState {
+        bytes16 xPrev;
+        bytes16 x;
+        bytes16 fPrev;
+        bytes16 fx;
+        bytes16 atTol;
+    }
+
+    // ================================================================
+    // Internal helpers
+    // ================================================================
+
+    /// @dev f(bytes16) -> bytes16 by staticcall into `target` with selector `sel`.
+    function _eval(address target, bytes4 sel, bytes16 x) private view returns (bytes16 y) {
+        (bool ok, bytes memory data) = target.staticcall(abi.encodeWithSelector(sel, x));
+        require(ok && data.length == 16, "eval failed");
+        assembly { y := mload(add(data, 32)) }
+    }
+
+    /// @dev a < b  (quad compare)
+    function _lt(bytes16 a, bytes16 b) private pure returns (bool) {
         return ABDKMathQuad.cmp(a, b) < 0;
     }
 
-
-    /**
-     * @notice Returns true if `a` is less than or equal to `b`.
-     * @dev Uses ABDKMathQuad.cmp(a, b) ≤ 0 for quadruple-precision comparison.
-     * @param a The first operand (bytes16, IEEE-754 quadruple precision)
-     * @param b The second operand (bytes16, IEEE-754 quadruple precision)
-     * @return True if a <= b, otherwise false
-     */
+    /// @dev a <= b (quad compare)
     function _lte(bytes16 a, bytes16 b) private pure returns (bool) {
         return ABDKMathQuad.cmp(a, b) <= 0;
     }
 
-    /**
-     * @notice Returns the absolute value of `a`.
-     * @dev Uses ABDKMathQuad.abs(a) for quadruple-precision absolute value.
-     * @param a The operand (bytes16, IEEE-754 quadruple precision)
-     * @return Absolute value of `a` as bytes16
-     */
+    /// @dev |a|
     function _abs(bytes16 a) private pure returns (bytes16) {
         return ABDKMathQuad.abs(a);
     }
 
-    // ------------------------------------------------------------------------
-    // BISECTION METHOD
-    // ------------------------------------------------------------------------
+    /// @dev max(a, b)
+    function _max(bytes16 a, bytes16 b) private pure returns (bytes16) {
+        return _lt(a, b) ? b : a;
+    }
+
+    /// @dev true if a == 0 (handles -0 too via cmp)
+    function _isZero(bytes16 a) private pure returns (bool) {
+        return ABDKMathQuad.cmp(a, ZERO) == 0;
+    }
+
+    /// @dev clamp tolerance to at least 1e-15 (in quad), without constants in storage
+    function _clampTol(bytes16 tol) private pure returns (bytes16) {
+        // minTol = 1 / 1e15
+        bytes16 minTol = ABDKMathQuad.fromUInt(1).div(ABDKMathQuad.fromUInt(1_000_000_000_000_000));
+        return _max(tol, minTol);
+    }
+
+    // ================================================================
+    // Bisection (internal)
+    // ================================================================
 
     /**
-     * @notice Computes a root of f(x) within [a, b] using the **Bisection method**.
-     * @dev Guaranteed convergence if f(a) and f(b) have opposite signs and f is continuous.
-     *
-     * Iteratively halves the interval until either:
-     *  - |f(mid)| ≤ tol, or  
-     *  - (b − a)/2 ≤ tol.
-     *
-     * @param target   Address of contract exposing f(bytes16) → bytes16.
-     * @param fSelector Function selector for f.
-     * @param a        Left endpoint of the interval.
-     * @param b        Right endpoint of the interval.
-     * @param tol      Tolerance for convergence (minimum ≈1e-15 enforced).
-     * @param maxIter  Maximum iteration limit.
-     * @return root      Final root approximation midpoint.
-     * @return iterations Number of iterations executed.
-     * @return converged  True if convergence criteria satisfied.
-     * @return fAtRoot    Value f(root) at termination.
+     * @notice Root by Bisection over [a,b] with f(a)*f(b)<0.
+     * @param target   Contract exposing f(bytes16)->bytes16
+     * @param fSelector Selector of f
+     * @param a        Left endpoint
+     * @param b        Right endpoint
+     * @param tol      Requested tolerance (will be clamped to >= 1e-15)
+     * @param maxIter  Iteration cap
      */
     function bisection(
         address target,
@@ -110,71 +125,57 @@ library RootFinding {
         bytes16 b,
         bytes16 tol,
         uint256 maxIter
-    )
-        internal
-        view
-        returns (bytes16 root, uint256 iterations, bool converged, bytes16 fAtRoot)
-    {
-        bytes16 atTol = tol.cmp(MIN_TOL) < 0 ? MIN_TOL : tol;
-        bytes16 fa = _eval(target, fSelector, a);
-        bytes16 fb = _eval(target, fSelector, b);
-        require(_lt(fa.mul(fb), ZERO), "No sign change");
+    ) internal view returns (RootResult memory) {
+        BisectionState memory s;
 
-        bytes16 left = a;
-        bytes16 right = b;
-        bytes16 mid;
-        bytes16 fm;
+        s.atTol = _clampTol(tol);
+        // normalize [left, right]
+        s.left  = _lt(a, b) ? a : b;
+        s.right = _lt(a, b) ? b : a;
+
+        s.fa = _eval(target, fSelector, s.left);
+        s.fb = _eval(target, fSelector, s.right);
+
+        if (_isZero(s.fa)) return RootResult(s.left, 0, true, s.fa);
+        if (_isZero(s.fb)) return RootResult(s.right, 0, true, s.fb);
+
+        // require sign change
+        require(_lt(s.fa.mul(s.fb), ZERO), "No sign change");
+
         uint256 k = 0;
-
         while (k < maxIter) {
-            mid = (left.add(right)).div(TWO);
-            fm = _eval(target, fSelector, mid);
+            s.mid = s.left.add(s.right).div(TWO);
+            s.fm  = _eval(target, fSelector, s.mid);
 
-            // stopping criteria: |f(m)| <= tol  OR  (right - left)/2 <= tol
-            if (_lte(_abs(fm), atTol) || _lte((right.sub(left)).div(TWO), atTol)) {
-                return (mid, k + 1, true, fm);
+            if (_lte(_abs(s.fm), s.atTol) || _lte(s.right.sub(s.left).div(TWO), s.atTol)) {
+                return RootResult(s.mid, k + 1, true, s.fm);
             }
 
-            // choose the subinterval with sign change: f(a)*f(m) < 0
-            if (_lt(fa.mul(fm), ZERO)) {
-                right = mid;
-                fb = fm;
+            if (_lt(s.fa.mul(s.fm), ZERO)) {
+                s.right = s.mid;
+                s.fb = s.fm;
             } else {
-                left = mid;
-                fa = fm;
+                s.left = s.mid;
+                s.fa = s.fm;
             }
             unchecked { ++k; }
         }
-        return (mid, k, false, fm);
+        return RootResult(s.mid, k, false, s.fm);
     }
 
-    // ------------------------------------------------------------------------
-    // NEWTON–RAPHSON METHOD
-    // ------------------------------------------------------------------------
+    // ================================================================
+    // Newton–Raphson (internal)
+    // ================================================================
 
     /**
-     * @notice Approximates a root of f(x) using the **Newton–Raphson iterative method**.
-     * @dev Requires both f(x) and its derivative f′(x).
-     *      Converges quadratically near a simple root with non-zero derivative.
-     *
-     * Iteration formula:
-     *      xₖ₊₁ = xₖ − f(xₖ) / f′(xₖ)
-     *
-     * Terminates when |f(xₖ₊₁)| ≤ tol or |xₖ₊₁ − xₖ| ≤ tol.
-     *
-     * @param target     Address exposing f(bytes16) → bytes16.
-     * @param fSelector  Function selector for f(x).
-     * @param dfTarget   Address exposing f′(bytes16) → bytes16.
-     * @param dfSelector Function selector for f′(x).
-     * @param x0         Initial guess (bytes16).
-     * @param tol        Tolerance for convergence (minimum ≈ 1e-15 enforced).
-     * @param maxIter    Maximum iteration limit.
-     * @return root       Final root approximation.
-     * @return iterations Iteration count.
-     * @return converged  True if tolerance satisfied.
-     * @return fAtRoot    f(root) value at termination.
-     *
-     * @custom:reverts Zero derivative encountered (df = 0).
+     * @notice Root by Newton–Raphson with analytic derivative.
+     * @param target     Contract exposing f(bytes16)->bytes16
+     * @param fSelector  Selector of f
+     * @param dfTarget   Contract exposing f'(bytes16)->bytes16
+     * @param dfSelector Selector of f'
+     * @param x0         Initial guess
+     * @param tol        Requested tolerance (clamped to >= 1e-15)
+     * @param maxIter    Iteration cap
      */
     function newton(
         address target,
@@ -184,64 +185,43 @@ library RootFinding {
         bytes16 x0,
         bytes16 tol,
         uint256 maxIter
-    )
-        internal
-        view
-        returns (bytes16 root, uint256 iterations, bool converged, bytes16 fAtRoot)
-    {
-        bytes16 atTol = tol.cmp(MIN_TOL) < 0 ? MIN_TOL : tol;
-        bytes16 x = x0;
-        bytes16 fx = _eval(target, fSelector, x);
-        if (_lte(_abs(fx), atTol)) {
-            return (x, 0, true, fx);
-        }
+    ) internal view returns (RootResult memory) {
+        NewtonState memory s;
+        s.atTol = _clampTol(tol);
+        s.x = x0;
+        s.fx = _eval(target, fSelector, s.x);
+
+        if (_lte(_abs(s.fx), s.atTol)) return RootResult(s.x, 0, true, s.fx);
 
         uint256 k = 0;
         while (k < maxIter) {
-            bytes16 dfx = _eval(dfTarget, dfSelector, x);
-            require(!dfx.eq(ZERO), "Zero derivative");
-
-            bytes16 xNext = x.sub(fx.div(dfx));
+            bytes16 dfx = _eval(dfTarget, dfSelector, s.x);
+            require(!_isZero(dfx), "Zero derivative");
+            bytes16 xNext = s.x.sub(s.fx.div(dfx));
             bytes16 fxNext = _eval(target, fSelector, xNext);
 
-            if (
-                _lte(_abs(fxNext), atTol) ||
-                _lte(_abs(xNext.sub(x)), atTol)
-            ) {
-                return (xNext, k + 1, true, fxNext);
+            if (_lte(_abs(fxNext), s.atTol) || _lte(_abs(xNext.sub(s.x)), s.atTol)) {
+                return RootResult(xNext, k + 1, true, fxNext);
             }
-
-            x = xNext;
-            fx = fxNext;
+            s.x = xNext;
+            s.fx = fxNext;
             unchecked { ++k; }
         }
-        return (x, k, false, fx);
+        return RootResult(s.x, k, false, s.fx);
     }
 
-    // ------------------------------------------------------------------------
-    // SECANT METHOD
-    // ------------------------------------------------------------------------
+    // ================================================================
+    // Secant (internal)
+    // ================================================================
 
     /**
-     * @notice Approximates a root of f(x) using the **Secant method** (derivative-free).
-     * @dev Uses two initial guesses (x₀, x₁) and approximates the derivative by a secant line.
-     *      Converges super-linearly under smoothness assumptions.
-     *
-     * Update rule:
-     *      xₖ₊₁ = xₖ − f(xₖ) · (xₖ − xₖ₋₁) / (f(xₖ) − f(xₖ₋₁))
-     *
-     * @param target   Address exposing f(bytes16) → bytes16.
-     * @param fSelector Function selector for f.
-     * @param x0       First initial point (bytes16).
-     * @param x1       Second initial point (bytes16).
-     * @param tol      Tolerance for convergence (minimum ≈ 1e-15 enforced).
-     * @param maxIter  Maximum iteration limit.
-     * @return root       Final root approximation.
-     * @return iterations Iteration count.
-     * @return converged  True if tolerance satisfied.
-     * @return fAtRoot    f(root) value at termination.
-     *
-     * @custom:reverts Zero slope encountered (f(xₖ) − f(xₖ₋₁) = 0).
+     * @notice Root by Secant (derivative-free) using two initial points.
+     * @param target   Contract exposing f(bytes16)->bytes16
+     * @param fSelector Selector of f
+     * @param x0       First start
+     * @param x1       Second start
+     * @param tol      Requested tolerance (clamped to >= 1e-15)
+     * @param maxIter  Iteration cap
      */
     function secant(
         address target,
@@ -250,41 +230,32 @@ library RootFinding {
         bytes16 x1,
         bytes16 tol,
         uint256 maxIter
-    )
-        internal
-        view
-        returns (bytes16 root, uint256 iterations, bool converged, bytes16 fAtRoot)
-    {
-        bytes16 atTol = tol.cmp(MIN_TOL) < 0 ? MIN_TOL : tol;
-        bytes16 xPrev = x0;
-        bytes16 x = x1;
-        bytes16 fPrev = _eval(target, fSelector, xPrev);
-        bytes16 fx = _eval(target, fSelector, x);
+    ) internal view returns (RootResult memory) {
+        SecantState memory s;
+        s.atTol  = _clampTol(tol);
+        s.xPrev  = x0;
+        s.x      = x1;
+        s.fPrev  = _eval(target, fSelector, s.xPrev);
+        s.fx     = _eval(target, fSelector, s.x);
 
-        if (_lte(_abs(fx), atTol)) {
-            return (x, 0, true, fx);
-        }
+        if (_lte(_abs(s.fx), s.atTol)) return RootResult(s.x, 0, true, s.fx);
+
         uint256 k = 0;
         while (k < maxIter) {
-            bytes16 denom = fx.sub(fPrev);
-            require(!denom.eq(ZERO), "Zero slope");
-
-            bytes16 xNext = x.sub(fx.mul(x.sub(xPrev)).div(denom));
+            bytes16 denom = s.fx.sub(s.fPrev);
+            require(!_isZero(denom), "Zero slope");
+            bytes16 xNext = s.x.sub( s.fx.mul( s.x.sub(s.xPrev) ).div(denom) );
             bytes16 fxNext = _eval(target, fSelector, xNext);
 
-            if (
-                _lte(_abs(fxNext), atTol) ||
-                _lte(_abs(xNext.sub(x)), atTol)
-            ) {
-                return (xNext, k + 1, true, fxNext);
+            if (_lte(_abs(fxNext), s.atTol) || _lte(_abs(xNext.sub(s.x)), s.atTol)) {
+                return RootResult(xNext, k + 1, true, fxNext);
             }
-
-            xPrev = x;
-            fPrev = fx;
-            x = xNext;
-            fx = fxNext;
+            s.xPrev = s.x;
+            s.fPrev = s.fx;
+            s.x = xNext;
+            s.fx = fxNext;
             unchecked { ++k; }
         }
-        return (x, k, false, fx);
+        return RootResult(s.x, k, false, s.fx);
     }
 }
