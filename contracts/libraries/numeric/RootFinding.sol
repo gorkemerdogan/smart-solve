@@ -2,13 +2,14 @@
 pragma solidity ^0.8.20;
 
 import "abdk-libraries-solidity/ABDKMathQuad.sol";
+import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 
 /**
  * @title RootFinding
  * @notice High-precision numerical root-finding algorithms (Bisection, Newton, Secant)
  *         implemented with IEEE-754 binary128 (bytes16) via ABDKMathQuad.
  * @dev Stateless, pure/parametric library. Facets (or other contracts) should inject
- *      tolerance (eps) and maxIter from configuration (e.g., LibNumericConfig).
+ *      tolerance (tol) and maxIter from configuration (e.g., LibNumericConfig).
  */
 library RootFinding {
     using ABDKMathQuad for bytes16;
@@ -69,8 +70,8 @@ library RootFinding {
     /// @dev f(bytes16) -> bytes16 by staticcall into `target` with selector `sel`.
     function _eval(address target, bytes4 sel, bytes16 x) private view returns (bytes16 y) {
         (bool ok, bytes memory data) = target.staticcall(abi.encodeWithSelector(sel, x));
-        require(ok && data.length == 16, "eval failed");
-        assembly { y := mload(add(data, 32)) }
+        require(ok && data.length == 32, "eval failed");
+        y = abi.decode(data, (bytes16)); // safe decode
     }
 
     /// @dev a < b  (quad compare)
@@ -98,11 +99,17 @@ library RootFinding {
         return ABDKMathQuad.cmp(a, ZERO) == 0;
     }
 
-    /// @dev clamp tolerance to at least 1e-15 (in quad), without constants in storage
-    function _clampTol(bytes16 tol) private pure returns (bytes16) {
-        // minTol = 1 / 1e15
-        bytes16 minTol = ABDKMathQuad.fromUInt(1).div(ABDKMathQuad.fromUInt(1_000_000_000_000_000));
-        return _max(tol, minTol);
+    /// @dev clamp tolerance from storage
+    function _clampTol(bytes16 tol) private view returns (bytes16) {
+        LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
+        bytes16 minTol = cfg.minTol;
+
+        // Fefault fallback if not set on storage
+        if (minTol == bytes16(0)) {
+            minTol = 0x3FC063E11D9235650000000000000000; // 1e-15
+        }
+
+        return ABDKMathQuad.cmp(tol, minTol) < 0 ? minTol : tol;
     }
 
     // ================================================================
