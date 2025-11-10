@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "abdk-libraries-solidity/ABDKMathQuad.sol";
+
 import { RootFinding } from "../../libraries/numeric/RootFinding.sol";
 import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 
@@ -16,13 +18,21 @@ contract RootFindingFacet {
     /// @dev Read config; if missing/zero, apply safe academic defaults.
     function _readCfg() internal view returns (bytes16 eps, uint256 maxIter) {
         LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
+
+        bytes16 minEps = cfg.minEps;
         eps = cfg.eps;
         maxIter = cfg.maxIter;
 
-        // default eps ≈ 1e-12 in quad
-        if (eps == bytes16(0)) {
-            eps = 0x3FC063E11D9235650000000000000000; // 1e-15
+        if (minEps == bytes16(0)) {
+            minEps = 0x3FC063E11D9235650000000000000000; // 1e-15
         }
+
+        if (eps == bytes16(0)) {
+            eps = 0x3FD3C1F07C1F07C1F07C1F07C1F07C20; // 1e-12
+        }
+
+        eps = (ABDKMathQuad.cmp(eps, minEps) < 0) ? minEps : eps; // eps must be at least equal to minEps
+
         if (maxIter == 0) {
             maxIter = 200;
         }
