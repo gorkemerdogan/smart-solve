@@ -13,6 +13,21 @@ import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 contract RootFindingFacet {
     using RootFinding for *;
 
+    /// @dev Read config; if missing/zero, apply safe academic defaults.
+    function _readCfg() internal view returns (bytes16 eps, uint256 maxIter) {
+        LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
+        eps = cfg.eps;
+        maxIter = cfg.maxIter;
+
+        // default eps ≈ 1e-12 in quad
+        if (eps == bytes16(0)) {
+            eps = 0x3FC063E11D9235650000000000000000; // 1e-15
+        }
+        if (maxIter == 0) {
+            maxIter = 200;
+        }
+    }
+
     /**
      * @notice Bisection on [a,b] for target f(x).
      * @param target Address exposing f(bytes16) -> bytes16
@@ -26,8 +41,8 @@ contract RootFindingFacet {
         bytes16 a,
         bytes16 b
     ) external view returns (RootFinding.RootResult memory result) {
-        LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
-        return RootFinding.bisection(target, fSelector, a, b, cfg.eps, cfg.maxIter);
+        (bytes16 eps, uint256 maxIter) = _readCfg();
+        return RootFinding.bisection(target, fSelector, a, b, eps, maxIter);
     }
 
     /**
@@ -45,8 +60,8 @@ contract RootFindingFacet {
         bytes4 dfSelector,
         bytes16 x0
     ) external view returns (RootFinding.RootResult memory result) {
-        LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
-        return RootFinding.newton(target, fSelector, dfTarget, dfSelector, x0, cfg.eps, cfg.maxIter);
+        (bytes16 eps, uint256 maxIter) = _readCfg();
+        return RootFinding.newton(target, fSelector, dfTarget, dfSelector, x0, eps, maxIter);
     }
 
     /**
@@ -62,7 +77,7 @@ contract RootFindingFacet {
         bytes16 x0,
         bytes16 x1
     ) external view returns (RootFinding.RootResult memory result) {
-        LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
-        return RootFinding.secant(target, fSelector, x0, x1, cfg.eps, cfg.maxIter);
+        (bytes16 eps, uint256 maxIter) = _readCfg();
+        return RootFinding.secant(target, fSelector, x0, x1, eps, maxIter);
     }
 }
