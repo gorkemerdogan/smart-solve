@@ -6,14 +6,14 @@ import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 
 contract NumericConfigFacet {
     /**
-     * Set numerical tolerance (eps)
+     * Set numerical tolerance (tol)
      * Only callable by the contract owner (diamond owner).
-     * @param eps The tolerance value as an ABDKMathQuad (bytes16).
+     * @param tol The tolerance value as an ABDKMathQuad (bytes16).
      * Example: 0x3E2386F26FC0948A0000000000000000 represents 1e-9
      */
-    function setEps(bytes16 eps) external {
+    function setTol(bytes16 tol) external {
         LibSmartSolve.enforceIsContractOwner();
-        LibNumericConfig.setEps(eps);
+        LibNumericConfig.setTol(tol);
     }
 
     // Set maximum iterations for algorithms
@@ -23,9 +23,9 @@ contract NumericConfigFacet {
         LibNumericConfig.setMaxIter(m);
     }
 
-    // Get current numerical tolerance (eps)
-    function getEps() external view returns (bytes16) {
-        return LibNumericConfig.cfg().eps;
+    // Get current numerical tolerance (tol)
+    function getTol() external view returns (bytes16) {
+        return LibNumericConfig.cfg().tol;
     }
 
     // Get current maximum iteration count

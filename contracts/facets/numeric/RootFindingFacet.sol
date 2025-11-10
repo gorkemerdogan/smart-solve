@@ -9,29 +9,29 @@ import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 /**
  * @title RootFindingFacet
  * @notice Diamond facet exposing high-precision root-finding (bytes16 ABDK).
- * @dev Thin ABI layer: pulls eps/maxIter from LibNumericConfig and forwards
+ * @dev Thin ABI layer: pulls tol/maxIter from LibNumericConfig and forwards
  *     to the pure RootFinding library. Returns RootFinding.RootResult.
  */
 contract RootFindingFacet {
     using RootFinding for *;
 
     /// @dev Read config; if missing/zero, apply safe academic defaults.
-    function _readCfg() internal view returns (bytes16 eps, uint256 maxIter) {
+    function _readCfg() internal view returns (bytes16 tol, uint256 maxIter) {
         LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
 
-        bytes16 minEps = cfg.minEps;
-        eps = cfg.eps;
+        bytes16 minTol = cfg.minTol;
+        tol = cfg.tol;
         maxIter = cfg.maxIter;
 
-        if (minEps == bytes16(0)) {
-            minEps = 0x3FC063E11D9235650000000000000000; // 1e-15
+        if (minTol == bytes16(0)) {
+            minTol = 0x3FC063E11D9235650000000000000000; // 1e-15
         }
 
-        if (eps == bytes16(0)) {
-            eps = 0x3FD3C1F07C1F07C1F07C1F07C1F07C20; // 1e-12
+        if (tol == bytes16(0)) {
+            tol = 0x3FD3C1F07C1F07C1F07C1F07C1F07C20; // 1e-12
         }
 
-        eps = (ABDKMathQuad.cmp(eps, minEps) < 0) ? minEps : eps; // eps must be at least equal to minEps
+        tol = (ABDKMathQuad.cmp(tol, minTol) < 0) ? minTol : tol; // tol must be at least equal to minTol
 
         if (maxIter == 0) {
             maxIter = 200;
@@ -51,8 +51,8 @@ contract RootFindingFacet {
         bytes16 a,
         bytes16 b
     ) external view returns (RootFinding.RootResult memory result) {
-        (bytes16 eps, uint256 maxIter) = _readCfg();
-        return RootFinding.bisection(target, fSelector, a, b, eps, maxIter);
+        (bytes16 tol, uint256 maxIter) = _readCfg();
+        return RootFinding.bisection(target, fSelector, a, b, tol, maxIter);
     }
 
     /**
@@ -70,8 +70,8 @@ contract RootFindingFacet {
         bytes4 dfSelector,
         bytes16 x0
     ) external view returns (RootFinding.RootResult memory result) {
-        (bytes16 eps, uint256 maxIter) = _readCfg();
-        return RootFinding.newton(target, fSelector, dfTarget, dfSelector, x0, eps, maxIter);
+        (bytes16 tol, uint256 maxIter) = _readCfg();
+        return RootFinding.newton(target, fSelector, dfTarget, dfSelector, x0, tol, maxIter);
     }
 
     /**
@@ -87,7 +87,7 @@ contract RootFindingFacet {
         bytes16 x0,
         bytes16 x1
     ) external view returns (RootFinding.RootResult memory result) {
-        (bytes16 eps, uint256 maxIter) = _readCfg();
-        return RootFinding.secant(target, fSelector, x0, x1, eps, maxIter);
+        (bytes16 tol, uint256 maxIter) = _readCfg();
+        return RootFinding.secant(target, fSelector, x0, x1, tol, maxIter);
     }
 }

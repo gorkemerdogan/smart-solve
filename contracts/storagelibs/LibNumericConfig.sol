@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 /**
  * @title LibNumericConfig
  * @notice Global numeric configuration stored in diamond storage.
- * @dev eps (tolerance) is bytes16 when using ABDKMathQuad. maxIter is a hard cap for loops.
+ * @dev tol (tolerance) and minTol (min tolerance) is bytes16 when using ABDKMathQuad. maxIter is a hard cap for loops.
  */
 library LibNumericConfig {
     // Fixed storage slot for numeric config (unique hash key)
@@ -12,11 +12,13 @@ library LibNumericConfig {
 
     /**
      * @notice Struct holding global numeric configuration values.
-     * @param eps: numerical tolerance as ABDKMathQuad (bytes16)
+     * @param tol: numerical tolerance as ABDKMathQuad (bytes16)
+     * @param minTol: numerical minimum tolerance as ABDKMathQuad (bytes16)
      * @param maxIter: maximum iterations allowed for loops (e.g., 500)
      */
     struct NumericConfig {
-        bytes16 eps;
+        bytes16 tol;
+        bytes16 minTol;
         uint256 maxIter;
     }
 
@@ -30,12 +32,22 @@ library LibNumericConfig {
         assembly { c.slot := position }
     }
 
+    /// Setters
+
     /**
-     * @notice Update epsilon (tolerance) in storage
-     * @param eps The new tolerance value as ABDKMathQuad (bytes16)
+     * @notice Update min tolilon (tolerance) in storage
+     * @param minTol The new min tolerance value as ABDKMathQuad (bytes16)
      */
-    function setEps(bytes16 eps) internal {
-        cfg().eps = eps;
+    function setminTol(bytes16 minTol) internal {
+        cfg().minTol = minTol;
+    }
+
+    /**
+     * @notice Update tolilon (tolerance) in storage
+     * @param tol The new tolerance value as ABDKMathQuad (bytes16)
+     */
+    function setTol(bytes16 tol) internal {
+        cfg().tol = tol;
     }
 
     /**
@@ -44,5 +56,19 @@ library LibNumericConfig {
      */
     function setMaxIter(uint256 m) internal {
         cfg().maxIter = m;
+    }
+
+    /// Getters
+
+    function getTol() internal view returns (bytes16) {
+    return cfg().tol;
+    }
+
+    function getminTol() internal view returns (bytes16) {
+        return cfg().minTol;
+    }
+
+    function getMaxIter() internal view returns (uint256) {
+        return cfg().maxIter;
     }
 }
