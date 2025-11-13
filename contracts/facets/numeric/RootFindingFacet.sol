@@ -45,7 +45,7 @@ contract RootFindingFacet {
      * @param a Left endpoint
      * @param b Right endpoint
      */
-    function bisection(
+    function rootFindingBisection(
         address target,
         bytes4 fSelector,
         bytes16 a,
@@ -63,7 +63,7 @@ contract RootFindingFacet {
      * @param dfSelector Function selector for f'
      * @param x0 Initial guess
      */
-    function newton(
+    function rootFindingNewton(
         address target,
         bytes4 fSelector,
         address dfTarget,
@@ -81,7 +81,7 @@ contract RootFindingFacet {
      * @param x0 First starting point
      * @param x1 Second starting point
      */
-    function secant(
+    function rootFindingSecant(
         address target,
         bytes4 fSelector,
         bytes16 x0,
