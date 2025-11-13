@@ -5,6 +5,7 @@ import "abdk-libraries-solidity/ABDKMathQuad.sol";
 
 import { RootFinding } from "../../libraries/numeric/RootFinding.sol";
 import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
+import { QuadConstants } from "../../libraries/QuadConstants.sol";
 
 /**
  * @title RootFindingFacet
@@ -24,11 +25,11 @@ contract RootFindingFacet {
         maxIter = cfg.maxIter;
 
         if (minTol == bytes16(0)) {
-            minTol = 0x3FC063E11D9235650000000000000000; // 1e-15
+            minTol = QuadConstants.EPS_1e15();
         }
 
         if (tol == bytes16(0)) {
-            tol = 0x3FD3C1F07C1F07C1F07C1F07C1F07C20; // 1e-12
+            tol = QuadConstants.EPS_1e12();
         }
 
         tol = (ABDKMathQuad.cmp(tol, minTol) < 0) ? minTol : tol; // tol must be at least equal to minTol
