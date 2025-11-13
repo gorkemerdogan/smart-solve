@@ -32,44 +32,44 @@ library Trigonometric {
     // sin coefficients (degree 16, odd symmetry baked in)
     function _sinCoeffs() private pure returns (bytes16[17] memory c) {
         c[0]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=0
-        c[1]  = bytes16(uint128(0x3FFEFFFFFFFFFFFFFFFFFFFFFFFD2F9A)); // k=1
+        c[1]  = bytes16(uint128(0x3FFE921FB54442D18469898CC51701B8)); // k=1
         c[2]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=2
-        c[3]  = bytes16(uint128(0xBFFA55555555555555555541BEC6A4));   // k=3
+        c[3]  = bytes16(uint128(0xBFF86E631833959E653F74FE3A7156F3)); // k=3
         c[4]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=4
-        c[5]  = bytes16(uint128(0x3FF811111111111111110EF3D51F7A));   // k=5
+        c[5]  = bytes16(uint128(0x3FF16B58F1070F3A56C2E2A19151B1D1)); // k=5
         c[6]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=6
-        c[7]  = bytes16(uint128(0xBFF2A01A01A01A01A01876B15FC40F));   // k=7
+        c[7]  = bytes16(uint128(0xBFE99B0B7F8000A917631112D8570E1B)); // k=7
         c[8]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=8
-        c[9]  = bytes16(uint128(0x3FEF5D3C7C4DA3E28BA6412A8220F7));   // k=9
+        c[9]  = bytes16(uint128(0x3FE13AB6666133C3A39A2534C15B06C1)); // k=9
         c[10] = bytes16(uint128(0x00000000000000000000000000000000)); // k=10
-        c[11] = bytes16(uint128(0xBFE75D6E03EA3A54C728FDAACB42E5));   // k=11
+        c[11] = bytes16(uint128(0xBFDA1F606660143899C5DE8A666A0C21)); // k=11
         c[12] = bytes16(uint128(0x00000000000000000000000000000000)); // k=12
-        c[13] = bytes16(uint128(0x3FE3A527D8E5FFEB6F7C654E56E8C2));   // k=13
+        c[13] = bytes16(uint128(0x3FD29B072CB07536AA8C8B56BC79C075)); // k=13
         c[14] = bytes16(uint128(0x00000000000000000000000000000000)); // k=14
-        c[15] = bytes16(uint128(0xBFE0F8594E49C3E845D4A0341AC8AB));   // k=15
-        c[16] = bytes16(uint128(0x00000000000000000000000000000000)); // k=16 (≈0)
+        c[15] = bytes16(uint128(0xBFC21D15509740000A13083B8D838A60)); // k=15
+        c[16] = bytes16(uint128(0x00000000000000000000000000000000)); // k=16
         return c;
     }
 
     // cos coefficients (degree 16, even symmetry)
     function _cosCoeffs() private pure returns (bytes16[17] memory c) {
-        c[0]  = bytes16(uint128(0x3FFF0000000000000000000000000000)); // k=0
-        c[1]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=1
-        c[2]  = bytes16(uint128(0xBFFD0000000000000000000000000000)); // k=2
+        c[0]  = bytes16(uint128(0x3FFE22F8B681333D5B94686A30250785)); // k=0
+        c[1_1] = bytes16(uint128(0x00000000000000000000000000000000)); // k=1
+        c[2]  = bytes16(uint128(0xBFFC6E427F2D79482A0C22B0054F6A7A)); // k=2
         c[3]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=3
-        c[4]  = bytes16(uint128(0x3FF5555555555555555555552C4484));   // k=4
+        c[4]  = bytes16(uint128(0x3FF393A6404113D573752A161645E010)); // k=4
         c[5]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=5
-        c[6]  = bytes16(uint128(0xBFEFA01A01A01A01A01A006B13F94A));   // k=6
+        c[6]  = bytes16(uint128(0xBFECBC0312699FE1DE0D6804538D4351)); // k=6
         c[7]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=7
-        c[8]  = bytes16(uint128(0x3FEA79435E50D63EA03D0813AF162D));   // k=8
+        c[8]  = bytes16(uint128(0x3FE532FBA7C280783344A000A254243C)); // k=8
         c[9]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=9
-        c[10] = bytes16(uint128(0xBFE51B0792BD7C43E78A6B02E395AE));   // k=10
+        c[10] = bytes16(uint128(0xBFE0B40316E4E2C838A561C1D183606A)); // k=10
         c[11] = bytes16(uint128(0x00000000000000000000000000000000)); // k=11
-        c[12] = bytes16(uint128(0x3FE18F5C28F5C28F5C2B1297B40218));   // k=12
+        c[12] = bytes16(uint128(0x3FDB15655D1D70B51A613F58F1A3A358)); // k=12
         c[13] = bytes16(uint128(0x00000000000000000000000000000000)); // k=13
-        c[14] = bytes16(uint128(0xBFDE06F0AA31F2F4B1DB32B3AF78FB));   // k=14
+        c[14] = bytes16(uint128(0xBFD6A1E976938954316C0E10515C8E58)); // k=14
         c[15] = bytes16(uint128(0x00000000000000000000000000000000)); // k=15
-        c[16] = bytes16(uint128(0x3FDBB6FB601EC0C040C0A29DD89294));   // k=16
+        c[16] = bytes16(uint128(0x3FD27891D88327F000109C48A739C19E)); // k=16
         return c;
     }
 
