@@ -14,7 +14,7 @@ import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
  *  - The integrand is provided as (target, selector): f(bytes16) -> bytes16.
  *  - This facet reuses LibNumericConfig.maxIter as the default number of
  *    sub-intervals n for all rules.
- *  - LibNumericConfig.tol / minTol are not used by the fixed-grid rules yet,
+ *  - TODO: LibNumericConfig.tol / minTol are not used by the fixed-grid rules yet,
  *    but kept in storage for future adaptive schemes.
  *
  *  For each rule exposed two variants:
@@ -95,7 +95,6 @@ contract IntegrationFacet {
 
     /**
      * @notice Simpson’s 1/3 rule using n from LibNumericConfig.maxIter.
-     * @dev n must be even; Integration.simpson13 is expected to revert if not.
      */
     function integrateSimpson13(
         address target,
