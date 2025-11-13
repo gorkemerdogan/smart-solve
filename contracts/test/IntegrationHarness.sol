@@ -2,7 +2,9 @@
 pragma solidity ^0.8.20;
 
 import { ABDKMathQuad as Q } from "abdk-libraries-solidity/ABDKMathQuad.sol";
-import { Integration } from "../libraries/numeric/Integration.sol"; 
+import { Trigonometric } from "../libraries/Trigonometric.sol";
+import { QuadConstants as QC } from "../libraries/QuadConstants.sol";
+import { Integration } from "../libraries/numeric/Integration.sol";
 
 /**
  * @title IntegrationHarness
@@ -47,11 +49,7 @@ contract IntegrationHarness {
 
     /// @notice |a - b| in quad
     function absDiff(bytes16 a, bytes16 b) external pure returns (bytes16) {
-        if (Q.cmp(a, b) >= 0) {
-            return a.sub(b);
-        } else {
-            return b.sub(a);
-        }
+        return a.sub(b).abs();
     }
 
     // ---------- Integrand functions f(x) ----------
@@ -84,6 +82,54 @@ contract IntegrationHarness {
     /// Always reverts – to test that a==b short-circuits before calling f
     function f_revert(bytes16 /*x*/) external pure returns (bytes16) {
         revert("f_revert called");
+    }
+
+        /// f(x) = 5
+    function f_const5(bytes16 /*x*/) external pure returns (bytes16) {
+        return Q.fromInt(5);
+    }
+
+    /// f(x) = sin(x)
+    function f_sin(bytes16 x) external pure returns (bytes16) {
+        return Trigonometric.sin(x);
+    }
+
+    /// f(x) = 1/x
+    function f_inv(bytes16 x) external pure returns (bytes16) {
+        return Q.fromInt(1).div(x);
+    }
+
+    /// f(x) = 1e-30 * x
+    function f_tiny(bytes16 x) external pure returns (bytes16) {
+        bytes16 scale = Q.fromUInt(1).div(Q.fromUInt(10**30));
+        return x.mul(scale);
+    }
+
+    /// f(x) = 1e20 * x
+    function f_large(bytes16 x) external pure returns (bytes16) {
+        bytes16 scale = Q.fromUInt(10**20);
+        return x.mul(scale);
+    }
+
+    /// f(x) = piecewise:
+    /// [0,1]: f=1
+    /// [1,2]: f=3
+    function f_piecewise(bytes16 x) external pure returns (bytes16) {
+        bytes16 one = Q.fromInt(1);
+        bytes16 two = Q.fromInt(2);
+
+        if (Q.cmp(x, one) <= 0) {
+            return Q.fromInt(1);
+        } else if (Q.cmp(x, two) <= 0) {
+            return Q.fromInt(3);
+        } else {
+            revert("piecewise domain");
+        }
+    }
+
+    /// π constant
+    function PI() external pure returns (bytes16) {
+        return QC.PI;
     }
 
     // ---------- Wrappers around Integration library ----------
