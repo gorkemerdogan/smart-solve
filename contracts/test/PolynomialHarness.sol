@@ -82,7 +82,10 @@ contract PolynomialHarness {
         return Q.fromInt(num).div(Q.fromInt(den));
     }
 
-    /// @notice Human-readable decimal string for a quad (for logging or report printing)
+    /**
+     * @notice Returns the raw hexadecimal string for a quad (e.g. "0x...")
+     * @dev Useful for logging and debugging in test suites.
+     */
     function qToString(bytes16 x) public pure returns (string memory) {
         bytes memory b = abi.encodePacked(x);
         bytes memory hexChars = "0123456789abcdef";
