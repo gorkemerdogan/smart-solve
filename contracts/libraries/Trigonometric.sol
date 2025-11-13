@@ -92,12 +92,9 @@ library Trigonometric {
     // Chebyshev evaluator: ∑ c[k] T_k(z), z ∈ [-1, 1]
     // using Clenshaw recurrence.
     // ------------------------------------------------------------
-    function _cheby(bytes16 z, bytes16[17] memory c)
-        private
-        pure
-        returns (bytes16)
-    {
-        bytes16 b_kplus1 = QZERO;
+    function _cheby(bytes16 z, bytes16[17] memory c) private pure returns (bytes16) {
+        
+        bytes16 b_kplus1 = QZERO; 
         bytes16 b_kplus2 = QZERO;
 
         for (int256 k = 16; k >= 0; k--) {
