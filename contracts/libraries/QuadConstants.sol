@@ -34,40 +34,6 @@ library QuadConstants {
         return n.div(d);
     }
 
-    // -------------------------------------------------------------
-    // BASIC NUMERIC CONSTANTS
-    // -------------------------------------------------------------
-
-    /// @return 0.0 as quad
-    function ZERO() internal pure returns (bytes16) {
-        return ABDKMathQuad.fromInt(0);
-    }
-
-    /// @return 1.0 as quad
-    function ONE() internal pure returns (bytes16) {
-        return ABDKMathQuad.fromInt(1);
-    }
-
-    /// @return -1.0 as quad
-    function MONE() internal pure returns (bytes16) {
-        return ABDKMathQuad.fromInt(-1);
-    }
-
-    /// @return 2.0 as quad
-    function TWO() internal pure returns (bytes16) {
-        return ABDKMathQuad.fromInt(2);
-    }
-
-    /// @return 3.0 as quad
-    function THREE() internal pure returns (bytes16) {
-        return ABDKMathQuad.fromInt(3);
-    }
-
-    /// @return 4.0 as quad
-    function FOUR() internal pure returns (bytes16) {
-        return ABDKMathQuad.fromInt(4);
-    }
-
     /// @return 0.5 as quad
     function HALF() internal pure returns (bytes16) {
         // 1 / 2
@@ -88,12 +54,12 @@ library QuadConstants {
 
     /// @return π/2
     function HALF_PI() internal pure returns (bytes16) {
-        return PI().div(TWO());
+        return PI().div(ABDKMathQuad.fromInt(2));
     }
 
     /// @return 2π
     function TWO_PI() internal pure returns (bytes16) {
-        return PI().mul(TWO());
+        return PI().mul(ABDKMathQuad.fromInt(2));
     }
 
     /// @return π/4
