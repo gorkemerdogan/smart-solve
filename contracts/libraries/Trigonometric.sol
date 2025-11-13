@@ -77,13 +77,13 @@ library Trigonometric {
     // ------------------------------------------------------------
     function _reduce(bytes16 x) private pure returns (bytes16 t, uint256 q) {
         // k = round( x / (π/2) )
-        bytes16 kf = x.div(QC.HALF_PI);
+        bytes16 kf = x.div(QC.HALF_PI());
         int256 k = _roundNearest(kf);
 
         q = uint256(k) & 3; // quadrant in [0,3]
 
         // t = x - k * (π/2)
-        bytes16 kHalfPi = QC.HALF_PI.mul(Q.fromInt(k));
+        bytes16 kHalfPi = QC.HALF_PI().mul(Q.fromInt(k));
         t = x.sub(kHalfPi);
     }
 
@@ -118,7 +118,7 @@ library Trigonometric {
     function sin(bytes16 x) internal pure returns (bytes16) {
         (bytes16 t, uint256 q) = _reduce(x);
         // Map t ∈ [-π/2, π/2] → z ∈ [-1, 1]
-        bytes16 z = t.mul(Q.fromInt(2)).div(QC.PI);
+        bytes16 z = t.mul(Q.fromInt(2)).div(QC.PI());
 
         if (q == 0) {
             // region near 0 → sin(x) = sin(t)
@@ -146,7 +146,7 @@ library Trigonometric {
     // ------------------------------------------------------------
     function cos(bytes16 x) internal pure returns (bytes16) {
         (bytes16 t, uint256 q) = _reduce(x);
-        bytes16 z = t.mul(Q.fromInt(2)).div(QC.PI);
+        bytes16 z = t.mul(Q.fromInt(2)).div(QC.PI());
 
         // Approximate cos(t) on [-π/2, π/2]
         bytes16[17] memory cCos = _cosCoeffs();
@@ -177,7 +177,7 @@ library Trigonometric {
 function tan(bytes16 x) internal pure returns (bytes16) {
         (bytes16 t, uint256 q) = _reduce(x);
         // Map t ∈ [-π/2, π/2] → z ∈ [-1, 1]
-        bytes16 z = t.mul(Q.fromInt(2)).div(QC.PI);
+        bytes16 z = t.mul(Q.fromInt(2)).div(QC.PI());
 
         // Get both approximations
         bytes16 s = _cheby(z, _sinCoeffs());
@@ -199,7 +199,7 @@ function tan(bytes16 x) internal pure returns (bytes16) {
     function cot(bytes16 x) internal pure returns (bytes16) {
         (bytes16 t, uint256 q) = _reduce(x);
         // Map t ∈ [-π/2, π/2] → z ∈ [-1, 1]
-        bytes16 z = t.mul(Q.fromInt(2)).div(QC.PI);
+        bytes16 z = t.mul(Q.fromInt(2)).div(QC.PI());
 
         // Get both approximations
         bytes16 s = _cheby(z, _sinCoeffs());
@@ -255,7 +255,7 @@ function tan(bytes16 x) internal pure returns (bytes16) {
         approx = approx.sub(t.sub(x).div(sec2));
 
         if (flip) {
-            approx = QC.HALF_PI.sub(approx);
+            approx = QC.HALF_PI().sub(approx);
         }
         if (neg) {
             approx = approx.neg();
@@ -275,8 +275,8 @@ function tan(bytes16 x) internal pure returns (bytes16) {
         );
 
         if (Q.cmp(x, QZERO) == 0) return QZERO;
-        if (Q.cmp(x, Q.fromInt(1)) == 0) return QC.HALF_PI;
-        if (Q.cmp(x, Q.fromInt(-1)) == 0) return QC.HALF_PI.neg();
+        if (Q.cmp(x, Q.fromInt(1)) == 0) return QC.HALF_PI();
+        if (Q.cmp(x, Q.fromInt(-1)) == 0) return QC.HALF_PI().neg();
 
         // asin(x) = atan( x / sqrt(1 - x²) )
         bytes16 oneMinus = Q.fromInt(1).sub(x.mul(x));
@@ -287,7 +287,7 @@ function tan(bytes16 x) internal pure returns (bytes16) {
     }
 
     function acos(bytes16 x) internal pure returns (bytes16) {
-        return QC.HALF_PI.sub(asin(x));
+        return QC.HALF_PI().sub(asin(x));
     }
 
     // ------------------------------------------------------------
@@ -324,7 +324,7 @@ function tan(bytes16 x) internal pure returns (bytes16) {
             diff = diff.neg();
         }
 
-        if (Q.cmp(diff, QC.HALF) >= 0) {
+        if (Q.cmp(diff, QC.HALF()) >= 0) {
             // round away from zero
             if (t >= 0) return t + 1;
             return t - 1;

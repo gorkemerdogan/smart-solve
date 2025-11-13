@@ -129,7 +129,7 @@ contract IntegrationHarness {
 
     /// π constant
     function PI() external pure returns (bytes16) {
-        return QC.PI;
+        return QC.PI();
     }
 
     // ---------- Wrappers around Integration library ----------
