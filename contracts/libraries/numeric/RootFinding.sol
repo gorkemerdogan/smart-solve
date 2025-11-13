@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "abdk-libraries-solidity/ABDKMathQuad.sol";
 import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
-import { QuadConstants } from "./QuadConstants.sol";
+import { QuadConstants } from "../QuadConstants.sol";
 
 /**
  * @title RootFinding
