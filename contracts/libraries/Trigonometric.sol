@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import { ABDKMathQuad as Q } from "abdk-libraries-solidity/ABDKMathQuad.sol";
 import { QuadConstants as QC } from "./QuadConstants.sol";
+import { Scalar } from "./numeric/Scalar.sol";
 
 /**
  * @title Trigonometric
@@ -268,6 +269,12 @@ function tan(bytes16 x) internal pure returns (bytes16) {
     // asin / acos
     // ------------------------------------------------------------
     function asin(bytes16 x) internal pure returns (bytes16) {
+        bytes16 one = Q.fromInt(1);
+        bytes16 mOne = Q.fromInt(-1);
+
+        // Handle precision errors from cos()
+        x = Scalar.clamp(x, mOne, one);
+
         // Domain check: x ∈ [-1, 1]
         require(
             Q.cmp(x, Q.fromInt(1)) <= 0 && Q.cmp(x, Q.fromInt(-1)) >= 0,
