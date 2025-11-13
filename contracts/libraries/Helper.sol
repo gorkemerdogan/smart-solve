@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "abdk-libraries-solidity/ABDKMathQuad.sol";
+import { Scalar } from "./numeric/Scalar.sol";
 
 /**
  * Helper
@@ -23,8 +24,8 @@ library Helper {
         bytes16 diff = a.sub(b).abs();
 
         // Standard check for most cases
-        bytes16 largest = a.abs().max(b.abs());
-        bytes16 tolerance = absTol.max(largest.mul(relTol));
+        bytes16 largest = Scalar.max(a.abs(), b.abs());
+        bytes16 tolerance = Scalar.max(absTol, largest.mul(relTol));
 
         return ABDKMathQuad.cmp(diff, tolerance) <= 0;
     }
