@@ -47,28 +47,14 @@ describe("Trigonometric Library Complete Test Suite", function () {
     await harness.waitForDeployment();
 
     // Basic constants
-    q.ZERO = await harness.ZERO();
+    q.ZERO = await harness.qFromInt(0);
     q.ONE = await harness.qFromInt(1);
     q.MONE = await harness.qFromInt(-1);
 
-    // π, π/2, 2π (all within Number.MAX_SAFE_INTEGER)
-    q.PI = await harness.qFromFrac(
-      Number(3141592653589793n),
-      Number(1000000000000000n)
-    ); // ≈ 3.141592653589793
-
-    q.HALF_PI = await harness.qFromFrac(
-      Number(1570796326794896n),
-      Number(1000000000000000n)
-    ); // ≈ π/2
-
-    q.TWO_PI = await harness.qFromFrac(
-      Number(6283185307179586n),
-      Number(1000000000000000n)
-    ); // ≈ 2π
-
-    // tolerance = 1e-12
-    TOL = await harness.qFromFrac(1, 1_000_000_000_000);
+    q.PI = await harness.PI();
+    q.HALF_PI = await harness.HALF_PI();
+    q.TWO_PI = await harness.TWO_PI();
+    TOL = await harness.DEFAULT_TOL();
   });
 
   // Helper for |a-b| <= tolerance
@@ -217,14 +203,14 @@ describe("Trigonometric Library Complete Test Suite", function () {
   // 12. tan(pi/2) should revert
   // ---------------------------------------------------------------
   it("12. tan(pi/2) reverts", async () => {
-    await expect(harness.tan(q.HALF_PI)).to.be.reverted;
+    await expect((harness.tan as any).staticCall(q.HALF_PI)).to.be.reverted;
   });
 
   // ---------------------------------------------------------------
   // 13. cot(0) should revert
   // ---------------------------------------------------------------
   it("13. cot(0) reverts", async () => {
-    await expect(harness.cot(q.ZERO)).to.be.reverted;
+    await expect((harness.cot as any).staticCall(q.ZERO)).to.be.reverted;
   });
 
   // ---------------------------------------------------------------

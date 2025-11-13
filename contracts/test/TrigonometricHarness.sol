@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import { ABDKMathQuad as Q } from "abdk-libraries-solidity/ABDKMathQuad.sol";
 import { Trigonometric } from "../libraries/Trigonometric.sol";
-
+import { QuadConstants as QC } from "../libraries/QuadConstants.sol";
 /**
  * @title TrigonometricHarness
  * @notice Thin test wrapper exposing all Trigonometric library functions
@@ -35,6 +35,14 @@ contract TrigonometricHarness {
     function absDiff(bytes16 a, bytes16 b) external pure returns (bytes16) {
         return a.sub(b).abs();
     }
+
+    // -------------------------------------------------------------
+    // QuadConstants library forwarding functions
+    // -------------------------------------------------------------
+    function PI() external pure returns (bytes16) { return QC.PI(); }
+    function HALF_PI() external pure returns (bytes16) { return QC.HALF_PI(); }
+    function TWO_PI() external pure returns (bytes16) { return QC.TWO_PI(); }
+    function DEFAULT_TOL() external pure returns (bytes16) { return QC.DEFAULT_TOL(); }
 
     // -------------------------------------------------------------
     // Trigonometric library forwarding functions
