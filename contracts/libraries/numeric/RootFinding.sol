@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "abdk-libraries-solidity/ABDKMathQuad.sol";
 import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
+import { QuadConstants } from "./QuadConstants.sol";
 
 /**
  * @title RootFinding
@@ -15,8 +16,7 @@ library RootFinding {
     using ABDKMathQuad for bytes16;
 
     // ---- constants (quad literals) ----
-    bytes16 private constant ZERO = 0x00000000000000000000000000000000; // 0.0
-    bytes16 private constant TWO  = 0x40000000000000000000000000000000; // 2.0
+    bytes16 private constant QZERO = 0x00000000000000000000000000000000; // 0.0
 
     // ================================================================
     // Result & internal working-state structs
@@ -70,8 +70,10 @@ library RootFinding {
     /// @dev f(bytes16) -> bytes16 by staticcall into `target` with selector `sel`.
     function _eval(address target, bytes4 sel, bytes16 x) private view returns (bytes16 y) {
         (bool ok, bytes memory data) = target.staticcall(abi.encodeWithSelector(sel, x));
-        require(ok && data.length == 32, "eval failed");
-        y = abi.decode(data, (bytes16)); // safe decode
+        require(ok && data.length >= 32, "RootFinding: eval failed");
+        assembly {
+            y := mload(add(data, 32))
+        }
     }
 
     /// @dev a < b  (quad compare)
@@ -96,7 +98,7 @@ library RootFinding {
 
     /// @dev true if a == 0 (handles -0 too via cmp)
     function _isZero(bytes16 a) private pure returns (bool) {
-        return ABDKMathQuad.cmp(a, ZERO) == 0;
+        return ABDKMathQuad.cmp(a, QZERO) == 0;
     }
 
     /// @dev clamp tolerance from storage
@@ -106,7 +108,7 @@ library RootFinding {
 
         // Fefault fallback if not set on storage
         if (minTol == bytes16(0)) {
-            minTol = 0x3FC063E11D9235650000000000000000; // 1e-15
+            minTol = minTol = QuadConstants.EPS_1e15();
         }
 
         return ABDKMathQuad.cmp(tol, minTol) < 0 ? minTol : tol;
@@ -147,18 +149,18 @@ library RootFinding {
         if (_isZero(s.fb)) return RootResult(s.right, 0, true, s.fb);
 
         // require sign change
-        require(_lt(s.fa.mul(s.fb), ZERO), "No sign change");
+        require(_lt(s.fa.mul(s.fb), QZERO), "No sign change");
 
         uint256 k = 0;
         while (k < maxIter) {
-            s.mid = s.left.add(s.right).div(TWO);
+            s.mid = s.left.add(s.right).div(ABDKMathQuad.fromInt(2));
             s.fm  = _eval(target, fSelector, s.mid);
 
-            if (_lte(_abs(s.fm), s.atTol) || _lte(s.right.sub(s.left).div(TWO), s.atTol)) {
+            if (_lte(_abs(s.fm), s.atTol) || _lte(s.right.sub(s.left).div(ABDKMathQuad.fromInt(2)), s.atTol)) {
                 return RootResult(s.mid, k + 1, true, s.fm);
             }
 
-            if (_lt(s.fa.mul(s.fm), ZERO)) {
+            if (_lt(s.fa.mul(s.fm), QZERO)) {
                 s.right = s.mid;
                 s.fb = s.fm;
             } else {
