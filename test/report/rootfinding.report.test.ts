@@ -216,7 +216,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = bisectionRef(f_x2_minus_4, 1, 3, 1e-12, 200);
     printBlock(
       T,
-      "bisection",
+      "bisection (standard)",
       "Standard case with opposite sign endpoints; should converge to root≈2.",
       "f(x)=x^2-4, [1,3]",
       gas,
@@ -237,7 +237,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = bisectionRef(f_x2_minus_4, 3, 1, 1e-12, 200);
     printBlock(
       T,
-      "bisection",
+      "bisection (swap)",
       "a>b; implementation swaps to maintain [min,max].",
       "f(x)=x^2-4, [3,1]",
       gas,
@@ -258,7 +258,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = bisectionRef(f_x2_minus_4, 2, 3, 1e-12, 200);
     printBlock(
       T,
-      "bisection",
+      "bisection (f(a)=0)",
       "Endpoint is a root; should return in 0 or 1 iteration depending on implementation details.",
       "f(x)=x^2-4, [2,3]",
       gas,
@@ -277,7 +277,7 @@ describe("RootFinding — Report (values + gas)", function () {
     await expect(root.bisection(await harness.getAddress(), sel_fx2m4, a, b)).to.be.reverted;
     printBlock(
       T,
-      "bisection",
+      "bisection (no sign change)",
       "Opposite signs missing; should revert with 'No sign change'.",
       "f(x)=x^2-4, [3,4]",
       gas,
@@ -297,7 +297,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = bisectionRef(f_cubic, 1, 2, 1e-12, 250);
     printBlock(
       T,
-      "bisection",
+      "bisection (cubic)",
       "Cubic has a unique real root in [1,2]; convergence to ≈1.521...",
       "f(x)=x^3-x-2, [1,2]",
       gas,
@@ -323,7 +323,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = newtonRef(f_x2_minus_4, df_2x, 3, 1e-12, 100);
     printBlock(
       T,
-      "newton",
+      "newton (standard)",
       "Classic Newton on quadratic with analytic derivative; quadratic convergence.",
       "f=x^2-4, df=2x, x0=3",
       gas,
@@ -347,7 +347,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = newtonRef(f_cubic, df_cubic, 1, 1e-12, 50);
     printBlock(
       T,
-      "newton",
+      "newton (cubic)",
       "Cubic with good initial guess; converges rapidly to the real root.",
       "f=x^3-x-2, df=3x^2-1, x0=1",
       gas,
@@ -371,7 +371,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = newtonRef(f_x2_minus_4, df_2x, 2, 1e-12, 100);
     printBlock(
       T,
-      "newton",
+      "newton (immediate)",
       "If f(x0)=0, method halts with 0 iterations.",
       "f=x^2-4, df=2x, x0=2",
       gas,
@@ -397,7 +397,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
     printBlock(
       T,
-      "newton",
+      "newton (zero derivative)",
       "At x0=0, df=0 → implementation reverts (guard against division by zero).",
       "f=x^2-4, df=2x, x0=0",
       gas,
@@ -420,7 +420,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = newtonRef(f_x2_minus_4, df_2x, 3, 1e-12, 100);
     printBlock(
       T,
-      "newton",
+      "newton (tight tolerance)",
       "Ensures stopping is triggered by residual (|f(x)|<=eps) or step size.",
       "f=x^2-4, df=2x, x0=3",
       gas,
@@ -443,7 +443,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = secantRef(f_x2_minus_4, 1, 3, 1e-12, 100);
     printBlock(
       T,
-      "secant",
+      "secant (standard)",
       "Two-point derivative-free method; converges to 2 from (1,3).",
       "f=x^2-4, x0=1, x1=3",
       gas,
@@ -464,7 +464,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = secantRef(f_cubic, 1, 2, 1e-12, 100);
     printBlock(
       T,
-      "secant",
+      "secant (cubic)",
       "Cubic with good bracketing starts; should converge rapidly.",
       "f=x^3-x-2, x0=1, x1=2",
       gas,
@@ -485,7 +485,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = secantRef(f_x2_minus_4, 1, 2, 1e-12, 100);
     printBlock(
       T,
-      "secant",
+      "secant (immediate)",
       "If x1 is exact root, method halts immediately.",
       "f=x^2-4, x0=1, x1=2",
       gas,
@@ -504,10 +504,10 @@ describe("RootFinding — Report (values + gas)", function () {
 
     const gas = await touchGas(root, "secant", [await harness.getAddress(), sel_fx2m4, x0, x1]);
     await expect(root.secant(await harness.getAddress(), sel_fx2m4, x0, x1)).to.be.reverted;
-    
+
     printBlock(
       T,
-      "secant",
+      "secant (zero slope)",
       "When f(x1)=f(x0) (but neither is root), slope is zero; implementation reverts.",
       "f=x^2-4, x0=1, x1=-1",
       gas,
@@ -527,7 +527,7 @@ describe("RootFinding — Report (values + gas)", function () {
     const ref = secantRef(f_cubic, -10, 10, 1e-12, 20); // small maxIter in ref to illustrate stopping
     printBlock(
       T,
-      "secant",
+      "secant (poor starts)",
       "Wide, poor initial guesses may exhaust iterations; check converged flag.",
       "f=x^3-x-2, x0=-10, x1=10",
       gas,
