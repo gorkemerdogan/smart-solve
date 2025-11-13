@@ -54,7 +54,7 @@ library Trigonometric {
     // cos coefficients (degree 16, even symmetry)
     function _cosCoeffs() private pure returns (bytes16[17] memory c) {
         c[0]  = bytes16(uint128(0x3FFE22F8B681333D5B94686A30250785)); // k=0
-        c[1_1] = bytes16(uint128(0x00000000000000000000000000000000)); // k=1
+        c[1]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=1
         c[2]  = bytes16(uint128(0xBFFC6E427F2D79482A0C22B0054F6A7A)); // k=2
         c[3]  = bytes16(uint128(0x00000000000000000000000000000000)); // k=3
         c[4]  = bytes16(uint128(0x3FF393A6404113D573752A161645E010)); // k=4
@@ -93,8 +93,7 @@ library Trigonometric {
     // using Clenshaw recurrence.
     // ------------------------------------------------------------
     function _cheby(bytes16 z, bytes16[17] memory c) private pure returns (bytes16) {
-        
-        bytes16 b_kplus1 = QZERO; 
+        bytes16 b_kplus1 = QZERO;
         bytes16 b_kplus2 = QZERO;
 
         for (int256 k = 16; k >= 0; k--) {
@@ -266,24 +265,23 @@ function tan(bytes16 x) internal pure returns (bytes16) {
     // asin / acos
     // ------------------------------------------------------------
     function asin(bytes16 x) internal pure returns (bytes16) {
-        bytes16 one = Q.fromInt(1);
-        bytes16 mOne = Q.fromInt(-1);
+        bytes16 ONE = Q.fromInt(1);
+        bytes16 MONE = Q.fromInt(-1);
 
         // Handle precision errors from cos()
-        x = Scalar.clamp(x, mOne, one);
+        x = Scalar.clamp(x, MONE, ONE);
 
         // Domain check: x ∈ [-1, 1]
         require(
-            Q.cmp(x, Q.fromInt(1)) <= 0 && Q.cmp(x, Q.fromInt(-1)) >= 0,
+            Q.cmp(x, ONE) <= 0 && Q.cmp(x, MONE) >= 0,
             "asin: domain"
         );
 
         if (Q.cmp(x, QZERO) == 0) return QZERO;
-        if (Q.cmp(x, Q.fromInt(1)) == 0) return QC.HALF_PI();
-        if (Q.cmp(x, Q.fromInt(-1)) == 0) return QC.HALF_PI().neg();
+        if (Q.cmp(x, ONE) == 0) return QC.HALF_PI();
+        if (Q.cmp(x, MONE) == 0) return QC.HALF_PI().neg();
 
-        // asin(x) = atan( x / sqrt(1 - x²) )
-        bytes16 oneMinus = Q.fromInt(1).sub(x.mul(x));
+        bytes16 oneMinus = ONE.sub(x.mul(x));
         bytes16 root = Q.sqrt(oneMinus);
         bytes16 ratio = x.div(root);
 
