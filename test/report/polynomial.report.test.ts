@@ -56,7 +56,7 @@ async function estimateGas(h: Harness, method: string, args: any[]) {
   return gas.toString();
 }
 
-/** Print pretty test output (now with Gas right after Explanation) */
+/** Print test output */
 function printBlock(
   n: number,
   method: string,
