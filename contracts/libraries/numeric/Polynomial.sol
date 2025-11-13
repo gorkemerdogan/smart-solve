@@ -272,7 +272,7 @@ library Polynomial {
     }
 
     function _isZero(bytes16 c) private pure returns (bool) {
-        return c == QZERO;
+        return ABDKMathQuad.cmp(c, QZERO) == 0;
     }
 
     /**
