@@ -17,7 +17,6 @@ import "abdk-libraries-solidity/ABDKMathQuad.sol";
 library Integration {
     using ABDKMathQuad for bytes16;
 
-    // ---- constants ----
     bytes16 private constant QZERO = bytes16(0x00000000000000000000000000000000);
 
     // ================================================================
