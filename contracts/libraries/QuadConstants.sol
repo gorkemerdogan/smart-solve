@@ -45,11 +45,15 @@ library QuadConstants {
     // -------------------------------------------------------------
 
     /**
-     * @notice π ≈ 3.141592653589793
-     * @dev Represented as 3141592653589793 / 10^15.
+     * @notice π ≈ 3.1415926535897932384626433832795
+     * @dev Represented as 31415926535897932384626433832795 / 10^31.
+     * This provides 31 digits of precision, suitable for quad-precision.
      */
     function PI() internal pure returns (bytes16) {
-        return fromFrac(3141592653589793, 1000000000000000); // 3.141592653589793
+        return fromFrac(
+            31415926535897932384626433832795, // 31 digits
+            10000000000000000000000000000000  // 10^31
+        );
     }
 
     /// @return π/2
