@@ -33,24 +33,16 @@ library Scalar {
 
     /**
      * @notice Restricts a value x to stay within a lower bound (lo) and upper bound (hi).
-     * @dev If x is smaller than lo → return lo.
-     * @dev If x is bigger than hi → return hi.
-     * @dev Otherwise, return x unchanged.
+     * @dev Reverts if lo > hi.
      * @param x The value to clamp (bytes16)
      * @param lo The lower bound (bytes16)
      * @param hi The upper bound (bytes16)
      * @return The clamped value (bytes16)
      */
     function clamp(bytes16 x, bytes16 lo, bytes16 hi) internal pure returns (bytes16) {
-        // Check if x < lo
-        if (ABDKMathQuad.cmp(x, lo) < 0) {
-            return lo;
-        }
-        // Check if x > hi
-        if (ABDKMathQuad.cmp(x, hi) > 0) {
-            return hi;
-        }
-        // x is between lo and hi
-        return x;
+        require(ABDKMathQuad.cmp(lo, hi) <= 0, "Scalar: lo must be <= hi");
+        
+        // Return max(lo, min(x, hi))
+        return max(lo, min(x, hi));
     }
 }
