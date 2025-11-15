@@ -50,25 +50,22 @@ library QuadConstants {
      * This provides 31 digits of precision, suitable for quad-precision.
      */
     function PI() internal pure returns (bytes16) {
-        return fromFrac(
-            31415926535897932384626433832795, // 31 digits
-            10000000000000000000000000000000  // 10^31
-        );
-    }
-
-    /// @return π/2
-    function HALF_PI() internal pure returns (bytes16) {
-        return PI().div(ABDKMathQuad.fromInt(2));
-    }
-
-    /// @return 2π
-    function TWO_PI() internal pure returns (bytes16) {
-        return PI().mul(ABDKMathQuad.fromInt(2));
+        return 0x4000921FB54442D18469898CC51701B8;
     }
 
     /// @return π/4
     function QUARTER_PI() internal pure returns (bytes16) {
-        return PI().div(ABDKMathQuad.fromInt(4));
+        return 0x3FFE921FB54442D18469898CC51701B8;
+    }
+
+    /// @return π/2
+    function HALF_PI() internal pure returns (bytes16) {
+        return 0x3FFF921FB54442D18469898CC51701B8;
+    }
+
+    /// @return 2π
+    function TWO_PI() internal pure returns (bytes16) {
+        return 0x4001921FB54442D18469898CC51701B8;
     }
 
     // -------------------------------------------------------------
@@ -78,6 +75,11 @@ library QuadConstants {
     /// @return 1e-6 as quad
     function EPS_1e6() internal pure returns (bytes16) {
         return fromFrac(1, 1_000_000);
+    }
+
+    /// @return 1e-69as quad
+    function EPS_1e9() internal pure returns (bytes16) {
+        return fromFrac(1, 1_000_000_000);
     }
 
     /// @return 1e-12 as quad (good default tolerance)
