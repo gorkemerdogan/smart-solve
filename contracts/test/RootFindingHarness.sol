@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { ABDKMathQuad as Q } from "abdk-libraries-solidity/ABDKMathQuad.sol";
+import { MathLib } from "../libraries/MathLib.sol";
 
 /**
  * @title RootFindingHarness
@@ -17,7 +17,7 @@ import { ABDKMathQuad as Q } from "abdk-libraries-solidity/ABDKMathQuad.sol";
  *      Functions are external/pure to be callable from facets in a diamond.
  */
 contract RootFindingHarness {
-    using Q for bytes16;
+    using MathLib for bytes16;
 
     // ───────────────────────────── Constants ─────────────────────────────
 
@@ -25,22 +25,22 @@ contract RootFindingHarness {
 
     /// @notice 1 as quadruple
     function ONE() external pure returns (bytes16) {
-        return Q.fromInt(1);
+        return MathLib.fromInt(1);
     }
 
     /// @notice 2 as quadruple
     function TWO() external pure returns (bytes16) {
-        return Q.fromInt(2);
+        return MathLib.fromInt(2);
     }
 
     /// @notice 3 as quadruple
     function THREE() external pure returns (bytes16) {
-        return Q.fromInt(3);
+        return MathLib.fromInt(3);
     }
 
     /// @notice 4 as quadruple
     function FOUR() external pure returns (bytes16) {
-        return Q.fromInt(4);
+        return MathLib.fromInt(4);
     }
 
     // ───────────────────── Quadruple helper constructors ─────────────────────
@@ -51,7 +51,7 @@ contract RootFindingHarness {
      * @return q IEEE-754 quadruple (bytes16) representing `n`
      */
     function qFromInt(int256 n) external pure returns (bytes16 q) {
-        q = Q.fromInt(n);
+        q = MathLib.fromInt(n);
     }
 
     /**
@@ -63,8 +63,8 @@ contract RootFindingHarness {
      */
     function qFromFrac(int256 num, int256 den) external pure returns (bytes16 q) {
         require(den != 0, "den=0");
-        bytes16 qNum = Q.fromInt(num);
-        bytes16 qDen = Q.fromInt(den);
+        bytes16 qNum = MathLib.fromInt(num);
+        bytes16 qDen = MathLib.fromInt(den);
         q = qNum.div(qDen);
     }
 
@@ -76,7 +76,7 @@ contract RootFindingHarness {
      * @return y f(x) as quadruple
      */
     function f_x2_minus_4(bytes16 x) external pure returns (bytes16 y) {
-        bytes16 four = Q.fromInt(4);
+        bytes16 four = MathLib.fromInt(4);
         y = x.mul(x).sub(four);
     }
 
@@ -86,7 +86,7 @@ contract RootFindingHarness {
      * @return y 2x as quadruple
      */
     function df_2x(bytes16 x) external pure returns (bytes16 y) {
-        bytes16 two = Q.fromInt(2);
+        bytes16 two = MathLib.fromInt(2);
         y = two.mul(x);
     }
 
@@ -98,7 +98,7 @@ contract RootFindingHarness {
     function f_cubic(bytes16 x) external pure returns (bytes16 y) {
         bytes16 x2 = x.mul(x);
         bytes16 x3 = x2.mul(x);
-        bytes16 two = Q.fromInt(2);
+        bytes16 two = MathLib.fromInt(2);
         y = x3.sub(x).sub(two);
     }
 
@@ -108,8 +108,8 @@ contract RootFindingHarness {
      * @return y df(x) as quadruple
      */
     function df_cubic(bytes16 x) external pure returns (bytes16 y) {
-        bytes16 three = Q.fromInt(3);
-        bytes16 one   = Q.fromInt(1);
+        bytes16 three = MathLib.fromInt(3);
+        bytes16 one   = MathLib.fromInt(1);
         bytes16 x2    = x.mul(x);
         y = three.mul(x2).sub(one);
     }
@@ -129,6 +129,6 @@ contract RootFindingHarness {
      * @param b Second operand
      */
     function cmp(bytes16 a, bytes16 b) external pure returns (int256) {
-        return Q.cmp(a, b);
+        return MathLib.cmp(a, b);
     }
 }

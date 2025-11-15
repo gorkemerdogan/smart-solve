@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { ABDKMathQuad as Q } from "abdk-libraries-solidity/ABDKMathQuad.sol";
 import { Polynomial } from "../libraries/numeric/Polynomial.sol";
+import { MathLib } from "../libraries/MathLib.sol";
 
 /**
  * @title PolynomialHarness
@@ -10,7 +10,7 @@ import { Polynomial } from "../libraries/numeric/Polynomial.sol";
  * @dev All functions are thin passthroughs. Helpers are provided for exact quad construction/printing.
  */
 contract PolynomialHarness {
-    using Q for bytes16;
+    using MathLib for bytes16;
 
     // ====== Passthroughs to Polynomial library ======
 
@@ -73,13 +73,13 @@ contract PolynomialHarness {
 
     /// @notice Quad from integer (exact)
     function qFromInt(int256 x) public pure returns (bytes16) {
-        return Q.fromInt(x);
+        return MathLib.fromInt(x);
     }
 
     /// @notice Quad from rational num/den (exact for finite decimals like 7/4 = 1.75)
     function qFromFrac(int256 num, int256 den) public pure returns (bytes16) {
         require(den != 0, "den=0");
-        return Q.fromInt(num).div(Q.fromInt(den));
+        return MathLib.fromInt(num).div(MathLib.fromInt(den));
     }
 
     /**

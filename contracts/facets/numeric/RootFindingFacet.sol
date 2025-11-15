@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "abdk-libraries-solidity/ABDKMathQuad.sol";
-
 import { RootFinding } from "../../libraries/numeric/RootFinding.sol";
 import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 import { QuadConstants } from "../../libraries/QuadConstants.sol";
+import { MathLib } from "../../libraries/MathLib.sol";
 
 /**
  * @title RootFindingFacet
@@ -32,7 +31,7 @@ contract RootFindingFacet {
             tol = QuadConstants.EPS_1e12();
         }
 
-        tol = (ABDKMathQuad.cmp(tol, minTol) < 0) ? minTol : tol; // tol must be at least equal to minTol
+        tol = (MathLib.cmp(tol, minTol) < 0) ? minTol : tol; // tol must be at least equal to minTol
 
         if (maxIter == 0) {
             maxIter = 200;
