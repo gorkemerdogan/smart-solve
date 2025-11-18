@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import { MathLib } from "../libraries/MathLib.sol";
 import "../libraries/Trigonometry/Trigonometry.sol";
+import "../libraries/Trigonometry/TrigonometryHelpers.sol";
 
 /**
  * @title TrigonometryHarness
@@ -87,6 +88,10 @@ contract TrigonometryHarness {
     function isNaN(bytes16 x) external pure returns (bool) {
         return MathLib.isNaN(x);
     }
+
+    function add(bytes16 a, bytes16 b) external pure returns (bytes16) {
+        return MathLib.add(a, b);
+    } 
 
     function mul(bytes16 a, bytes16 b) external pure returns (bytes16) {
         return MathLib.mul(a, b);
