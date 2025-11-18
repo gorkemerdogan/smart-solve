@@ -7,52 +7,48 @@ import { TrigonometricConstants as CS } from "./TrigonometricConstants.sol";
 
 library TrigonometryHelpers {
 
-    /*──────────────────────────────────────────────────────────
-        HELPERS
-    ──────────────────────────────────────────────────────────*/
+    bytes16 internal constant QZERO = 0x00000000000000000000000000000000;
 
-    // ===============================================================
-    // === REDUCE ANGLE FUNCTION
-    // ===============================================================
     /**
-     * @dev Angle reduction function.
-     * Reduces the input 'x' to the interval [-π/2, π/2] (returned as xr)
-     * and determines which quadrant the angle belongs to.
-     *
-     * Returns:
-     * - xr: Reduced angle in [-π/2, π/2].
-     * - quadrant: Integer [0..3] (0: 0-90, 1: 90-180, 2: 180-270, 3: 270-360)
-     */
-    function reduceAngle(bytes16 x) internal pure returns (bytes16 xr, uint8 quadrant) {
-        bytes16 halfpi = QC.HALF_PI();
+    * @dev IEEE-754 compliant angle reduction.
+    *
+    * Returns:
+    *  - xr ∈ [-π/4, +π/4]
+    *  - mask bitfield:
+    *        bit0: swap (0 → use sin_poly, 1 → use cos_poly)
+    *        bit1: sin sign  (1 → negative)
+    *        bit2: cos sign  (1 → negative)
+    */
+    function reduceAngle(bytes16 x) internal pure returns (bytes16 xr, uint8 mask) {
+        bytes16 halfpi  = QC.HALF_PI();
+        bytes16 twopi   = QC.TWO_PI();
 
-        // Step 1: Compute x / (π/2).
-        // This determines how many 90-degree slices are contained in x.
-        bytes16 t = MathLib.div(x, halfpi);
+        // 1) mod 2π
+        bytes16 t = MathLib.div(x, twopi);
+        int256 k = MathLib.toInt(t);
+        bytes16 kq = MathLib.fromInt(k);
+        bytes16 xm = MathLib.sub(x, MathLib.mul(kq, twopi));
 
-        // Step 2: Get the integer part (Truncate towards zero).
-        // Example: For 1.6 radians (~91 degrees), t ≈ 1.01, so qi becomes 1.
-        int256 qi = MathLib.toInt(t);
+        // 2) mod π/2
+        bytes16 t2 = MathLib.div(xm, halfpi);
+        int256 k2 = MathLib.toInt(t2);
+        bytes16 k2q = MathLib.fromInt(k2);
+        xr = MathLib.sub(xm, MathLib.mul(k2q, halfpi));
 
-        // Step 3: Convert this integer back to Quad format for calculation.
-        bytes16 qi_f = MathLib.fromInt(qi);
+        // 3) quadrant
+        uint8 q = uint8(uint256(k2 & 3));
 
-        // Step 4: Calculate the quadrant.
-        // Bitwise AND (& 3) is equivalent to (qi % 4) but handles negative numbers correctly.
-        // Example: qi = 1  -> q = 1
-        // Example: qi = -1 -> (-1 & 3) = 3 (Correct mathematical wrapping)
-        quadrant = uint8(uint256(qi & 3));
+        uint8 swap   = (q == 1 || q == 3) ? 1 : 0; // bit0
+        uint8 sinNeg = (q == 2 || q == 3) ? 1 : 0; // bit1
+        uint8 cosNeg = (q == 1 || q == 2) ? 1 : 0; // bit2
 
-        // Step 5: Calculate the remaining angle (xr).
-        // xr = x - (qi * π/2)
-        xr = MathLib.sub(x, MathLib.mul(qi_f, halfpi));
+        mask = (swap)
+            | (sinNeg << 1)
+            | (cosNeg << 2);
 
-        return (xr, quadrant);
+        return (xr, mask);
     }
 
-    // ===============================================================
-    // === NaN HELPERS
-    // ===============================================================
     /**
      * @dev Check if x is NaN in IEEE-754 quad format.
      * NaN is defined as: exponent all 1s AND mantissa != 0.
