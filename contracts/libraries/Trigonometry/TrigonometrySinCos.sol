@@ -75,21 +75,16 @@ library TrigonometrySinCos {
         // Core mapping to [-π/4, π/4]
         bytes16 axr = MathLib.abs(xr);
         bytes16 coreX;
-        bool useCosPoly;
+        bytes16 result;
 
         if (MathLib.cmp(axr, QC.QUARTER_PI()) > 0) {
-            // axr in (π/4, π/2]
-            // sin(axr) = cos(π/2 - axr)
-            coreX = MathLib.sub(QC.HALF_PI(), axr);   // coreX ∈ [0, π/4)
-            useCosPoly = true;                        // sin(axr) uses cos(coreX)
+            // (π/4, π/2] aralığı -> cos(π/2 - x)
+            bytes16 coreX = MathLib.sub(QC.HALF_PI(), axr);
+            result = _cos_poly(coreX); 
         } else {
-            // axr ∈ [0, π/4]
-            coreX = axr;
-            useCosPoly = false;                       // sin(axr) uses sin(coreX)
+            // [0, π/4] aralığı -> sin(x)
+            result = _sin_poly(axr);
         }
-
-        // Evaluate polynomial
-        bytes16 result = useCosPoly ? _cos_poly(coreX) : _sin_poly(coreX);
 
         // Restore sign due to original xr sign (sin is odd)
         if (MathLib.cmp(xr, QZERO) < 0) {
