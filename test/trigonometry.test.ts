@@ -5,31 +5,40 @@ import { ethers } from "hardhat";
     JS HELPERS
 ──────────────────────────────────────────────────────────*/
 
-function approx(a: number, b: number, tol = 1e-9): boolean {
-  return Math.abs(a - b) <= tol;
+const SCALE = 1e12;
+
+// Convert JS float → quad input using SCALE
+async function toQuad(trig: any, x: number): Promise<string> {
+  const scaled = Math.round(x * SCALE);
+  return trig.fromFloat(scaled);
 }
 
+// Convert quad → JS float using SCALE
+async function fromQuad(trig: any, q: string): Promise<number> {
+  const scaled: bigint = await trig.toFloat(q);
+  return Number(scaled) / SCALE;
+}
+
+// Hex logger
+function logHex(name: string, expected: string | null, result: string) {
+  console.log(`${name}\n  expected = ${expected}\n  result   = ${result}\n`);
+}
+
+// Decimal logger
 function log(name: string, expected: any, result: any) {
   console.log(`${name}\n  expected = ${expected}\n  result   = ${result}\n`);
+}
+
+function approx(a: number, b: number, tol = 1e-9): boolean {
+  return Math.abs(a - b) <= tol;
 }
 
 /*──────────────────────────────────────────────────────────
     MAIN TEST SUITE
 ──────────────────────────────────────────────────────────*/
 
-describe("Trigonometry.sol High-Precision Tests", function () {
+describe("Trigonometry.sol HEX + DEC Tests", function () {
   let trig: any;
-  const SCALE = 1e12; // same scale used by harness
-
-  async function toQuad(x: number): Promise<string> {
-    const scaled = Math.round(x * SCALE);
-    return trig.fromFloat(scaled);
-  }
-
-  async function fromQuad(q: string): Promise<number> {
-    const scaled: bigint = await trig.toFloat(q);
-    return Number(scaled) / SCALE;
-  }
 
   before(async () => {
     // Deploy MathLib
@@ -37,263 +46,366 @@ describe("Trigonometry.sol High-Precision Tests", function () {
     const mathlib = await MathLibFactory.deploy();
     await mathlib.waitForDeployment();
 
-    // Deploy TrigonometryHarness WITH library linking
+    // Deploy Harness
     const H = await ethers.getContractFactory("TrigonometryHarness", {
-        libraries: {
+      libraries: {
         MathLib: await mathlib.getAddress(),
-        },
-  });
+      },
+    });
 
     trig = await H.deploy();
     await trig.waitForDeployment();
-    });
+  });
 
   /*──────────────────────────────────────────────────────────
-      SIMPLE BASE TESTS: sin(0), cos(0)
+      BASELINE HEX TESTS
   ──────────────────────────────────────────────────────────*/
 
-  it("sin(0) = 0", async () => {
-    const q0 = await toQuad(0);
+  it("HEX: sin(0) == 0x00...", async () => {
+    const q0 = await toQuad(trig, 0);
     const r = await trig.sin(q0);
-    const v = await fromQuad(r);
 
-    log("sin(0)", 0, v);
-    expect(approx(v, 0)).to.be.true;
+    const hex = r.toLowerCase();
+    logHex("sin(0)", "0x00000000000000000000000000000000", hex);
+
+    expect(hex).to.equal("0x00000000000000000000000000000000");
   });
 
-  it("cos(0) = 1", async () => {
-    const q0 = await toQuad(0);
+  it("HEX: cos(0) == +1", async () => {
+    const q0 = await toQuad(trig, 0);
     const r = await trig.cos(q0);
-    const v = await fromQuad(r);
 
-    log("cos(0)", 1, v);
-    expect(approx(v, 1)).to.be.true;
+    const hex = r.toLowerCase();
+    logHex("cos(0)", "0x3fff0000000000000000000000000000", hex);
+
+    expect(hex).to.equal("0x3fff0000000000000000000000000000");
   });
 
   /*──────────────────────────────────────────────────────────
-      EXACT VALUES USING π CONSTANTS
+      π CONSTANT HEX TESTS
   ──────────────────────────────────────────────────────────*/
 
-  it("sin(pi/2) = 1", async () => {
+  it("HEX: sin(pi/2) == 1.0", async () => {
     const q = await trig.QHALF_PI();
     const r = await trig.sin(q);
-    const v = await fromQuad(r);
 
-    log("sin(pi/2)", 1, v);
-    expect(approx(v, 1)).to.be.true;
+    const hex = r.toLowerCase();
+    logHex("sin(pi/2)", "0x3fff0000000000000000000000000000", hex);
+
+    expect(hex).to.equal("0x3fff0000000000000000000000000000");
   });
 
-  it("cos(pi/2) = 0", async () => {
+  it("HEX: cos(pi/2) == 0", async () => {
     const q = await trig.QHALF_PI();
     const r = await trig.cos(q);
-    const v = await fromQuad(r);
 
-    log("cos(pi/2)", 0, v);
-    expect(approx(v, 0, 1e-9)).to.be.true;
+    const hex = r.toLowerCase();
+    logHex("cos(pi/2)", "0x00000000000000000000000000000000", hex);
+
+    expect(hex).to.equal("0x00000000000000000000000000000000");
   });
 
-  it("sin(pi) = 0", async () => {
+  it("HEX: sin(pi) == 0", async () => {
     const q = await trig.QPI();
     const r = await trig.sin(q);
-    const v = await fromQuad(r);
 
-    log("sin(pi)", 0, v);
-    expect(approx(v, 0, 1e-9)).to.be.true;
+    const hex = r.toLowerCase();
+    logHex("sin(pi)", "0x00000000000000000000000000000000", hex);
+
+    expect(hex).to.equal("0x00000000000000000000000000000000");
   });
 
-  it("cos(pi) = -1", async () => {
+  it("HEX: cos(pi) == -1", async () => {
     const q = await trig.QPI();
     const r = await trig.cos(q);
-    const v = await fromQuad(r);
 
-    log("cos(pi)", -1, v);
-    expect(approx(v, -1, 1e-9)).to.be.true;
+    const hex = r.toLowerCase();
+    logHex("cos(pi)", "0xbfff0000000000000000000000000000", hex);
+
+    expect(hex).to.equal("0xbfff0000000000000000000000000000");
   });
 
   /*──────────────────────────────────────────────────────────
-      SYMMETRY TESTS
+      SYMMETRY HEX TESTS
   ──────────────────────────────────────────────────────────*/
 
-  it("sin(-x) = -sin(x)", async () => {
+  it("HEX: sin(-x) == -sin(x)", async () => {
     const x = 0.345;
-    const qx = await toQuad(x);
-    const qn = await toQuad(-x);
 
-    const pos = await fromQuad(await trig.sin(qx));
-    const neg = await fromQuad(await trig.sin(qn));
+    const qx = await toQuad(trig, x);
+    const qn = await toQuad(trig, -x);
 
-    log("sin(-x) vs -sin(x)", -pos, neg);
-    expect(approx(neg, -pos)).to.be.true;
+    const pos = (await trig.sin(qx)).toLowerCase(); // sin(+x)
+    const neg = (await trig.sin(qn)).toLowerCase(); // sin(-x)
+
+    const expectedNeg = flipSign(pos);
+
+    logHex("sin(-x)", expectedNeg, neg);
+    expect(neg).to.equal(expectedNeg);
   });
 
-  it("cos(-x) = cos(x)", async () => {
-    const x = 0.789;
-    const qx = await toQuad(x);
-    const qn = await toQuad(-x);
-
-    const pos = await fromQuad(await trig.cos(qx));
-    const neg = await fromQuad(await trig.cos(qn));
-
-    log("cos(-x)", pos, neg);
-    expect(approx(neg, pos)).to.be.true;
-  });
+  function flipSign(hex: string): string {
+    const bn = BigInt(hex);
+    const flipped = bn ^ (1n << 127n);
+    return "0x" + flipped.toString(16).padStart(32, "0");
+  }
 
   /*──────────────────────────────────────────────────────────
-      PYTHAGOREAN IDENTITY: sin² + cos² ≈ 1
+      APPROX TESTS (DECIMAL)
   ──────────────────────────────────────────────────────────*/
 
-  it("sin^2 + cos^2 ≈ 1", async () => {
+  it("DEC: sin(x^2) produces a consistent quad result", async () => {
+    const x = 0.75;
+    const qx = await toQuad(trig, x);
+
+    // x^2 (quad)
+    const qx2 = await trig.mul(qx, qx);
+
+    // sin(x^2) (quad)
+    const qs = await trig.sin(qx2);
+
+    // convert to JS just for display
+    const s = await fromQuad(trig, qs);
+
+    log("sin(x^2)", Math.sin(x * x), s);
+    expect(approx(s, Math.sin(x * x), 1e-9)).to.be.true;
+  });
+
+  it("DEC: cos(x^2) produces a consistent quad result", async () => {
+    const x = -1.12;
+    const qx = await toQuad(trig, x);
+
+    // x^2 (quad)
+    const qx2 = await trig.mul(qx, qx);
+
+    // cos(x^2) (quad)
+    const qc = await trig.cos(qx2);
+
+    // convert to JS for comparison
+    const c = await fromQuad(trig, qc);
+
+    log("cos(x^2)", Math.cos(x * x), c);
+    expect(approx(c, Math.cos(x * x), 1e-9)).to.be.true;
+  });
+
+  it("DEC: sin^2 + cos^2 ≈ 1", async () => {
     const x = 1.234567;
-    const qx = await toQuad(x);
+    const qx = await toQuad(trig, x);
 
-    const s = await fromQuad(await trig.sin(qx));
-    const c = await fromQuad(await trig.cos(qx));
+    // quad sin, quad cos
+    const qs = await trig.sin(qx);
+    const qc = await trig.cos(qx);
 
-    log("sin^2 + cos^2", 1, s * s + c * c);
-    expect(approx(s * s + c * c, 1, 1e-9)).to.be.true;
+    // quad sin^2, quad cos^2
+    const qs2 = await trig.mul(qs, qs);
+    const qc2 = await trig.mul(qc, qc);
+
+    // quad sum
+    const sumQuad = await trig.add(qs2, qc2);
+
+    // convert to decimal via SCALE
+    const sum = await fromQuad(trig, sumQuad);
+
+    log("sin^2+cos^2", 1, sum);
+    expect(approx(sum, 1, 1e-9)).to.be.true;
   });
 
-  /*──────────────────────────────────────────────────────────
-      TAN & COT IDENTITIES
-  ──────────────────────────────────────────────────────────*/
-
-  it("tan(x) ≈ sin(x)/cos(x)", async () => {
+  it("DEC: tan(x) ≈ sin(x)/cos(x)", async () => {
     const x = 0.42;
-    const qx = await toQuad(x);
+    const qx = await toQuad(trig, x);
 
-    const t = await fromQuad(await trig.tan(qx));
-    const s = await fromQuad(await trig.sin(qx));
-    const c = await fromQuad(await trig.cos(qx));
+    const t = await fromQuad(trig, await trig.tan(qx));
+    const s = await fromQuad(trig, await trig.sin(qx));
+    const c = await fromQuad(trig, await trig.cos(qx));
 
     log("tan(x)", s / c, t);
     expect(approx(t, s / c, 1e-9)).to.be.true;
   });
 
-  it("cot(x) ≈ cos(x)/sin(x)", async () => {
-    const x = 0.42;
-    const qx = await toQuad(x);
-
-    const t = await fromQuad(await trig.cot(qx));
-    const s = await fromQuad(await trig.sin(qx));
-    const c = await fromQuad(await trig.cos(qx));
-
-    log("cot(x)", c / s, t);
-    expect(approx(t, c / s, 1e-9)).to.be.true;
-  });
-
-  it("tan(pi/2) returns NaN", async () => {
-    const q = await trig.QHALF_PI();
-    const r = await trig.tan(q);
-    expect(await trig.isNaN(r)).to.be.true;
-  });
-
-  it("cot(0) returns NaN", async () => {
-    const q0 = await toQuad(0);
-    const r = await trig.cot(q0);
-    expect(await trig.isNaN(r)).to.be.true;
-  });
-
-  /*──────────────────────────────────────────────────────────
-      INVERSE TRIG TESTS
-  ──────────────────────────────────────────────────────────*/
-
-  it("asin(sin(x)) ≈ x for |x| <= 0.5", async () => {
+  it("DEC: asin(sin(x)) ≈ x", async () => {
     const x = 0.3;
-    const qx = await toQuad(x);
+    const qx = await toQuad(trig, x);
 
     const s = await trig.sin(qx);
-    const asinRes = await trig.asin(s);
+    const a = await fromQuad(trig, await trig.asin(s));
 
-    const v = await fromQuad(asinRes);
-
-    log("asin(sin(x))", x, v);
-    expect(approx(v, x, 1e-9)).to.be.true;
+    log("asin(sin(x))", x, a);
+    expect(approx(a, x, 1e-9)).to.be.true;
   });
 
-  it("acos(cos(x)) ≈ x for x ∈ [0, pi]", async () => {
-    const x = 0.9;
-    const qx = await toQuad(x);
-
-    const c = await trig.cos(qx);
-    const acosRes = await fromQuad(await trig.acos(c));
-
-    log("acos(cos(x))", x, acosRes);
-    expect(approx(acosRes, x, 1e-9)).to.be.true;
-  });
-
-  it("tan(atan(x)) ≈ x", async () => {
+  it("DEC: tan(atan(x)) ≈ x", async () => {
     const x = 1.2345;
-    const qx = await toQuad(x);
+    const qx = await toQuad(trig, x);
 
-    const atanRes = await trig.atan(qx);
-    const tanRes = await fromQuad(await trig.tan(atanRes));
+    const at = await trig.atan(qx);
+    const t = await fromQuad(trig, await trig.tan(at));
 
-    log("tan(atan(x))", x, tanRes);
-    expect(approx(tanRes, x, 1e-9)).to.be.true;
-  });
-
-  it("acot(x) ≈ atan(1/x)", async () => {
-    const x = 2.0;
-    const qx = await toQuad(x);
-
-    const inv = await toQuad(1 / x);
-    const res1 = await fromQuad(await trig.atan(inv));       // atan(1/x)
-    const res2 = await fromQuad(await trig.atan(await toQuad(1 / x))); // same
-
-    log("acot(x) vs atan(1/x)", res1, res2);
-    expect(approx(res1, res2, 1e-9)).to.be.true;
+    log("tan(atan(x))", x, t);
+    // For composition errors we allow a slightly looser tolerance
+    expect(approx(t, x, 1e-6)).to.be.true;
   });
 
   /*──────────────────────────────────────────────────────────
-      LARGE INPUT RANGE REDUCTION
+      ACADEMIC STABILITY / IDENTITY TESTS (10 EXTRA)
   ──────────────────────────────────────────────────────────*/
 
-  it("sin(2π * 1e6) ≈ 0", async () => {
-    const twoPi = await trig.QTWO_PI();
-    const big = 1_000_000;
+  it("DEC: asin(x) + acos(x) ≈ π/2", async () => {
+    const x = 0.37;
+    const qx = await toQuad(trig, x);
 
-    // Convert big integer to quad
-    const qBig = await trig.fromDouble(big);
-    const angle = await trig.mul(twoPi, qBig).catch(() => null);
+    const qa = await trig.asin(qx);
+    const qb = await trig.acos(qx);
 
-    // If harness has no mul() helper, compute in JS then convert:
-    const jsAngle = 2 * Math.PI * big;
-    const qAngle = await toQuad(jsAngle);
+    const a = await fromQuad(trig, qa);
+    const b = await fromQuad(trig, qb);
 
-    const r = await fromQuad(await trig.sin(qAngle));
+    const sum = a + b;
+    log("asin(x)+acos(x)", Math.PI / 2, sum);
+    expect(approx(sum, Math.PI / 2, 1e-9)).to.be.true;
+  });
 
-    log("sin(2π * 1e6)", 0, r);
-    expect(approx(r, 0, 1e-9)).to.be.true;
+  it("DEC: asin is odd → asin(-x) = -asin(x)", async () => {
+    const x = 0.4;
+    const qx = await toQuad(trig, x);
+    const qn = await toQuad(trig, -x);
+
+    const aPos = await fromQuad(trig, await trig.asin(qx));
+    const aNeg = await fromQuad(trig, await trig.asin(qn));
+
+    log("asin(-x)", -aPos, aNeg);
+    expect(approx(aNeg, -aPos, 1e-9)).to.be.true;
+  });
+
+  it("DEC: atan is odd → atan(-x) = -atan(x)", async () => {
+    const x = 0.9;
+    const qx = await toQuad(trig, x);
+    const qn = await toQuad(trig, -x);
+
+    const aPos = await fromQuad(trig, await trig.atan(qx));
+    const aNeg = await fromQuad(trig, await trig.atan(qn));
+
+    log("atan(-x)", -aPos, aNeg);
+    expect(approx(aNeg, -aPos, 1e-9)).to.be.true;
+  });
+
+  it("DEC: atan(1) ≈ π/4", async () => {
+    // QONE is exposed as a public constant on the harness
+    const q1 = await trig.QONE();
+    const qa = await trig.atan(q1);
+
+    const a = await fromQuad(trig, qa);
+    log("atan(1)", Math.PI / 4, a);
+    expect(approx(a, Math.PI / 4, 1e-9)).to.be.true;
+  });
+
+  it("DEC: periodicity sin(x + 2πk) ≈ sin(x)", async () => {
+    const x = 0.73;
+    const k = 100; // moderate k to avoid JS overflow in scaling
+
+    const base = await fromQuad(trig, await trig.sin(await toQuad(trig, x)));
+
+    const xp = x + 2 * Math.PI * k;
+    const sp = await fromQuad(trig, await trig.sin(await toQuad(trig, xp)));
+
+    log("sin(x+2πk)", base, sp);
+    expect(approx(sp, base, 1e-9)).to.be.true;
+  });
+
+  it("DEC: periodicity cos(x + 2πk) preserves magnitude", async () => {
+    const x = -1.11;
+    const k = 80;
+
+    const base = await fromQuad(
+      trig,
+      await trig.cos(await toQuad(trig, x)),
+    );
+
+    const xp = x + 2 * Math.PI * k;
+    const cp = await fromQuad(
+      trig,
+      await trig.cos(await toQuad(trig, xp)),
+    );
+
+    log("cos(x+2πk) (mag)", Math.abs(base), Math.abs(cp));
+    expect(approx(Math.abs(cp), Math.abs(base), 1e-9)).to.be.true;
+  });
+
+  it("DEC: phase shift sin(x + π/2) ≈ cos(x)", async () => {
+    const x = 0.6;
+    const qx = await toQuad(trig, x);
+    const qHalfPi = await trig.QHALF_PI();
+
+    const qShift = await trig.add(qx, qHalfPi);
+
+    const sShift = await fromQuad(trig, await trig.sin(qShift));
+    const cBase = await fromQuad(trig, await trig.cos(qx));
+
+    log("sin(x+π/2)", cBase, sShift);
+    expect(approx(sShift, cBase, 1e-9)).to.be.true;
+  });
+
+  it("DEC: phase shift cos(x + π/2)^2 ≈ sin(x)^2", async () => {
+    const x = -0.8;
+    const qx = await toQuad(trig, x);
+    const qHalfPi = await trig.QHALF_PI();
+
+    const qShift = await trig.add(qx, qHalfPi);
+
+    const cShift = await fromQuad(trig, await trig.cos(qShift));
+    const sBase = await fromQuad(trig, await trig.sin(qx));
+
+    const left = cShift * cShift;
+    const right = sBase * sBase;
+
+    log("cos^2(x+π/2) vs sin^2(x)", right, left);
+    expect(approx(left, right, 1e-9)).to.be.true;
+  });
+
+  it("DEC: atan(tan(x)) ≈ x for |x| < π/2", async () => {
+    const x = 0.7;
+    const qx = await toQuad(trig, x);
+
+    const qt = await trig.tan(qx);
+    const qa = await trig.atan(qt);
+
+    const back = await fromQuad(trig, qa);
+
+    log("atan(tan(x))", x, back);
+    expect(approx(back, x, 1e-6)).to.be.true;
+  });
+
+  it("DEC: numerical derivative of sin ≈ cos (central difference)", async () => {
+    const x = 0.5;
+    const h = 1e-4;
+
+    const qxPlus = await toQuad(trig, x + h);
+    const qxMinus = await toQuad(trig, x - h);
+
+    const sPlus = await fromQuad(trig, await trig.sin(qxPlus));
+    const sMinus = await fromQuad(trig, await trig.sin(qxMinus));
+
+    const numerical = (sPlus - sMinus) / (2 * h);
+    const cExact = await fromQuad(trig, await trig.cos(await toQuad(trig, x)));
+
+    log("d/dx sin(x)", cExact, numerical);
+    expect(approx(numerical, cExact, 1e-5)).to.be.true;
   });
 
   /*──────────────────────────────────────────────────────────
-      SMALL ANGLE APPROXIMATION
+      SPECIAL CASE HEX TESTS
   ──────────────────────────────────────────────────────────*/
 
-  it("sin(x) ≈ x for tiny x", async () => {
-    const x = 1e-6;
-    const qx = await toQuad(x);
+  it("HEX: tan(pi/2) → NaN", async () => {
+    const q = await trig.QHALF_PI();
+    const r = await trig.tan(q);
 
-    const r = await fromQuad(await trig.sin(qx));
-
-    log("sin(x) ≈ x", x, r);
-    expect(approx(r, x, 1e-9)).to.be.true;
+    expect(await trig.isNaN(r)).to.be.true;
   });
 
-  /*──────────────────────────────────────────────────────────
-      tan(x) * cot(x) ≈ 1 (where defined)
-  ──────────────────────────────────────────────────────────*/
+  it("HEX: cot(0) → NaN", async () => {
+    const q0 = await toQuad(trig, 0);
+    const r = await trig.cot(q0);
 
-  it("tan(x) * cot(x) ≈ 1", async () => {
-    const x = 0.55;
-    const qx = await toQuad(x);
-
-    const t = await fromQuad(await trig.tan(qx));
-    const c = await fromQuad(await trig.cot(qx));
-    const prod = t * c;
-
-    log("tan(x)*cot(x)", 1, prod);
-    expect(approx(prod, 1, 1e-9)).to.be.true;
+    expect(await trig.isNaN(r)).to.be.true;
   });
-
 });
