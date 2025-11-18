@@ -33,6 +33,10 @@ library MathLib {
         return ABDKMathQuad.div(a, b);
     }
 
+    function sqrt(bytes16 a) public pure returns (bytes16) {
+        return ABDKMathQuad.sqrt(a);
+    }
+
     function neg(bytes16 a) public pure returns (bytes16) {
         return ABDKMathQuad.neg(a);
     }
@@ -41,8 +45,43 @@ library MathLib {
         return ABDKMathQuad.abs(a);
     }
 
-    function sqrt(bytes16 a) public pure returns (bytes16) {
-        return ABDKMathQuad.sqrt(a);
+    /*──────────────────────────────────────────────────────────
+        FLOOR
+    ───────────────────────────────────────────────────────────*/
+
+    function floorQuad(bytes16 x) public pure returns (bytes16) {
+        // If x >= 0: floor = trunc
+        if (cmp(x, fromInt(0)) >= 0) {
+            int256 ti = toInt(x);          // truncate
+            return fromInt(ti);
+        }
+
+        // x < 0
+        int256 ti2 = toInt(x);             // truncate toward zero
+        bytes16 b = fromInt(ti2);
+
+        // If x is already integer, floor(x) == x
+        if (cmp(b, x) == 0) {
+            return b;
+        }
+
+        // else: floor(x) = trunc(x) - 1
+        return sub(b, fromInt(1));
+    }
+
+    function floorInt(bytes16 x) public pure returns (int256) {
+        if (cmp(x, fromInt(0)) >= 0) {
+            return toInt(x); // trunc = floor
+        }
+
+        int256 ti = toInt(x); // trunc
+        bytes16 t = fromInt(ti);
+
+        if (cmp(t, x) == 0) {
+            return ti; // already integer
+        }
+
+        return ti - 1; // subtract 1 for negative non-integers
     }
 
     /*──────────────────────────────────────────────────────────
