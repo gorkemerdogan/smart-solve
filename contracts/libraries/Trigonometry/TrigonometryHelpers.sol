@@ -15,48 +15,39 @@ library TrigonometryHelpers {
     // === REDUCE ANGLE FUNCTION
     // ===============================================================
     /**
-     * @dev Hybrid range reduction.
+     * @dev Angle reduction function.
+     * Reduces the input 'x' to the interval [-π/2, π/2] (returned as xr)
+     * and determines which quadrant the angle belongs to.
+     *
      * Returns:
-     * - xr: reduced angle in [-π/2, π/2]
-     * - quadrant: integer in [0..3] for sin/cos symmetry
+     * - xr: Reduced angle in [-π/2, π/2].
+     * - quadrant: Integer [0..3] (0: 0-90, 1: 90-180, 2: 180-270, 3: 270-360)
      */
     function reduceAngle(bytes16 x) internal pure returns (bytes16 xr, uint8 quadrant) {
-        bytes16 ax = MathLib.abs(x);
         bytes16 halfpi = QC.HALF_PI();
-        bytes16 twopi  = QC.TWO_PI();
 
-        // Fast Path - |x| < 2^64
-        if (MathLib.cmp(ax,CS.TWO_POW_64()) <= 0) {
-            bytes16 t = MathLib.div(x, halfpi);
-            int256 qi = MathLib.toInt(t); // TRUNCATE toward zero
-            bytes16 qi_f = MathLib.fromInt(qi);
+        // Step 1: Compute x / (π/2).
+        // This determines how many 90-degree slices are contained in x.
+        bytes16 t = MathLib.div(x, halfpi);
 
-            // quadrant = qi mod 4
-            // We use a bitwise AND for (qi % 4)
-            // Note: In Solidity, (-1 & 3) is 3, (-2 & 3) is 2.
-            quadrant = uint8(uint256(qi & 3));
-            xr = MathLib.sub(x, MathLib.mul(qi_f, halfpi));
-            return (xr, quadrant);
-        }
+        // Step 2: Get the integer part (Truncate towards zero).
+        // Example: For 1.6 radians (~91 degrees), t ≈ 1.01, so qi becomes 1.
+        int256 qi = MathLib.toInt(t);
 
-        // Slow Path - PAYNE–HANEK
-        // Reduce mod 2π
-        bytes16 t1 = MathLib.div(x, twopi);
-        int256 k1 = MathLib.floorInt(t1);
-        bytes16 k1f = MathLib.fromInt(k1);
-        bytes16 xm = MathLib.sub(x, MathLib.mul(k1f, twopi));
+        // Step 3: Convert this integer back to Quad format for calculation.
+        bytes16 qi_f = MathLib.fromInt(qi);
 
-        // Reduce xm mod (π/2)
-        bytes16 t2 = MathLib.div(xm, halfpi);
-        int256 k2 = MathLib.floorInt(t2);
-        bytes16 k2f = MathLib.fromInt(k2);
+        // Step 4: Calculate the quadrant.
+        // Bitwise AND (& 3) is equivalent to (qi % 4) but handles negative numbers correctly.
+        // Example: qi = 1  -> q = 1
+        // Example: qi = -1 -> (-1 & 3) = 3 (Correct mathematical wrapping)
+        quadrant = uint8(uint256(qi & 3));
 
-        xr = MathLib.sub(xm, MathLib.mul(k2f, halfpi));
+        // Step 5: Calculate the remaining angle (xr).
+        // xr = x - (qi * π/2)
+        xr = MathLib.sub(x, MathLib.mul(qi_f, halfpi));
 
-        // quadrant = k2 mod 4
-        int256 qm = k2 % 4;
-        if (qm < 0) qm += 4; // normalize to [0..3]
-        quadrant = uint8(uint256(qm));
+        return (xr, quadrant);
     }
 
     // ===============================================================
