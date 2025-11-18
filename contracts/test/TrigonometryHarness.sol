@@ -88,6 +88,10 @@ contract TrigonometryHarness {
         return MathLib.isNaN(x);
     }
 
+    function mul(bytes16 a, bytes16 b) external pure returns (bytes16) {
+        return MathLib.mul(a, b);
+    }
+
     /*──────────────────────────────────────────────────────────
         TRIGONOMETRY EXPOSED FUNCTIONS
     ──────────────────────────────────────────────────────────*/
