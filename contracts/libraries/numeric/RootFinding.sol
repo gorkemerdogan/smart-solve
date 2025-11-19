@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "abdk-libraries-solidity/ABDKMathQuad.sol";
+import { MathLib } from "../MathLib.sol";
 import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 import { QuadConstants } from "../QuadConstants.sol";
 
 /**
  * @title RootFinding
  * @notice High-precision numerical root-finding algorithms (Bisection, Newton, Secant)
- *         implemented with IEEE-754 binary128 (bytes16) via ABDKMathQuad.
+ *         implemented with IEEE-754 binary128 (bytes16) via ABDKMathQuad (from MathLib).
  * @dev Stateless, pure/parametric library. Facets (or other contracts) should inject
  *      tolerance (tol) and maxIter from configuration (e.g., LibNumericConfig).
  */
 library RootFinding {
-    using ABDKMathQuad for bytes16;
+    using MathLib for bytes16;
 
     // ---- constants (quad literals) ----
     bytes16 private constant QZERO = 0x00000000000000000000000000000000; // 0.0
@@ -76,31 +76,6 @@ library RootFinding {
         }
     }
 
-    /// @dev a < b  (quad compare)
-    function _lt(bytes16 a, bytes16 b) private pure returns (bool) {
-        return ABDKMathQuad.cmp(a, b) < 0;
-    }
-
-    /// @dev a <= b (quad compare)
-    function _lte(bytes16 a, bytes16 b) private pure returns (bool) {
-        return ABDKMathQuad.cmp(a, b) <= 0;
-    }
-
-    /// @dev |a|
-    function _abs(bytes16 a) private pure returns (bytes16) {
-        return ABDKMathQuad.abs(a);
-    }
-
-    /// @dev max(a, b)
-    function _max(bytes16 a, bytes16 b) private pure returns (bytes16) {
-        return _lt(a, b) ? b : a;
-    }
-
-    /// @dev true if a == 0 (handles -0 too via cmp)
-    function _isZero(bytes16 a) private pure returns (bool) {
-        return ABDKMathQuad.cmp(a, QZERO) == 0;
-    }
-
     /// @dev clamp tolerance from storage
     function _clampTol(bytes16 tol) private view returns (bytes16) {
         LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
@@ -111,7 +86,7 @@ library RootFinding {
             minTol = minTol = QuadConstants.EPS_1e15();
         }
 
-        return ABDKMathQuad.cmp(tol, minTol) < 0 ? minTol : tol;
+        return MathLib.cmp(tol, minTol) < 0 ? minTol : tol;
     }
 
     // ================================================================
@@ -139,28 +114,39 @@ library RootFinding {
 
         s.atTol = _clampTol(tol);
         // normalize [left, right]
-        s.left  = _lt(a, b) ? a : b;
-        s.right = _lt(a, b) ? b : a;
+        bool isALess = MathLib.cmp(a, b) < 0;
+        s.left  = isALess ? a : b;
+        s.right = isALess ? b : a;
 
         s.fa = _eval(target, fSelector, s.left);
         s.fb = _eval(target, fSelector, s.right);
 
-        if (_isZero(s.fa)) return RootResult(s.left, 0, true, s.fa);
-        if (_isZero(s.fb)) return RootResult(s.right, 0, true, s.fb);
+        if (MathLib.cmp(s.fa, MathLib.fromInt(0)) == 0) {
+            return RootResult(s.left, 0, true, s.fa);
+        }
+
+        if (MathLib.cmp(s.fb, MathLib.fromInt(0)) == 0) {
+            return RootResult(s.right, 0, true, s.fb);
+        }
 
         // require sign change
-        require(_lt(s.fa.mul(s.fb), QZERO), "No sign change");
+        require(MathLib.cmp(s.fa.mul(s.fb), QZERO) < 0, "No sign change");
 
         uint256 k = 0;
         while (k < maxIter) {
-            s.mid = s.left.add(s.right).div(ABDKMathQuad.fromInt(2));
+            s.mid = s.left.add(s.right).div(MathLib.fromInt(2));
             s.fm  = _eval(target, fSelector, s.mid);
 
-            if (_lte(_abs(s.fm), s.atTol) || _lte(s.right.sub(s.left).div(ABDKMathQuad.fromInt(2)), s.atTol)) {
+            if (MathLib.cmp(MathLib.abs(s.fm), s.atTol) <= 0 ||
+                MathLib.cmp(
+                    s.right.sub(s.left).div(MathLib.fromInt(2)),
+                    s.atTol
+                ) <= 0
+            ) {
                 return RootResult(s.mid, k + 1, true, s.fm);
             }
 
-            if (_lt(s.fa.mul(s.fm), QZERO)) {
+            if (MathLib.cmp(s.fa.mul(s.fm), QZERO) < 0) {
                 s.right = s.mid;
                 s.fb = s.fm;
             } else {
@@ -200,18 +186,25 @@ library RootFinding {
         s.x = x0;
         s.fx = _eval(target, fSelector, s.x);
 
-        if (_lte(_abs(s.fx), s.atTol)) return RootResult(s.x, 0, true, s.fx);
+        if (MathLib.cmp(MathLib.abs(s.fx), s.atTol) <= 0) {
+            return RootResult(s.x, 0, true, s.fx);
+        }
 
         uint256 k = 0;
         while (k < maxIter) {
             bytes16 dfx = _eval(dfTarget, dfSelector, s.x);
-            require(!_isZero(dfx), "Zero derivative");
+            require(MathLib.cmp(dfx, MathLib.fromInt(0)) != 0, "Zero derivative");
+
             bytes16 xNext = s.x.sub(s.fx.div(dfx));
             bytes16 fxNext = _eval(target, fSelector, xNext);
 
-            if (_lte(_abs(fxNext), s.atTol) || _lte(_abs(xNext.sub(s.x)), s.atTol)) {
+            bytes16 errF = MathLib.abs(fxNext);          // |f(xNext)|
+            bytes16 errX = MathLib.abs(xNext.sub(s.x));  // |xNext – x|
+
+            if (MathLib.cmp(errF, s.atTol) <= 0 || MathLib.cmp(errX, s.atTol) <= 0) {
                 return RootResult(xNext, k + 1, true, fxNext);
             }
+
             s.x = xNext;
             s.fx = fxNext;
             unchecked { ++k; }
@@ -247,18 +240,23 @@ library RootFinding {
         s.fPrev  = _eval(target, fSelector, s.xPrev);
         s.fx     = _eval(target, fSelector, s.x);
 
-        if (_lte(_abs(s.fx), s.atTol)) return RootResult(s.x, 0, true, s.fx);
+        if (MathLib.cmp(MathLib.abs(s.fx), s.atTol) <= 0) {
+            return RootResult(s.x, 0, true, s.fx);
+        }
 
         uint256 k = 0;
         while (k < maxIter) {
             bytes16 denom = s.fx.sub(s.fPrev);
-            require(!_isZero(denom), "Zero slope");
+            require(MathLib.cmp(denom, MathLib.fromInt(0)) != 0, "Zero slope");
+
             bytes16 xNext = s.x.sub( s.fx.mul( s.x.sub(s.xPrev) ).div(denom) );
             bytes16 fxNext = _eval(target, fSelector, xNext);
 
-            if (_lte(_abs(fxNext), s.atTol) || _lte(_abs(xNext.sub(s.x)), s.atTol)) {
+            if (MathLib.cmp(MathLib.abs(fxNext), s.atTol) <= 0 ||
+                MathLib.cmp(MathLib.abs(xNext.sub(s.x)), s.atTol) <= 0) {
                 return RootResult(xNext, k + 1, true, fxNext);
             }
+
             s.xPrev = s.x;
             s.fPrev = s.fx;
             s.x = xNext;
