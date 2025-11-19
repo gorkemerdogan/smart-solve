@@ -74,26 +74,36 @@ describe("Integration Library via IntegrationHarness", function () {
   }
 
   before(async () => {
+    // 1 — Deploy MathLib
+    const MathLibFactory = await ethers.getContractFactory("MathLib");
+    const math = await MathLibFactory.deploy();
+    await math.waitForDeployment();
+    const mathAddr = await math.getAddress();
+
+    // 2 — Deploy IntegrationHarness
     const HarnessFactory = await ethers.getContractFactory(
-      "IntegrationHarness"
+      "IntegrationHarness",
+      {
+        libraries: {
+          "contracts/libraries/MathLib.sol:MathLib": mathAddr,
+        },
+      }
     );
+
     harness = (await HarnessFactory.deploy()) as unknown as IntegrationHarness;
     await harness.waitForDeployment();
     target = await harness.getAddress();
 
-    // selectors for integrand functions
+    // selectors
     const sigs = [
       "f_zero(bytes16)",
       "f_one(bytes16)",
-      "f_x(bytes16)",
-      "f_x2(bytes16)",
-      "f_x3(bytes16)",
+      "f_linear(bytes16)",
+      "f_square(bytes16)",
+      "f_cube(bytes16)",
       "f_revert(bytes16)",
     ];
-    for (const s of sigs) {
-      const name = s.split("(")[0]; // f_zero, f_one, etc.
-      sel[name] = ethers.id(s).slice(0, 10);
-    }
+    for (const s of sigs) sel[s.split("(")[0]] = ethers.id(s).slice(0, 10);
 
     // quad constants
     q.zero = await harness.ZERO();
@@ -102,9 +112,8 @@ describe("Integration Library via IntegrationHarness", function () {
     q.mOne = await harness.qFromInt(-1);
     q.mTwo = await harness.qFromInt(-2);
 
-    // tolerance 1e-9
     TOL_1E9 = await harness.qFromFrac(1, 1_000_000_000n);
-    TOL_TRAP = await harness.qFromFrac(1, 10_000n); // 1e-4 for 100 steps
+    TOL_TRAP = await harness.qFromFrac(1, 10_000n);
   });
 
   // ==========================================================
@@ -114,7 +123,7 @@ describe("Integration Library via IntegrationHarness", function () {
     it("1. f(x)=0 on [0,1], any n → integral = 0", async () => {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
-      const I = await harness.trap(target, sel.f_zero, a, b, 10);
+      const I = await harness.trapezoidal(target, sel.f_zero, a, b, 10);
       const cmp = await harness.cmp(I, q.zero);
       expect(Number(cmp)).to.equal(0);
     });
@@ -122,7 +131,7 @@ describe("Integration Library via IntegrationHarness", function () {
     it("2. f(x)=1 on [0,1], n=1 → exact 1", async () => {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
-      const I = await harness.trap(target, sel.f_one, a, b, 1);
+      const I = await harness.trapezoidal(target, sel.f_one, a, b, 1);
       const cmp = await harness.cmp(I, q.one);
       expect(Number(cmp)).to.equal(0);
     });
@@ -131,7 +140,7 @@ describe("Integration Library via IntegrationHarness", function () {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(5);
       const expected = await harness.qFromInt(5);
-      const I = await harness.trap(target, sel.f_one, a, b, 10);
+      const I = await harness.trapezoidal(target, sel.f_one, a, b, 10);
       const cmp = await harness.cmp(I, expected);
       expect(Number(cmp)).to.equal(0);
     });
@@ -140,7 +149,7 @@ describe("Integration Library via IntegrationHarness", function () {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
       const expected = await harness.qFromFrac(1, 2); // 0.5
-      const I = await harness.trap(target, sel.f_x, a, b, 10);
+      const I = await harness.trapezoidal(target, sel.f_linear, a, b, 10);
       await expectApprox(I, expected, TOL_1E9, "trap: x on [0,1]");
     });
 
@@ -148,22 +157,22 @@ describe("Integration Library via IntegrationHarness", function () {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(2);
       const expected = await harness.qFromInt(2); // ∫0^2 x dx = 2
-      const I = await harness.trap(target, sel.f_x, a, b, 20);
+      const I = await harness.trapezoidal(target, sel.f_linear, a, b, 20);
       await expectApprox(I, expected, TOL_1E9, "trap: x on [0,2]");
     });
 
     it("6. f(x)=x^2 on [0,1], n=100 → ≈ 1/3", async () => {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
-      const expected = await harness.qFromFrac(1, 3); // ≈ 0.3333
-      const I = await harness.trap(target, sel.f_x2, a, b, 100);
+      const expected = await harness.qFromFrac(1, 3);
+      const I = await harness.trapezoidal(target, sel.f_square, a, b, 100);
       await expectApprox(I, expected, TOL_TRAP, "trap: x^2 on [0,1]");
     });
 
     it("7. a==b → integral = 0 and f(x) is never called (using reverting f)", async () => {
       const a = await harness.qFromInt(2);
-      const b = a; // same bound
-      const I = await harness.trap(target, sel.f_revert, a, b, 10);
+      const b = a;
+      const I = await harness.trapezoidal(target, sel.f_revert, a, b, 10);
       const cmp = await harness.cmp(I, q.zero);
       expect(Number(cmp)).to.equal(0);
     });
@@ -172,7 +181,7 @@ describe("Integration Library via IntegrationHarness", function () {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
       await expect(
-        harness.trap(target, sel.f_one, a, b, 0)
+        harness.trapezoidal(target, sel.f_one, a, b, 0)
       ).to.be.revertedWith("Integration: n must be > 0");
     });
 
@@ -180,7 +189,7 @@ describe("Integration Library via IntegrationHarness", function () {
       const a = await harness.qFromInt(2);
       const b = await harness.qFromInt(1);
       await expect(
-        harness.trap(target, sel.f_one, a, b, 10)
+        harness.trapezoidal(target, sel.f_one, a, b, 10)
       ).to.be.revertedWith("Integration: upper bound b must be >= a");
     });
 
@@ -188,7 +197,7 @@ describe("Integration Library via IntegrationHarness", function () {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
       await expect(
-        harness.trap(ethers.ZeroAddress, sel.f_one, a, b, 10)
+        harness.trapezoidal(ethers.ZeroAddress, sel.f_one, a, b, 10)
       ).to.be.revertedWith("Integration: target is zero");
     });
   });
@@ -208,8 +217,8 @@ describe("Integration Library via IntegrationHarness", function () {
     it("12. f(x)=x on [0,1], n=10 (even) → ≈ 1/2", async () => {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
-      const expected = await harness.qFromFrac(1, 2); // 0.5
-      const I = await harness.simpson13(target, sel.f_x, a, b, 10);
+      const expected = await harness.qFromFrac(1, 2);
+      const I = await harness.simpson13(target, sel.f_linear, a, b, 10);
       await expectApprox(I, expected, TOL_1E9, "simpson 1/3: x on [0,1]");
     });
 
@@ -217,7 +226,7 @@ describe("Integration Library via IntegrationHarness", function () {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
       const expected = await harness.qFromFrac(1, 3);
-      const I = await harness.simpson13(target, sel.f_x2, a, b, 10);
+      const I = await harness.simpson13(target, sel.f_square, a, b, 10);
       await expectApprox(I, expected, TOL_1E9, "simpson 1/3: x^2 on [0,1]");
     });
 
@@ -225,11 +234,11 @@ describe("Integration Library via IntegrationHarness", function () {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
       const expected = await harness.qFromFrac(1, 4);
-      const I = await harness.simpson13(target, sel.f_x3, a, b, 10);
+      const I = await harness.simpson13(target, sel.f_cube, a, b, 10);
       await expectApprox(I, expected, TOL_1E9, "simpson 1/3: x^3 on [0,1]");
     });
 
-    it("15. a==b → integral = 0 and f(x) not called (reverting f)", async () => {
+    it("15. a==b → integral = 0 and f(x) not called", async () => {
       const a = await harness.qFromInt(3);
       const b = a;
       const I = await harness.simpson13(target, sel.f_revert, a, b, 2);
@@ -270,7 +279,7 @@ describe("Integration Library via IntegrationHarness", function () {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
       const expected = await harness.qFromFrac(1, 2);
-      const I = await harness.simpson38(target, sel.f_x, a, b, 3);
+      const I = await harness.simpson38(target, sel.f_linear, a, b, 3);
       await expectApprox(I, expected, TOL_1E9, "simpson 3/8: x on [0,1]");
     });
 
@@ -278,7 +287,7 @@ describe("Integration Library via IntegrationHarness", function () {
       const a = await harness.qFromInt(0);
       const b = await harness.qFromInt(1);
       const expected = await harness.qFromFrac(1, 4);
-      const I = await harness.simpson38(target, sel.f_x3, a, b, 3);
+      const I = await harness.simpson38(target, sel.f_cube, a, b, 3);
       await expectApprox(I, expected, TOL_1E9, "simpson 3/8: x^3 on [0,1]");
     });
 
@@ -290,7 +299,7 @@ describe("Integration Library via IntegrationHarness", function () {
       ).to.be.revertedWith("Integration: Simpson 3/8 requires n % 3 == 0");
     });
 
-    it("22. a==b → integral = 0 and f(x) not called (reverting f)", async () => {
+    it("22. a==b → integral = 0 and f(x) not called", async () => {
       const a = await harness.qFromInt(5);
       const b = a;
       const I = await harness.simpson38(target, sel.f_revert, a, b, 3);

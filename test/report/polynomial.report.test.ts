@@ -24,10 +24,23 @@ type Harness = Contract & {
 
 // Deploy harness
 async function deployHarness(): Promise<Harness> {
-  const F = await ethers.getContractFactory("PolynomialHarness");
-  const h = (await F.deploy()) as unknown as Harness;
+  const MathLibFactory = await ethers.getContractFactory("MathLib");
+  const math = await MathLibFactory.deploy();
+  await math.waitForDeployment();
+  const mathAddr = await math.getAddress();
+
+  const HarnessFactory = await ethers.getContractFactory(
+    "PolynomialHarness",
+    {
+      libraries: {
+        "contracts/libraries/MathLib.sol:MathLib": mathAddr,
+      }
+    }
+  );
+
+  const h = await HarnessFactory.deploy();
   await h.waitForDeployment();
-  return h;
+  return h as unknown as Harness;
 }
 
 // --- utilities ---
