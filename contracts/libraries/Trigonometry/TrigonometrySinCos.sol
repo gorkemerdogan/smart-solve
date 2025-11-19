@@ -173,7 +173,7 @@ library TrigonometrySinCos {
 
         // 2) Special case: exact multiples of π/2
         //    xr == 0 => x = k * (π/2)
-        if (MathLib.cmp(xr, QZERO) == 0) {
+        if (MathLib.isZero(xr)) {
             uint8 q = _quadrant(mask);
             if (q == 1) return MathLib.fromUInt(1);                // +π/2, 5π/2, ...
             if (q == 3) return MathLib.neg(MathLib.fromUInt(1));   // -π/2, 3π/2, ...
@@ -218,7 +218,7 @@ library TrigonometrySinCos {
         (bytes16 xr, uint8 mask) = reduceAngle(x);
 
         // 2) Special case: exact multiples of π/2
-        if (MathLib.cmp(xr, QZERO) == 0) {
+        if (MathLib.isZero(xr)) {
             uint8 q = _quadrant(mask);
             if (q == 0) return MathLib.fromUInt(1);               // 0, 2π, ...
             if (q == 2) return MathLib.neg(MathLib.fromUInt(1));  // π, 3π, ...
