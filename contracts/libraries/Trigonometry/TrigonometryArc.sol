@@ -4,8 +4,7 @@ pragma solidity ^0.8.20;
 import { MathLib } from "../MathLib.sol";
 import { QuadConstants as QC } from "../QuadConstants.sol";
 import { TrigonometricConstants as CS } from "./TrigonometricConstants.sol";
-import { TrigonometryHelpers as TH } from "./TrigonometryHelpers.sol";
-import { TrigonometrySinCos } from "./TrigonometrySinCos.sol";
+import { TrigonometrySinCos as TSC } from "./TrigonometrySinCos.sol";
 
 /**
  * @title TrigonometryArc
@@ -118,8 +117,8 @@ library TrigonometryArc {
         // ─────────────────────────────────────────
         bytes16 y = y0;
         for (uint8 i = 0; i < 3; ++i) {
-            bytes16 sy = TrigonometrySinCos.sin(y);
-            bytes16 cy = TrigonometrySinCos.cos(y);
+            bytes16 sy = TSC.sin(y);
+            bytes16 cy = TSC.cos(y);
             bytes16 f  = MathLib.sub(sy, x);
 
             // If cos is ~0 (shouldn't happen in principal branch), just break
@@ -174,7 +173,7 @@ library TrigonometryArc {
     * consistency with the primary trigonometric identities.
     */
     function atan(bytes16 x) internal pure returns (bytes16) {
-        if (TH.isNaN(x)) return QNAN;
+        if (MathLib.isNaN(x)) return QNAN;
 
         bytes16 one = MathLib.fromUInt(1);
         bytes16 ax  = MathLib.abs(x);
@@ -200,8 +199,8 @@ library TrigonometryArc {
         //     t_next = t - (tan(t) - x) / (1 + tan²(t))
         bytes16 tiny = 0x3F8A39EF35793C767300000000000000; // ~1e-6
         for (uint8 i = 0; i < 2; ++i) {
-            bytes16 sy = TrigonometrySinCos.sin(y);
-            bytes16 cy = TrigonometrySinCos.cos(y);
+            bytes16 sy = TSC.sin(y);
+            bytes16 cy = TSC.cos(y);
 
             // Skip iteration if cos(y) ≈ 0 (near singularity)
             if (MathLib.cmp(MathLib.abs(cy), tiny) <= 0) {

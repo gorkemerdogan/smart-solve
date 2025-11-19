@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import { MathLib } from "../MathLib.sol";
 import { QuadConstants as QC } from "../QuadConstants.sol";
-import { TrigonometricConstants as CS } from "./TrigonometricConstants.sol";
 import { TrigonometryHelpers as TH } from "./TrigonometryHelpers.sol";
 
 library TrigonometrySinCos {
