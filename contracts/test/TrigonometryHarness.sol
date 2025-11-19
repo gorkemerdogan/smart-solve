@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import { MathLib } from "../libraries/MathLib.sol";
 import "../libraries/Trigonometry/Trigonometry.sol";
-import "../libraries/Trigonometry/TrigonometryHelpers.sol";
 
 /**
  * @title TrigonometryHarness
