@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "abdk-libraries-solidity/ABDKMathQuad.sol";
+import { MathLib } from "../MathLib.sol";
 
 /**
  * @title Polynomial
@@ -9,13 +9,13 @@ import "abdk-libraries-solidity/ABDKMathQuad.sol";
  * coeffs[i] corresponds to coefficient of x^i. All coeffs and x are bytes16.
  */
 library Polynomial {
-    using ABDKMathQuad for bytes16;
+    using MathLib for bytes16;
     bytes16 private constant QZERO = bytes16(0x00000000000000000000000000000000);
 
     /**
      * @notice Evaluate a polynomial at point x using Horner’s method
      * @param coeffs Array of coefficients, where coeffs[i] is the coefficient of x^i
-     * Example: for f(x) = 3x^2 + 2x + 5, coeffs = [ABDKMathQuad.fromInt(5), ABDKMathQuad.fromInt(2), ABDKMathQuad.fromInt(3)]
+     * Example: for f(x) = 3x^2 + 2x + 5, coeffs = [MathLib.fromInt(5), MathLib.fromInt(2), MathLib.fromInt(3)]
      * @param x The input value (bytes16) at which to evaluate the polynomial
      * @return y The computed value f(x) (bytes16)
      *
@@ -54,13 +54,13 @@ library Polynomial {
     function evalHornerMonic(bytes16[] memory coeffs, bytes16 x) internal pure returns (bytes16 y) {
         // Degree-1 monic: p(x) = x
         if (coeffs.length == 0) {
-            return ABDKMathQuad.fromInt(1);
+            return MathLib.fromInt(1);
         }
 
         // Horner with implicit leading 1:
         // acc_0 = 1
         // acc_{k+1} = acc_k * x + a_{n-1-k}, ending at a0
-        bytes16 acc = ABDKMathQuad.fromInt(1); // leading coefficient
+        bytes16 acc = MathLib.fromInt(1); // leading coefficient
         for (uint256 i = coeffs.length; i > 0; i--) {
             acc = acc.mul(x).add(coeffs[i - 1]);
         }
@@ -93,7 +93,7 @@ library Polynomial {
             int256 i_int = int256(i);
             
             // Convert the integer 'i' to ABDK bytes16 format
-            bytes16 i_quad = ABDKMathQuad.fromInt(i_int);
+            bytes16 i_quad = MathLib.fromInt(i_int);
             
             // d[i-1] = coeffs[i] * i
             d[i - 1] = coeffs[i].mul(i_quad);
@@ -196,7 +196,7 @@ library Polynomial {
         out = new bytes16[](coeffs.length + 1);
         out[0] = C;
         for (uint256 i = 0; i < coeffs.length; i++) {
-            bytes16 denom = ABDKMathQuad.fromInt(int256(i + 1));
+            bytes16 denom = MathLib.fromInt(int256(i + 1));
             out[i + 1] = coeffs[i].div(denom);
         }
     }
@@ -235,14 +235,14 @@ library Polynomial {
         if (n == 0) {
             // P(x) = 0 -> Q = [0], R = 0
             q = new bytes16[](1);
-            q[0] = ABDKMathQuad.fromInt(0);
-            r   = ABDKMathQuad.fromInt(0);
+            q[0] = MathLib.fromInt(0);
+            r   = MathLib.fromInt(0);
             return (q, r);
         }
         if (n == 1) {
             // Degree 0: P(x) = a0 -> Q = [0], R = a0
             q = new bytes16[](1);
-            q[0] = ABDKMathQuad.fromInt(0);
+            q[0] = MathLib.fromInt(0);
             r    = coeffs[0];
             return (q, r);
         }
@@ -272,7 +272,7 @@ library Polynomial {
     }
 
     function _isZero(bytes16 c) private pure returns (bool) {
-        return ABDKMathQuad.cmp(c, QZERO) == 0;
+        return MathLib.cmp(c, QZERO) == 0;
     }
 
     /**

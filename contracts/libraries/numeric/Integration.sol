@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "abdk-libraries-solidity/ABDKMathQuad.sol";
+import { MathLib } from "../MathLib.sol";
 
 /**
  * @title Integration
  * @notice High-precision numerical integration on uniform grids using
  *         trapezoidal rule, Simpson's 1/3 rule, and Simpson's 3/8 rule.
  *
- *         All scalars are IEEE-754 binary128 (bytes16) via ABDKMathQuad.
+ *         All scalars are IEEE-754 binary128 (bytes16) via ABDKMathQuad (MathLib).
  *         The integrand f is provided as an external view function
  *         f(bytes16) -> bytes16, addressed by (target, selector).
  *
  *         These routines are stateless and do not touch storage.
  */
 library Integration {
-    using ABDKMathQuad for bytes16;
+    using MathLib for bytes16;
 
     bytes16 private constant QZERO = bytes16(0x00000000000000000000000000000000);
 
@@ -34,7 +34,7 @@ library Integration {
 
     /// @dev true if a == 0 (handles -0 via cmp).
     function _isZero(bytes16 a) private pure returns (bool) {
-        return ABDKMathQuad.cmp(a, QZERO) == 0;
+        return MathLib.cmp(a, QZERO) == 0;
     }
 
     /// @dev Common validation similar to Java validateCommon:
@@ -49,12 +49,12 @@ library Integration {
     ) private pure {
         require(target != address(0), "Integration: target is zero");
         require(n > 0, "Integration: n must be > 0");
-        require(ABDKMathQuad.cmp(b, a) >= 0, "Integration: upper bound b must be >= a");
+        require(MathLib.cmp(b, a) >= 0, "Integration: upper bound b must be >= a");
     }
 
-    /// @dev Convert uint256 to quad (bytes16) using ABDKMathQuad.
+    /// @dev Convert uint256 to quad (bytes16) using MathLib.
     function _fromUInt(uint256 x) private pure returns (bytes16) {
-        return ABDKMathQuad.fromUInt(x);
+        return MathLib.fromUInt(x);
     }
 
     // ================================================================
@@ -95,7 +95,7 @@ library Integration {
         bytes16 fb = _eval(target, fSelector, b);
 
         // sum = 0.5*(f(a) + f(b)) = (f(a) + f(b))/2
-        bytes16 sum = fa.add(fb).div(ABDKMathQuad.fromInt(2));
+        bytes16 sum = fa.add(fb).div(MathLib.fromInt(2));
 
         // i = 1..n-1: sum += f(a + i*h)
         for (uint256 i = 1; i < n; i++) {
@@ -158,11 +158,11 @@ library Integration {
 
         // I = (h/3) * (f(a) + 4*sumOdd + 2*sumEven + f(b))
         bytes16 inner = fa
-            .add(sumOdd.mul(ABDKMathQuad.fromInt(4)))
-            .add(sumEven.mul(ABDKMathQuad.fromInt(2)))
+            .add(sumOdd.mul(MathLib.fromInt(4)))
+            .add(sumEven.mul(MathLib.fromInt(2)))
             .add(fb);
 
-        return h.div(ABDKMathQuad.fromInt(3)).mul(inner);
+        return h.div(MathLib.fromInt(3)).mul(inner);
     }
 
     // ================================================================
@@ -217,13 +217,13 @@ library Integration {
 
         // I = (3h/8) * (f(a) + 3*sumNot3 + 2*sum3 + f(b))
         bytes16 inner = fa
-            .add(sumNot3.mul(ABDKMathQuad.fromInt(3)))
-            .add(sum3.mul(ABDKMathQuad.fromInt(2)))
+            .add(sumNot3.mul(MathLib.fromInt(3)))
+            .add(sum3.mul(MathLib.fromInt(2)))
             .add(fb);
 
         bytes16 factor = h
-            .mul(ABDKMathQuad.fromInt(3))
-            .div(ABDKMathQuad.fromInt(8));
+            .mul(MathLib.fromInt(3))
+            .div(MathLib.fromInt(8));
 
         return factor.mul(inner);
     }
