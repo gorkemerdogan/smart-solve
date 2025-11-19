@@ -76,17 +76,72 @@ library RootFinding {
         }
     }
 
-    /// @dev clamp tolerance from storage
-    function _clampTol(bytes16 tol) private view returns (bytes16) {
+    /**
+    * @notice Returns the effective tolerance to be used by root-finding algorithms.
+    *
+    * @dev The tolerance selection follows a strict priority order:
+    *
+    *      1) If the caller supplies a non-zero `requestedTol`,
+    *         it is used but never allowed below the configured minimum tolerance.
+    *
+    *      2) If `requestedTol == 0`, then the global configured tolerance
+    *         (`cfg.tol`) is used instead.
+    *
+    *      3) If the global configured tolerance is unset (0),
+    *         we fall back to `QuadConstants.DEFAULT_TOL()`.
+    *
+    *      4) Regardless of source, the final tolerance is always clamped
+    *         so that:
+    *
+    *             tol >= minTol
+    *
+    *         where `minTol` is loaded from config or falls back to
+    *         `QuadConstants.DEFAULT_MIN_TOL()`.
+    *
+    * @param requestedTol  The tolerance supplied by the caller.
+    *                      If zero, the system configuration tolerance is used.
+    *
+    * @return tol          The validated and clamped tolerance value
+    *                      guaranteed to satisfy:
+    *                           tol >= minTol   and   tol > 0
+    */
+    function _clampTol(bytes16 requestedTol) private view returns (bytes16 tol) {
         LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
-        bytes16 minTol = cfg.minTol;
 
-        // Fefault fallback if not set on storage
+        // --------------------------------------------------------------
+        // Load minimum tolerance from storage or fallback default
+        // --------------------------------------------------------------
+        bytes16 minTol = cfg.minTol;
         if (minTol == bytes16(0)) {
-            minTol = minTol = QuadConstants.EPS_1e15();
+            minTol = QuadConstants.DEFAULT_MIN_TOL();
         }
 
-        return MathLib.cmp(tol, minTol) < 0 ? minTol : tol;
+        // --------------------------------------------------------------
+        // Case 1: Caller provided a specific, non-zero requestedTol
+        // --------------------------------------------------------------
+        if (!MathLib.isZero(requestedTol)) {
+            // Clamp upward to ensure tolerance >= minTol
+            if (MathLib.cmp(requestedTol, minTol) < 0) {
+                return minTol;
+            }
+            return requestedTol;
+        }
+
+        // --------------------------------------------------------------
+        // Case 2: No caller-supplied tolerance → load system config
+        // --------------------------------------------------------------
+        tol = cfg.tol;
+
+        // If system-configured tolerance is unset → fallback default
+        if (MathLib.isZero(tol)) {
+            tol = QuadConstants.DEFAULT_TOL();
+        }
+
+        // Enforce minimum tolerance
+        if (MathLib.cmp(tol, minTol) < 0) {
+            tol = minTol;
+        }
+        return tol;
     }
 
     // ================================================================
