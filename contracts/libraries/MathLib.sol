@@ -145,6 +145,19 @@ library MathLib {
     }
 
     /**
+    * @notice Returns true if `x` is exactly zero in IEEE-754 quad format.
+    * @dev Uses cmp(x, 0) to correctly treat +0 and -0 as zero.
+    *
+    * @param x  Quadruple-precision value (bytes16)
+    * @return   True if x == 0, false otherwise
+    */
+    function isZero(bytes16 x) internal pure returns (bool) {
+        // QZERO is cheaper to inline than reading a constant
+        bytes16 zero = bytes16(0);
+        return cmp(x, zero) == 0;
+    }
+
+    /**
      * @notice Compares two floating-point numbers for "approximate equality"
      * using a combined absolute and relative tolerance.
      * @param a First value
