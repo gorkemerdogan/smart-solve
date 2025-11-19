@@ -276,6 +276,15 @@ describe("Integration Library via IntegrationHarness", function () {
       await expect(
         h.simpson13(target, SEL.square, q0, q1, 7)
       ).to.be.revertedWith("Integration: Simpson 1/3 requires even n");
+      printBlock(
+        t,
+        "invalid n (odd) should revert",
+        "Integration: Simpson 1/3 requires even n",
+        "x^2",
+        "N/A",
+        "revert",
+        "revert"
+      );
     });
   });
 
@@ -326,11 +335,21 @@ describe("Integration Library via IntegrationHarness", function () {
       expect(val).to.equal(q0);
     });
 
-    it("16. invalid n (not multiple of 3)", async () => {
+    it("16. invalid n (not multiple of 3) -> revert", async () => {
       t++;
+      const args = [target, SEL.square, q0, q1, 10];
       await expect(
-        h.simpson38(target, SEL.square, q0, q1, 10)
+        h.simpson38(...args)
       ).to.be.revertedWith("Integration: Simpson 3/8 requires n % 3 == 0");
+      printBlock(
+        t,
+        "invalid n (not multiple of 3)",
+        "Integration: Simpson 3/8 requires n % 3 == 0",
+        "x^2",
+        "N/A",
+        "revert",
+        "revert"
+      );
     });
   });
 
@@ -339,6 +358,7 @@ describe("Integration Library via IntegrationHarness", function () {
   // ================================================================
   describe("Edge Cases", function () {
     it("17. tiny magnitudes f=1e-30·x", async () => {
+      t++;
       const args = [target, SEL.tiny, q0, q1, 30];
       await touchGas(h, "trapezoidal", args);
       const gas = await estimateGas(h, "trapezoidal", args);
@@ -384,6 +404,15 @@ describe("Integration Library via IntegrationHarness", function () {
       await expect(
         h.trapezoidal(target, SEL.square, q1, q0, 10)
       ).to.be.revertedWith("Integration: upper bound b must be >= a");
+      printBlock(
+        t,
+        "reversed bounds → revert",
+        "Integration: upper bound b must be >= a",
+        "x^2",
+        "N/A",
+        "revert",
+        "revert"
+      );
     });
   });
 });
