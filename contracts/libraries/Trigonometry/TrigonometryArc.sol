@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import { MathLib } from "../MathLib.sol";
 import { QuadConstants as QC } from "../QuadConstants.sol";
-import { TrigonometricConstants as CS } from "./TrigonometricConstants.sol";
 import { TrigonometrySinCos as TSC } from "./TrigonometrySinCos.sol";
 
 /**
@@ -51,6 +50,14 @@ library TrigonometryArc {
             return x;
         }
 
+        bytes16 C3  = MathLib.div(MathLib.fromInt(1),   MathLib.fromInt(6));
+        bytes16 C5  = MathLib.div(MathLib.fromInt(3),   MathLib.fromInt(40));
+        bytes16 C7  = MathLib.div(MathLib.fromInt(5),   MathLib.fromInt(112));
+        bytes16 C9  = MathLib.div(MathLib.fromInt(35),  MathLib.fromInt(1152));
+        bytes16 C11 = MathLib.div(MathLib.fromInt(63),  MathLib.fromInt(2816));
+        bytes16 C13 = MathLib.div(MathLib.fromInt(231), MathLib.fromInt(13312));
+        bytes16 C15 = MathLib.div(MathLib.fromInt(143), MathLib.fromInt(10240));
+
         bytes16 half = MathLib.div(one, MathLib.fromUInt(2)); // 0.5
         bytes16 y0; // initial approximation
 
@@ -60,14 +67,14 @@ library TrigonometryArc {
         // ─────────────────────────────────────────
         if (MathLib.cmp(ax, half) <= 0) {
             bytes16 x2 = MathLib.mul(x, x);
+            bytes16 p = C15;
 
-            bytes16 p = CS.ASIN_C15();
-            p = MathLib.add(CS.ASIN_C13(), MathLib.mul(x2, p));
-            p = MathLib.add(CS.ASIN_C11(), MathLib.mul(x2, p));
-            p = MathLib.add(CS.ASIN_C9(),  MathLib.mul(x2, p));
-            p = MathLib.add(CS.ASIN_C7(),  MathLib.mul(x2, p));
-            p = MathLib.add(CS.ASIN_C5(),  MathLib.mul(x2, p));
-            p = MathLib.add(CS.ASIN_C3(),  MathLib.mul(x2, p));
+            p = MathLib.add(C13, MathLib.mul(x2, p));
+            p = MathLib.add(C11, MathLib.mul(x2, p));
+            p = MathLib.add(C9,  MathLib.mul(x2, p));
+            p = MathLib.add(C7,  MathLib.mul(x2, p));
+            p = MathLib.add(C5,  MathLib.mul(x2, p));
+            p = MathLib.add(C3,  MathLib.mul(x2, p));
 
             y0 = MathLib.add(x, MathLib.mul(x, p));
         } else {
@@ -90,13 +97,13 @@ library TrigonometryArc {
             // asin(r) with same Region-1 polynomial
             bytes16 r2 = MathLib.mul(r, r);
 
-            bytes16 p2 = CS.ASIN_C15();
-            p2 = MathLib.add(CS.ASIN_C13(), MathLib.mul(r2, p2));
-            p2 = MathLib.add(CS.ASIN_C11(), MathLib.mul(r2, p2));
-            p2 = MathLib.add(CS.ASIN_C9(),  MathLib.mul(r2, p2));
-            p2 = MathLib.add(CS.ASIN_C7(),  MathLib.mul(r2, p2));
-            p2 = MathLib.add(CS.ASIN_C5(),  MathLib.mul(r2, p2));
-            p2 = MathLib.add(CS.ASIN_C3(),  MathLib.mul(r2, p2));
+            bytes16 p2 = C15;
+            p2 = MathLib.add(C13, MathLib.mul(r2, p2));
+            p2 = MathLib.add(C11, MathLib.mul(r2, p2));
+            p2 = MathLib.add(C9,  MathLib.mul(r2, p2));
+            p2 = MathLib.add(C7,  MathLib.mul(r2, p2));
+            p2 = MathLib.add(C5,  MathLib.mul(r2, p2));
+            p2 = MathLib.add(C3,  MathLib.mul(r2, p2));
 
             bytes16 asin_r = MathLib.add(r, MathLib.mul(r, p2)); // asin(r)
             bytes16 two    = MathLib.fromUInt(2);
