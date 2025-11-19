@@ -4,14 +4,10 @@ pragma solidity ^0.8.20;
 import { IDiamondLoupe } from "../interfaces/IDiamondLoupe.sol";
 import { LibSmartSolve } from "../libraries/LibSmartSolve.sol";
 
-/*
- * =============== DiamondLoupeFacet.sol ===============
- *
- * Implements the IDiamondLoupe interface (EIP-2535).
- * Lets anyone inspect the current state of the diamond:
- *   - Which facets exist
- *   - Which selectors each facet has
- *   - Which facet implements a specific selector
+/**
+ * @title DiamondLoupeFacet
+ * @notice Implements the IDiamondLoupe interface (EIP-2535).
+ * @dev Allows querying facet addresses, selectors, and mappings from selectors to facets.
  */
 
 contract DiamondLoupeFacet is IDiamondLoupe {

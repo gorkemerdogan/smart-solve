@@ -1,27 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/*
- * =============== IDiamondCut.sol ===============
+/**
+ * @title IDiamondCut
+ * @notice Interface defining the upgrade mechanism for EIP-2535 diamonds.
+ *         Supports adding, replacing, and removing function selectors across facets.
+ * @dev A diamond upgrade is performed through `diamondCut`, which specifies:
+ *      - an array of facet modifications,
+ *      - an optional initialization address,
+ *      - and optional initialization calldata executed via delegatecall.
  *
- * Defines the "upgrade mechanism" for diamonds.
- * Lets the diamond owner add, replace, or remove functions
- * by pointing them to different facets.
+ *      Data structures:
+ *      - FacetCutAction : { Add, Replace, Remove }
+ *      - FacetCut : { facetAddress, functionSelectors, action }
  *
- * Functions:
- * - diamondCut(facetCuts, init, calldata)
- *   * facetCuts = array of changes (add/replace/remove)
- *   * init = address of contract to run setup code after upgrade
- *   * calldata = the encoded function call for `init`
- *
- * Enums & Structs:
- * - FacetCutAction : { Add, Replace, Remove }
- * - FacetCut : { facetAddress, functionSelectors, action }
- *
- * Events:
- * - DiamondCut : emitted after every upgrade
+ *      Event:
+ *      - DiamondCut : emitted after any facet modification.
  */
-
 interface IDiamondCut {
     enum FacetCutAction { Add, Replace, Remove }
 

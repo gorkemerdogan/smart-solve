@@ -15,8 +15,7 @@ import { QuadConstants } from "../QuadConstants.sol";
 library RootFinding {
     using MathLib for bytes16;
 
-    // ---- constants (quad literals) ----
-    bytes16 private constant QZERO = 0x00000000000000000000000000000000; // 0.0
+    bytes16 private constant QZERO = 0x00000000000000000000000000000000;
 
     // ================================================================
     // Result & internal working-state structs
@@ -24,6 +23,7 @@ library RootFinding {
 
     /**
      * @notice Result container for any root-finding algorithm.
+     * @dev Encapsulates the final approximation, iteration count, convergence flag, and f(root).
      * @param root       Final root approximation (bytes16)
      * @param iterations Number of iterations performed
      * @param converged  True if tolerance satisfied
@@ -36,14 +36,28 @@ library RootFinding {
         bytes16 fAtRoot;
     }
 
-    /// @notice Transient state for Newton–Raphson.
+    /**
+     * @notice Internal transient state used by the Newton–Raphson method.
+     * @param x Current iterate
+     * @param fx Current value f(x)
+     * @param atTol Effective tolerance applied during iteration
+     */
     struct NewtonState {
         bytes16 x;     // current iterate
         bytes16 fx;    // f(x)
         bytes16 atTol; // active tolerance (max(requested, MIN))
     }
 
-    /// @notice Working state for Bisection.
+    /**
+     * @notice Internal state for the bisection algorithm.
+     * @param left Current left endpoint
+     * @param right Current right endpoint
+     * @param fa f(left)
+     * @param fb f(right)
+     * @param mid Midpoint of current interval
+     * @param fm f(mid)
+     * @param atTol Effective tolerance applied during iteration
+     */
     struct BisectionState {
         bytes16 left;
         bytes16 right;
@@ -54,7 +68,14 @@ library RootFinding {
         bytes16 atTol;
     }
 
-    /// @notice Transient state for Secant.
+    /**
+     * @notice Internal transient state for the secant method.
+     * @param xPrev Previous iterate
+     * @param x Current iterate
+     * @param fPrev f(xPrev)
+     * @param fx f(x)
+     * @param atTol Effective tolerance applied during iteration
+     */
     struct SecantState {
         bytes16 xPrev;
         bytes16 x;
@@ -67,7 +88,15 @@ library RootFinding {
     // Internal helpers
     // ================================================================
 
-    /// @dev f(bytes16) -> bytes16 by staticcall into `target` with selector `sel`.
+    /**
+     * @notice Evaluates the integrand or function via staticcall.
+     * @dev Calls `target.selector(x)` and decodes a bytes16 return value.
+     *      Reverts on failure or insufficient return data.
+     * @param target Address exposing f(bytes16) -> bytes16
+     * @param sel Function selector for f
+     * @param x Input point
+     * @return y Result of f(x) encoded as bytes16
+     */
     function _eval(address target, bytes4 sel, bytes16 x) private view returns (bytes16 y) {
         (bool ok, bytes memory data) = target.staticcall(abi.encodeWithSelector(sel, x));
         require(ok && data.length >= 32, "RootFinding: eval failed");
@@ -77,48 +106,25 @@ library RootFinding {
     }
 
     /**
-    * @notice Returns the effective tolerance to be used by root-finding algorithms.
-    *
-    * @dev The tolerance selection follows a strict priority order:
-    *
-    *      1) If the caller supplies a non-zero `requestedTol`,
-    *         it is used but never allowed below the configured minimum tolerance.
-    *
-    *      2) If `requestedTol == 0`, then the global configured tolerance
-    *         (`cfg.tol`) is used instead.
-    *
-    *      3) If the global configured tolerance is unset (0),
-    *         we fall back to `QuadConstants.DEFAULT_TOL()`.
-    *
-    *      4) Regardless of source, the final tolerance is always clamped
-    *         so that:
-    *
-    *             tol >= minTol
-    *
-    *         where `minTol` is loaded from config or falls back to
-    *         `QuadConstants.DEFAULT_MIN_TOL()`.
-    *
-    * @param requestedTol  The tolerance supplied by the caller.
-    *                      If zero, the system configuration tolerance is used.
-    *
-    * @return tol          The validated and clamped tolerance value
-    *                      guaranteed to satisfy:
-    *                           tol >= minTol   and   tol > 0
-    */
+     * @notice Produces the effective tolerance used by a root-finding routine.
+     * @dev Enforces the following resolution order:
+     *      - Non-zero requestedTol is used but clamped to ≥ minTol.
+     *      - Otherwise uses configured tolerance from storage.
+     *      - If unset, uses the library default tolerance.
+     *      - Result is always ≥ configured or default minimum tolerance.
+     * @param requestedTol Tolerance supplied by the caller.
+     * @return tol Validated and clamped tolerance, guaranteed > 0.
+     */
     function _clampTol(bytes16 requestedTol) private view returns (bytes16 tol) {
         LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
 
-        // --------------------------------------------------------------
         // Load minimum tolerance from storage or fallback default
-        // --------------------------------------------------------------
         bytes16 minTol = cfg.minTol;
         if (minTol == bytes16(0)) {
             minTol = QuadConstants.DEFAULT_MIN_TOL();
         }
 
-        // --------------------------------------------------------------
         // Case 1: Caller provided a specific, non-zero requestedTol
-        // --------------------------------------------------------------
         if (!MathLib.isZero(requestedTol)) {
             // Clamp upward to ensure tolerance >= minTol
             if (MathLib.cmp(requestedTol, minTol) < 0) {
@@ -127,9 +133,7 @@ library RootFinding {
             return requestedTol;
         }
 
-        // --------------------------------------------------------------
         // Case 2: No caller-supplied tolerance → load system config
-        // --------------------------------------------------------------
         tol = cfg.tol;
 
         // If system-configured tolerance is unset → fallback default
@@ -149,13 +153,18 @@ library RootFinding {
     // ================================================================
 
     /**
-     * @notice Root by Bisection over [a,b] with f(a)*f(b)<0.
-     * @param target   Contract exposing f(bytes16)->bytes16
-     * @param fSelector Selector of f
-     * @param a        Left endpoint
-     * @param b        Right endpoint
-     * @param tol      Requested tolerance (will be clamped to >= 1e-15)
-     * @param maxIter  Iteration cap
+     * @notice Computes a root using the bisection method on [a, b].
+     * @dev Requires f(a) and f(b) to have opposite signs. Endpoints are normalized
+     *      to ensure left ≤ right. Convergence is triggered when either:
+     *      - |f(mid)| ≤ tol, or
+     *      - interval width / 2 ≤ tol.
+     * @param target Contract exposing f(bytes16) -> bytes16
+     * @param fSelector Selector for f(bytes16)
+     * @param a First endpoint of the interval
+     * @param b Second endpoint of the interval
+     * @param tol Requested tolerance (clamped to configured minimum)
+     * @param maxIter Maximum number of iterations
+     * @return RootResult Struct containing root approximation and metadata
      */
     function bisection(
         address target,
@@ -218,14 +227,18 @@ library RootFinding {
     // ================================================================
 
     /**
-     * @notice Root by Newton–Raphson with analytic derivative.
-     * @param target     Contract exposing f(bytes16)->bytes16
-     * @param fSelector  Selector of f
-     * @param dfTarget   Contract exposing f'(bytes16)->bytes16
-     * @param dfSelector Selector of f'
-     * @param x0         Initial guess
-     * @param tol        Requested tolerance (clamped to >= 1e-15)
-     * @param maxIter    Iteration cap
+     * @notice Computes a root using the Newton–Raphson method with analytic derivative.
+     * @dev Requires non-zero derivative at each iterate. Convergence is based on:
+     *      - |f(xNext)| ≤ tol, or
+     *      - |xNext − x| ≤ tol.
+     * @param target Contract exposing f(bytes16) -> bytes16
+     * @param fSelector Selector for f(bytes16)
+     * @param dfTarget Contract exposing f'(bytes16)
+     * @param dfSelector Selector for f'(bytes16)
+     * @param x0 Initial guess
+     * @param tol Requested tolerance (clamped to configured minimum)
+     * @param maxIter Maximum number of iterations
+     * @return RootResult Struct with the final iterate, iteration count, and convergence flag
      */
     function newton(
         address target,
@@ -272,13 +285,18 @@ library RootFinding {
     // ================================================================
 
     /**
-     * @notice Root by Secant (derivative-free) using two initial points.
-     * @param target   Contract exposing f(bytes16)->bytes16
-     * @param fSelector Selector of f
-     * @param x0       First start
-     * @param x1       Second start
-     * @param tol      Requested tolerance (clamped to >= 1e-15)
-     * @param maxIter  Iteration cap
+     * @notice Computes a root using the secant method (derivative-free).
+     * @dev Uses two initial values and updates via the secant update formula.
+     *      Reverts if consecutive function values yield zero slope. Converges when:
+     *      - |f(xNext)| ≤ tol, or
+     *      - |xNext − x| ≤ tol.
+     * @param target Contract exposing f(bytes16) -> bytes16
+     * @param fSelector Selector for f(bytes16)
+     * @param x0 First initial point
+     * @param x1 Second initial point
+     * @param tol Requested tolerance (clamped to configured minimum)
+     * @param maxIter Maximum number of iterations
+     * @return RootResult Struct containing the resulting approximation
      */
     function secant(
         address target,

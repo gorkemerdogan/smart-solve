@@ -4,18 +4,14 @@ pragma solidity ^0.8.20;
 import { IDiamondCut } from "../interfaces/IDiamondCut.sol";
 import { LibSmartSolve } from "../libraries/LibSmartSolve.sol";
 
-/*
- * =============== DiamondCutFacet.sol ===============
- *
- * Implements IDiamondCut.
- * Exposes the diamondCut() function so the owner can
- * add/replace/remove function selectors to facets.
- *
- * The actual logic lives in LibSmartSolve.diamondCut().
- * This facet is just the external entry point for users.
- *
- * Access control:
- * Only the contract owner (IERC173) can call diamondCut().
+/**
+ * @title DiamondCutFacet
+ * @notice Implements IDiamondCut.
+ *         Exposes the diamondCut() function so the owner can
+ *         add/replace/remove function selectors to facets.
+ * @dev Delegates all logic to LibSmartSolve.diamondCut().
+ *      This facet only exposes the external entry point required by the diamond standard.
+ *      Access control: restricted to the contract owner (IERC173).
  */
 
 contract DiamondCutFacet is IDiamondCut {

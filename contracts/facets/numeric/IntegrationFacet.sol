@@ -43,8 +43,8 @@ contract IntegrationFacet {
             n = 102;
         }
 
-        // Round n down to the nearest multiple of 6.
-        // This makes n valid for Simpson 1/3 (even) and 3/8 (n % 3 == 0).
+        // Handle edge case where the original n was < 6.
+        // Return a valid n > 0. The smallest valid n for all rules is 6.
         n = n - (n % 6);
 
         // Handle edge case where the original n was < 6.
@@ -159,8 +159,7 @@ contract IntegrationFacet {
     }
 
     /**
-     * @notice Returns the current default n (grid size) this facet will use
-     *         when you call the auto-n variants.
+     * @notice Returns the current default grid size n used by the auto-n variants.
      */
     function getDefaultIntegrationN() external view returns (uint256 n) {
         n = _defaultN();

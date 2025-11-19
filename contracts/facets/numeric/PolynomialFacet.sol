@@ -8,8 +8,8 @@ import { Polynomial } from "../../libraries/numeric/Polynomial.sol";
  * @notice External Diamond facet that exposes Polynomial (ABDK quad) utilities.
  *         All inputs/outputs use IEEE-754 quadruple precision as bytes16.
  *
- * Gas note: library functions take `memory` arrays, so we copy `calldata`
- * arrays to `memory` once per call.
+ * @dev Library functions require `memory` arrays, therefore calldata arrays are copied
+ *      to memory once per call.
  */
 contract PolynomialFacet {
     /*─────────────────────────── helpers ───────────────────────────*/

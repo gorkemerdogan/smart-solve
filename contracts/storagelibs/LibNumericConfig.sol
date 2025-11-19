@@ -3,19 +3,20 @@ pragma solidity ^0.8.20;
 
 /**
  * @title LibNumericConfig
- * @notice Global numeric configuration stored in diamond storage.
- * @dev tol (tolerance) and minTol (min tolerance) is bytes16 when using ABDKMathQuad. maxIter is a hard cap for loops.
+ * @notice Stores global numeric configuration in diamond storage.
+ * @dev Contains tolerance values (tol, minTol) encoded as bytes16 (ABDKMathQuad)
+ *      and maxIter as the global iteration cap for numerical routines.
  */
 library LibNumericConfig {
     // Fixed storage slot for numeric config (unique hash key)
     bytes32 internal constant SLOT = keccak256("smart-solve.numeric.config.v1");
 
     /**
-     * @notice Struct holding global numeric configuration values.
-     * @param tol: numerical tolerance as ABDKMathQuad (bytes16)
-     * @param minTol: numerical minimum tolerance as ABDKMathQuad (bytes16)
-     * @param maxIter: maximum iterations allowed for loops (e.g., 500)
-     */
+    * @notice Global numeric configuration values.
+    * @param tol Numerical tolerance encoded as bytes16
+    * @param minTol Minimum allowable tolerance encoded as bytes16
+    * @param maxIter Maximum iteration count for numeric loops
+    */
     struct NumericConfig {
         bytes16 tol;
         bytes16 minTol;
@@ -41,7 +42,7 @@ library LibNumericConfig {
     function setTol(bytes16 tol) internal {
         cfg().tol = tol;
     }
-    
+
     /**
      * @notice Update min tolerance in storage
      * @param minTol The new min tolerance value as ABDKMathQuad (bytes16)

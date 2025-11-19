@@ -7,17 +7,11 @@ import { TrigonometrySinCos as TSC } from "./TrigonometrySinCos.sol";
 
 /**
  * @title TrigonometryArc
- * @notice High–precision inverse trig functions (asin, acos, atan) in quad.
- *
- * Strategy:
- *  - asin(x):
- *      * Domain check |x| <= 1
- *      * |x| small: return x
- *      * |x| <= 0.5: odd polynomial (ASIN_Cn) → y0
- *      * |x|  > 0.5: half–angle identity → y0
- *      * 3x Newton iteration on f(y)=sin(y)−x using TrigonometrySinCos
- *  - acos(x) = π/2 − asin(x)
- *  - atan(x) = asin( x / sqrt(1 + x²) )
+ * @notice High-precision inverse trigonometric functions (asin, acos, atan) in
+ *         IEEE-754 binary128 (bytes16) arithmetic.
+ * @dev Implements domain checks, stable polynomial approximations, half-angle
+ *      reductions, and Newton refinements. All operations are performed using
+ *      MathLib and TrigonometrySinCos.
  */
 library TrigonometryArc {
     bytes16 internal constant QZERO = 0x00000000000000000000000000000000;
@@ -28,12 +22,20 @@ library TrigonometryArc {
     ──────────────────────────────────────────────────────────*/
 
     /**
-     * @dev High-precision asin(x).
-     * Domain: x ∈ [-1, 1]
+     * @notice Computes asin(x) in binary128 precision.
+     * @dev Domain: x ∈ [-1, 1].
      *
-     * - |x| very small  → asin(x) ≈ x
-     * - |x| ≤ 0.5       → polynomial approximation + Newton refine
-     * - |x|  > 0.5      → half-angle reduction + polynomial + Newton refine
+     *      Uses a region-dependent strategy:
+     *         - |x| < tiny threshold: return x
+     *         - |x| ≤ 0.5: odd polynomial in x² + Newton refinement
+     *         - |x|  > 0.5: stable half-angle reduction followed by the same polynomial path
+     *
+     *      Final approximation is refined with Newton iterations:
+     *         f(y)  = sin(y) − x
+     *         f'(y) = cos(y)
+     *
+     * @param x Input value (bytes16)
+     * @return bytes16 asin(x) in radians, or QNAN for inputs outside the domain
      */
     function asin(bytes16 x) internal pure returns (bytes16) {
         // Domain check
@@ -145,10 +147,16 @@ library TrigonometryArc {
     ──────────────────────────────────────────────────────────*/
 
     /**
-     * @dev High-precision acos(x).
-     * Uses identity:
-     *   acos(x) = π/2 − asin(x)
-     * Domain: x ∈ [-1, 1]
+     * @notice Computes acos(x) in binary128 precision.
+     * @dev Domain: x ∈ [-1, 1].
+     *
+     *      Implemented via the identity:
+     *          acos(x) = π/2 − asin(x)
+     *
+     *      Returns QNAN if |x| > 1.
+     *
+     * @param x Input value (bytes16)
+     * @return bytes16 acos(x) in radians
      */
     function acos(bytes16 x) internal pure returns (bytes16) {
         bytes16 one = MathLib.fromUInt(1);
@@ -166,19 +174,20 @@ library TrigonometryArc {
         atan(x)
     ──────────────────────────────────────────────────────────*/
     /**
-    * @dev High-precision atan(x) in quadruple precision.
-    *
-    * Initial approximation:
-    *   atan(x) ≈ asin( x / sqrt(1 + x²) )
-    *
-    * Then refined using two Newton iterations on:
-    *   f(t)   = tan(t) - x
-    *   f'(t)  = 1 + tan(t)²
-    *   t_next = t - f(t) / f'(t)
-    *
-    * This approach maintains accuracy up to ~1e-34 and ensures
-    * consistency with the primary trigonometric identities.
-    */
+     * @notice Computes atan(x) in binary128 precision.
+     * @dev Strategy:
+     *       (1) Initial approximation via:
+     *             atan(x) ≈ asin( x / sqrt(1 + x²) )
+     *
+     *       (2) Two Newton refinements on:
+     *             f(t)  = tan(t) − x
+     *             f'(t) = 1 + tan²(t)
+     *
+     *       For |x| → ∞, returns ±π/2.
+     *
+     * @param x Input value (bytes16)
+     * @return bytes16 atan(x) in radians, or QNAN if x is NaN
+     */
     function atan(bytes16 x) internal pure returns (bytes16) {
         if (MathLib.isNaN(x)) return QNAN;
 

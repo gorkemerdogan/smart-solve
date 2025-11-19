@@ -3,6 +3,13 @@ pragma solidity ^0.8.20;
 
 import "../libraries/Trigonometry/Trigonometry.sol";
 
+/**
+ * @title TrigonometryFacet
+ * @notice Facet exposing high-precision trigonometric functions that operate on
+ *         IEEE-754 quadruple-precision (bytes16) values.
+ * @dev Provides thin wrappers around the Trigonometry library. All functions
+ *      are pure passthroughs: sin, cos, tan, cot, asin, acos, and atan.
+ */
 contract TrigonometryFacet {
     function sin(bytes16 x) external pure returns (bytes16) {
         return Trigonometry.sin(x);

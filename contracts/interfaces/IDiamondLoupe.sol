@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/*
- * =============== IDiamondLoupe.sol ===============
+/**
+ * @title IDiamondLoupe
+ * @notice Interface defining the inspection (loupe) functions for EIP-2535 diamonds.
+ *         Provides read-only access to facet addresses and their associated
+ *         function selectors.
+ * @dev Enables enumeration of facets, selectors within each facet, the full
+ *      facet address list, and the facet responsible for a specific function
+ *      selector.
  *
- * Defines the "loupe" API for diamonds.
- * Lets anyone *inspect* the diamond to see which facets
- * and function selectors are currently active.
- *
- * Functions:
- * 1- facets() : returns all facets + their selectors
- * 2- facetFunctionSelectors(address facet) : list of selectors for one facet
- * 3- facetAddresses() : list of all facet addresses
- * 4- facetAddress(bytes4 selector) : facet that implements this function
+ *      Functions:
+ *      - facets(): returns all facets and their selectors
+ *      - facetFunctionSelectors(facet): returns selectors for the specified facet
+ *      - facetAddresses(): returns all facet addresses
+ *      - facetAddress(selector): returns the facet implementing the selector
  */
-
 interface IDiamondLoupe {
     struct Facet {
         address facetAddress;

@@ -15,7 +15,7 @@ import { MathLib } from "../../libraries/MathLib.sol";
 contract RootFindingFacet {
     using RootFinding for *;
 
-    /// @dev Read config; if missing/zero, apply safe academic defaults.
+    /// @dev Loads configuration values, applying fallback defaults if unset.
     function _readCfg() internal view returns (bytes16 tol, uint256 maxIter) {
         LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
 

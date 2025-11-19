@@ -3,58 +3,74 @@ pragma solidity ^0.8.20;
 
 import { IDiamondCut } from "../interfaces/IDiamondCut.sol";
 
-/*
- * =============== LibSmartSolve.sol ===============
+/**
+ * @title LibSmartSolve
+ * @notice Internal library providing diamond storage and upgrade logic for the SmartSolve system.
+ * @dev Implements the EIP-2535 Diamond Storage pattern, including:
+ *      - storage layout for selector routing
+ *      - facet address management
+ *      - ownership enforcement
+ *      - diamondCut() upgrade handling
  *
- * Defines a special storage layout (DiamondStorage) for all diamonds.
- * Provides functions to manage:
- *  * Owner (set/get/enforce)
- *  * Adding, replacing, removing function selectors
- *  * Running the diamondCut process
- *
- * Diamond Storage
- * - Mapping from function selector to facet address
- * - Mapping from facet to its selectors
- * - Array of all facet addresses
- * - Owner
- * - Supported interfaces (ERC-165)
- *
- * Contract Owner
- * - Only the owner can call `diamondCut`.
- *
- * diamondCut
- * - Takes an array of facet changes
- * - Updates storage routing table accordingly
- * - Optionally calls an init function
+ *      Storage details:
+ *      - selectorToFacetAndPosition: maps selectors to facet addresses and selector indices
+ *      - facetFunctionSelectors: maps facets to their selector arrays
+ *      - facetAddresses: global list of facet addresses
+ *      - contractOwner: owner address used for access control
+ *      - supportedInterfaces: ERC-165 interface support map
  */
-
 library LibSmartSolve {
-    // unique slot for DiamondStorage
+    // Fixed storage slot used for diamond storage (EIP-2535 pattern)
     bytes32 internal constant DIAMOND_STORAGE_POSITION =
         keccak256("smart-solve.diamond.storage");
 
     // ---------------- Data Structures ----------------
 
-
-    /// @notice Holds info about one function selector
-    /// @param facetAddress The facet that implements this selector
-    /// @param selectorPosition The index of this selector inside that facet’s selector array
+    /**
+    * @notice Holds info about one function selector
+    * @param facetAddress The facet that implements this selector
+    * @param selectorPosition The index of this selector inside that facet’s selector array
+     */
     struct FacetAddressAndSelectorPosition {
         address facetAddress;
         uint16 selectorPosition; // index in facetFunctionSelectors
     }
 
-    /// @notice Holds all selectors for a given facet
-    /// @param selectors The array of function selectors for this facet
-    /// @param facetAddressPosition The index of this facet in the global facetAddresses array
+    /**
+    * @notice Holds all selectors for a given facet
+    * @param selectors The array of function selectors for this facet
+    * @param facetAddressPosition The index of this facet in the global facetAddresses array
+     */ 
     struct FacetFunctionSelectors {
         bytes4[] selectors; // functions this facet implements
         uint16 facetAddressPosition; // index in facetAddresses array
     }
 
-
-    /// @notice Global storage for the diamond
-    /// @dev Lives at DIAMOND_STORAGE_POSITION slot
+    /**
+     * @notice Core storage layout for the SmartSolve Diamond (EIP-2535).
+     * @dev Lives at the fixed DIAMOND_STORAGE_POSITION slot to avoid collisions.
+     *
+     * selectorToFacetAndPosition:
+     *      Maps each function selector to:
+     *          - the facet implementing it
+     *          - the selector’s index inside that facet’s selector array
+     *
+     * facetFunctionSelectors:
+     *      Maps a facet address to:
+     *          - the list of selectors it provides
+     *          - its index in the global facetAddresses list
+     *
+     * facetAddresses:
+     *      List of all facet addresses currently linked to the diamond.
+     *      Enables enumeration of facets and introspection (Loupe).
+     *
+     * contractOwner:
+     *      Single privileged owner used for upgrade authorization.
+     *
+     * supportedInterfaces:
+     *      ERC-165 interface ID → supported flag.
+     *      Used by facets implementing ERC-165 detection logic.
+     */
     struct DiamondStorage {
         mapping(bytes4 => FacetAddressAndSelectorPosition) selectorToFacetAndPosition;
         mapping(address => FacetFunctionSelectors) facetFunctionSelectors;
@@ -65,8 +81,12 @@ library LibSmartSolve {
 
     // ---------------- Access to Storage ----------------
 
-    /// @notice Get pointer to diamond storage
-    /// @return ds Reference to DiamondStorage struct
+    /**
+     * @notice Returns the diamond’s storage struct at the fixed EIP-2535 storage slot.
+     * @dev Uses inline assembly to bind `DiamondStorage` to the constant slot
+     *      defined by DIAMOND_STORAGE_POSITION.
+     * @return ds Pointer to the diamond storage layout
+     */
     function diamondStorage() internal pure returns (DiamondStorage storage ds) {
         bytes32 position = DIAMOND_STORAGE_POSITION;
         assembly {
@@ -76,8 +96,12 @@ library LibSmartSolve {
 
     // ---------------- Ownership ----------------
 
-    /// @notice Sets the contract owner
-    /// @param newOwner The address of the new owner
+    /**
+     * @notice Sets the contract owner address.
+     * @dev Updates the owner stored in diamond storage.
+     * @param newOwner Address to assign as the new owner
+     * @return prevOwner The previous owner address
+     */
     function setContractOwner(address newOwner) internal returns (address prevOwner) {
         DiamondStorage storage ds = diamondStorage();
         prevOwner = ds.contractOwner;
@@ -85,24 +109,33 @@ library LibSmartSolve {
         return prevOwner;
     }
 
-    /// @notice Returns the current contract owner
-    /// @return The address of the contract owner
+    /**
+     * @notice Retrieves the current contract owner.
+     * @return Address of the owner stored in diamond storage
+     */
     function contractOwner() internal view returns (address) {
         return diamondStorage().contractOwner;
     }
 
-    /// @notice Ensures the caller is the contract owner
-    /// @dev Reverts if msg.sender != contractOwner
+    /**
+     * @notice Reverts unless msg.sender equals the stored contract owner.
+     * @dev Used by facets to enforce privileged upgrade access.
+     */
     function enforceIsContractOwner() internal view {
         require(msg.sender == diamondStorage().contractOwner, "LibSmartSolve: Must be contract owner");
     }
 
     // ---------------- DiamondCut Logic ----------------
 
-    /// @notice Executes a diamond cut (add/replace/remove functions)
-    /// @param _diamondCut Array of facet changes
-    /// @param _init Address of contract to call after upgrade (optional)
-    /// @param _calldata Encoded function call for _init (optional)
+    /**
+     * @notice Applies a diamond upgrade by adding, replacing, or removing selectors.
+     * @dev Iterates over the FacetCut list, performs the corresponding actions,
+     *      emits the DiamondCut event, then optionally performs an init delegatecall.
+     *
+     * @param _diamondCut Array of facet modifications (add/replace/remove)
+     * @param _init Target contract for optional initialization call
+     * @param _calldata Encoded call data used when executing the init delegatecall
+     */
     function diamondCut(
         IDiamondCut.FacetCut[] memory _diamondCut,
         address _init,
@@ -126,9 +159,14 @@ library LibSmartSolve {
 
     // ---------------- Helpers for DiamondCut ----------------
 
-    /// @notice Adds new function selectors and maps them to a facet
-    /// @param _facet Address of the facet providing these functions
-    /// @param _selectors List of function selectors to add
+    /**
+     * @notice Adds a list of function selectors to a facet.
+     * @dev Registers the facet if new, appends selectors, and updates the
+     *      selector→facet mapping. Reverts if any selector already exists.
+     *
+     * @param _facet Facet address providing the implementations
+     * @param _selectors Function selectors to add
+     */
     function addFunctions(address _facet, bytes4[] memory _selectors) internal {
         require(_facet != address(0), "LibSmartSolve: facet address is zero");
         DiamondStorage storage ds = diamondStorage();
@@ -149,9 +187,14 @@ library LibSmartSolve {
         }
     }
 
-    /// @notice Replaces existing selectors with ones from a new facet
-    /// @param _facet Address of the new facet
-    /// @param _selectors Function selectors to replace
+    /**
+     * @notice Replaces existing selectors with implementations from a new facet.
+     * @dev Each selector is removed, then re-added pointing to the new facet.
+     *      Reverts if the new facet address is zero.
+     *
+     * @param _facet Facet supplying replacement implementations
+     * @param _selectors Function selectors to replace
+     */
     function replaceFunctions(address _facet, bytes4[] memory _selectors) internal {
         require(_facet != address(0), "LibSmartSolve: facet address is zero");
         for (uint256 i; i < _selectors.length; i++) {
@@ -160,9 +203,12 @@ library LibSmartSolve {
         }
     }
 
-    /// @notice Removes function selectors from the diamond
-    // @param _facet Ignored (kept for event compatibility)
-    /// @param _selectors Function selectors to remove
+    /**
+     * @notice Removes a list of function selectors from the diamond.
+     * @dev Deletes each selector mapping and removes empty facets.
+     *
+     * @param _selectors Function selectors to remove
+     */
     function removeFunctions(address /*_facet*/, bytes4[] memory _selectors) internal {
         // _facet param is unused but kept for event consistency
         for (uint256 i; i < _selectors.length; i++) {
@@ -170,22 +216,29 @@ library LibSmartSolve {
         }
     }
 
+    /**
+     * @notice Removes a single selector from the diamond.
+     * @dev Performs in-place swap & pop on the facet’s selector array,
+     *      updates selector positions, and removes facets that become empty.
+     *
+     * @param _selector The selector to remove
+     */
     function removeFunction(bytes4 _selector) private {
         DiamondStorage storage ds = diamondStorage();
         FacetAddressAndSelectorPosition memory old = ds.selectorToFacetAndPosition[_selector];
         require(old.facetAddress != address(0), "LibSmartSolve: selector does not exist");
 
-        // get facet selectors array
+        // Get facet selectors array
         bytes4[] storage selectors = ds.facetFunctionSelectors[old.facetAddress].selectors;
         uint256 lastPos = selectors.length - 1;
         bytes4 lastSelector = selectors[lastPos];
 
-        // swap & pop
+        // Swap last selector into removed selector's position and pop the array
         selectors[old.selectorPosition] = lastSelector;
         ds.selectorToFacetAndPosition[lastSelector].selectorPosition = old.selectorPosition;
         selectors.pop();
 
-        // if facet now empty, remove facet address
+        // If facet now empty, remove facet address
         if (selectors.length == 0) {
             uint16 lastAddrPos = uint16(ds.facetAddresses.length - 1);
             address lastAddr = ds.facetAddresses[lastAddrPos];
@@ -201,11 +254,14 @@ library LibSmartSolve {
 
     // ---------------- Init Call ----------------
 
-
-    /// @notice Executes optional init call after diamondCut
-    /// @param _init The contract to delegatecall
-    /// @param _calldata Encoded function call for _init
-    /// @dev Allows running setup logic (e.g., initializing storage) after upgrade
+    /**
+     * @notice Executes the optional initialization delegatecall after a diamond cut.
+     * @dev Reverts if `_init` is zero but calldata is non-empty. Propagates
+     *      revert data from failed delegatecalls.
+     *
+     * @param _init Target contract to execute initialization logic
+     * @param _calldata Encoded call for the delegatecall
+     */
     function initializeDiamondCut(address _init, bytes memory _calldata) private {
         if (_init == address(0)) {
             require(_calldata.length == 0, "LibSmartSolve: _init is zero but calldata is not empty");
@@ -225,12 +281,13 @@ library LibSmartSolve {
     }
 
     // ---------------- Utility ----------------
-
-    /// @notice Helper to pack a single selector into an array
-    /// useful for single function operations
-    /// @param selector The function selector
-    /// @return arr A new array containing only that selector
-    /// @dev Useful when replacing a single function
+    
+    /**
+     * @notice Wraps a single bytes4 selector into a dynamic array.
+     * @dev Used when replaceFunctions() needs to add a single selector.
+     * @param selector Function selector to pack
+     * @return arr Array containing exactly one selector
+     */
     function toSingletonArray(bytes4 selector) private pure returns (bytes4[] memory arr) {
         arr = new bytes4[](1);
         arr[0] = selector;

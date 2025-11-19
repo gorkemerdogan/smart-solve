@@ -1,28 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/*
- * =============== IERC173.sol ===============
- *
- * Defines a **standard for ownership** of contracts.
- * Lets a contract have a single "owner" who can transfer ownership.
- *
- *
- * Functions:
- * 1- owner() : returns the current owner address
- * 2- transferOwnership(newOwner) : updates ownership (only owner can call this)
- *
- * Events:
- * - OwnershipTransferred(previousOwner, newOwner) : logs ownership changes
+/**
+ * @title IERC173
+ * @notice ERC-173 ownership standard defining a minimal interface for
+ *         single-owner contract control.
+ * @dev Provides functions for retrieving and updating the contract owner,
+ *      along with the OwnershipTransferred event.
  */
-
 interface IERC173 {
-    /// @notice Emitted when ownership changes
+    /**
+     * @notice Emitted when ownership changes.
+     * @param previousOwner Address of the former owner.
+     * @param newOwner Address of the new owner.
+     */
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-    /// @notice Get the address of the current owner
+    /**
+     * @notice Returns the address of the current contract owner.
+     */
     function owner() external view returns (address);
 
-    /// @notice Transfer ownership to a new address
+    /**
+     * @notice Updates the contract owner.
+     * @param newOwner The new owner address.
+     */
     function transferOwnership(address newOwner) external;
 }

@@ -23,7 +23,15 @@ library Integration {
     // Internal helpers
     // ================================================================
 
-    /// @dev f(bytes16) -> bytes16 by staticcall into `target` with selector `sel`.
+    /**
+     * @notice Evaluates the integrand at a given point by staticcalling the target contract.
+     * @dev Performs a staticcall to `target` using selector `sel` with argument `x`.
+     *      Reverts if the call fails or returns insufficient data.
+     * @param target Address of the contract exposing f(bytes16) -> bytes16
+     * @param sel Function selector for the integrand
+     * @param x Input point where the integrand is evaluated
+     * @return y Result of f(x) as bytes16
+     */
     function _eval(address target, bytes4 sel, bytes16 x) private view returns (bytes16 y) {
         (bool ok, bytes memory data) = target.staticcall(abi.encodeWithSelector(sel, x));
         require(ok && data.length >= 32, "Integration: eval failed");
@@ -32,16 +40,19 @@ library Integration {
         }
     }
 
-    /// @dev Common validation similar to Java validateCommon:
-    ///      - target nonzero
-    ///      - n > 0
-    ///      - b >= a
-    function _validateCommon(
-        address target,
-        bytes16 a,
-        bytes16 b,
-        uint256 n
-    ) private pure {
+    /**
+     * @notice Validates shared integration constraints for all numerical schemes.
+     * @dev Ensures:
+     *      - target address is nonzero
+     *      - n > 0
+     *      - b >= a (based on MathLib.cmp)
+     *      Used by all integration routines prior to computation.
+     * @param target Address of the contract exposing the integrand
+     * @param a Lower bound
+     * @param b Upper bound
+     * @param n Number of subintervals
+     */
+    function _validateCommon(address target, bytes16 a, bytes16 b, uint256 n) private pure {
         require(target != address(0), "Integration: target is zero");
         require(n > 0, "Integration: n must be > 0");
         require(MathLib.cmp(b, a) >= 0, "Integration: upper bound b must be >= a");
@@ -52,27 +63,17 @@ library Integration {
     // ================================================================
 
     /**
-     * @notice Composite trapezoidal rule on a uniform grid.
-     *
-     *         Integral ≈ h * [ 0.5 f(a) + f(a+h) + ... + f(b-h) + 0.5 f(b) ]
-     *
-     * @param target    Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector of f in `target`
-     * @param a         Lower integration bound (bytes16)
-     * @param b         Upper integration bound (bytes16) (must satisfy b >= a)
-     * @param n         Number of subintervals (must be > 0)
-     *
-     * @return I        Approximate integral as bytes16
-     *
-     * Gas note: O(n) calls to f; all math is in memory, no storage writes.
+     * @notice Computes the composite trapezoidal rule on a uniform grid.
+     * @dev Requires n > 0 and b >= a. Performs O(n) staticcalls to the integrand.
+     *      All computation is done in memory; no storage access occurs.
+     * @param target Contract exposing f(bytes16) -> bytes16
+     * @param fSelector Selector of f(bytes16) in `target`
+     * @param a Lower integration bound (bytes16)
+     * @param b Upper integration bound (bytes16)
+     * @param n Number of subintervals (must be > 0)
+     * @return I Approximate integral value encoded as bytes16
      */
-    function trapezoidal(
-        address target,
-        bytes4 fSelector,
-        bytes16 a,
-        bytes16 b,
-        uint256 n
-    ) internal view returns (bytes16 I) {
+    function trapezoidal(address target, bytes4 fSelector, bytes16 a, bytes16 b, uint256 n) internal view returns (bytes16 I) {
         _validateCommon(target, a, b, n);
 
         // h = (b - a) / n
@@ -102,26 +103,17 @@ library Integration {
     // ================================================================
 
     /**
-     * @notice Composite Simpson's 1/3 rule on a uniform grid.
-     *
-     *         Requires n even.
-     *         Integral ≈ (h/3) [ f(a) + 4 Σ_{odd} f(a+i h) + 2 Σ_{even} f(a+i h) + f(b) ]
-     *
-     * @param target    Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector of f in `target`
-     * @param a         Lower integration bound (bytes16)
-     * @param b         Upper integration bound (bytes16) (must satisfy b >= a)
-     * @param n         Number of subintervals (must be even and > 0)
-     *
-     * @return I        Approximate integral as bytes16
+     * @notice Computes the composite Simpson’s 1/3 rule on a uniform grid.
+     * @dev Requires n > 0, n even, and b >= a. Performs O(n) staticcalls to the integrand.
+     *      All computation occurs in memory; no storage is modified.
+     * @param target Contract exposing f(bytes16) -> bytes16
+     * @param fSelector Selector of f(bytes16) in `target`
+     * @param a Lower integration bound (bytes16)
+     * @param b Upper integration bound (bytes16)
+     * @param n Number of subintervals (must be even and > 0)
+     * @return I Approximate integral value encoded as bytes16
      */
-    function simpson13(
-        address target,
-        bytes4 fSelector,
-        bytes16 a,
-        bytes16 b,
-        uint256 n
-    ) internal view returns (bytes16 I) {
+    function simpson13(address target, bytes4 fSelector, bytes16 a, bytes16 b, uint256 n) internal view returns (bytes16 I) {
         _validateCommon(target, a, b, n);
         require(n % 2 == 0, "Integration: Simpson 1/3 requires even n");
 
@@ -160,27 +152,17 @@ library Integration {
     // ================================================================
 
     /**
-     * @notice Composite Simpson's 3/8 rule on a uniform grid.
-     *
-     *         Requires n to be a multiple of 3.
-     *         Integral ≈ (3h/8) [ f(a) + 3 Σ_{i not multiple of 3} f(a+i h)
-     *                                + 2 Σ_{i multiple of 3} f(a+i h) + f(b) ]
-     *
-     * @param target    Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector of f in `target`
-     * @param a         Lower integration bound (bytes16)
-     * @param b         Upper integration bound (bytes16) (must satisfy b >= a)
-     * @param n         Number of subintervals (must be > 0 and divisible by 3)
-     *
-     * @return I        Approximate integral as bytes16
+     * @notice Computes the composite Simpson’s 3/8 rule on a uniform grid.
+     * @dev Requires n > 0, n divisible by 3, and b >= a. Performs O(n) staticcalls
+     *      to the integrand. All arithmetic is performed in memory.
+     * @param target Contract exposing f(bytes16) -> bytes16
+     * @param fSelector Selector of f(bytes16) in `target`
+     * @param a Lower integration bound (bytes16)
+     * @param b Upper integration bound (bytes16)
+     * @param n Number of subintervals (must be > 0 and divisible by 3)
+     * @return I Approximate integral value encoded as bytes16
      */
-    function simpson38(
-        address target,
-        bytes4 fSelector,
-        bytes16 a,
-        bytes16 b,
-        uint256 n
-    ) internal view returns (bytes16 I) {
+    function simpson38(address target, bytes4 fSelector, bytes16 a, bytes16 b, uint256 n) internal view returns (bytes16 I) {
         _validateCommon(target, a, b, n);
         require(n % 3 == 0, "Integration: Simpson 3/8 requires n % 3 == 0");
 

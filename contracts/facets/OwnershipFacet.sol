@@ -4,16 +4,14 @@ pragma solidity ^0.8.20;
 import { LibSmartSolve } from "../libraries/LibSmartSolve.sol";
 import { IERC173 } from "../interfaces/IERC173.sol";
 
-/*
- * =============== OwnershipFacet.sol ===============
- *
- * Implements the IERC173 (Ownership) standard.
- * Provides external functions to get and transfer ownership.
- *
- *
- * Functions:
- * - owner() : returns current contract owner
- * - transferOwnership(newOwner) : changes the owner (only callable by current owner)
+/**
+ * @title OwnershipFacet
+ * @notice Implements the IERC173 ownership standard, providing external
+ *         accessors for retrieving and updating the contract owner.
+ * @dev
+ *      - owner(): returns the current contract owner
+ *      - transferOwnership(): updates the owner; restricted to the existing owner
+ *        via LibSmartSolve.enforceIsContractOwner().
  */
 
 contract OwnershipFacet is IERC173 {
