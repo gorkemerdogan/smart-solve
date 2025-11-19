@@ -289,8 +289,7 @@ describe("Trigonometry.sol HEX + DEC Tests", function () {
   });
 
   it("DEC: atan(1) ≈ π/4", async () => {
-    // QONE is exposed as a public constant on the harness
-    const q1 = await trig.QONE();
+    const q1 = await trig.fromUInt(1);
     const qa = await trig.atan(q1);
 
     const a = await fromQuad(trig, qa);

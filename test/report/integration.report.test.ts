@@ -14,9 +14,6 @@ import type { Contract } from "ethers";
 type IntegrationHarness = Contract & {
   qFromInt(n: bigint | number): Promise<string>;
   qFromFrac(n: bigint | number, d: bigint | number): Promise<string>;
-  ZERO(): Promise<string>;
-  ONE(): Promise<string>;
-  TWO(): Promise<string>;
   PI(): Promise<string>;
   f_linear(x: string): Promise<string>;
   f_square(x: string): Promise<string>;
@@ -84,9 +81,9 @@ describe("Integration Library via IntegrationHarness", function () {
     await h.waitForDeployment();
     target = await h.getAddress();
 
-    q0 = await h.ZERO();
-    q1 = await h.ONE();
-    q2 = await h.TWO();
+    q0 = await h.qFromInt(0);
+    q1 = await h.qFromInt(1);
+    q2 = await h.qFromInt(2);
     qPI = await h.PI();
   });
 

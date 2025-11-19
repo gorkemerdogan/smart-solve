@@ -26,8 +26,6 @@ contract TrigonometryHarness {
     bytes16 public constant QQUARTER_PI= 0x3FFE921FB54442D18469898CC51701B8;
     bytes16 public constant QTWO_PI    = 0x4001921FB54442D18469898CC51701B8;
 
-    bytes16 public constant QZERO      = 0x00000000000000000000000000000000;
-    bytes16 public constant QONE       = 0x3fff0000000000000000000000000000;
     bytes16 public constant QNAN       = 0x7fff8000000000000000000000000000;
 
     /*──────────────────────────────────────────────────────────

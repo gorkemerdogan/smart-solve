@@ -18,12 +18,6 @@ type RootFindingHarness = Contract & {
   qFromInt(n: bigint | number): Promise<string>;
   qFromFrac(n: bigint | number, d: bigint | number): Promise<string>;
 
-  ZERO(): Promise<string>;
-  ONE(): Promise<string>;
-  TWO(): Promise<string>;
-  THREE(): Promise<string>;
-  FOUR(): Promise<string>;
-
   cmp(a: string, b: string): Promise<bigint>;
 
   f_x2_minus_4(x: string): Promise<string>;
@@ -164,11 +158,11 @@ describe("RootFindingFacet Complete Test Suite", function () {
     }
 
     // Cache quad constants from harness
-    q.q0 = await harness.ZERO();
-    q.q1 = await harness.ONE();
-    q.q2 = await harness.TWO();
-    q.q3 = await harness.THREE();
-    q.q4 = await harness.FOUR();
+    q.q0 = await harness.qFromInt(0);
+    q.q1 = await harness.qFromInt(1);
+    q.q2 = await harness.qFromInt(2);
+    q.q3 = await harness.qFromInt(3);
+    q.q4 = await harness.qFromInt(4);
     q.qM1 = await harness.qFromInt(-1);
     q.qM3 = await harness.qFromInt(-3);
     q.qM10 = await harness.qFromInt(-10);

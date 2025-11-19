@@ -17,41 +17,6 @@ contract RootFindingHarness {
     using MathLib for bytes16;
 
     // ------------------------------------------------------------------------
-    // Constants
-    // ------------------------------------------------------------------------
-
-    bytes16 private constant QZERO = bytes16(0x00000000000000000000000000000000);
-
-    /**
-     * @notice Returns 1 as a quadruple-precision constant.
-     */
-    function ONE() external pure returns (bytes16) {
-        return MathLib.fromInt(1);
-    }
-
-    /**
-     * @notice Returns 2 as a quadruple-precision constant.
-     */
-    function TWO() external pure returns (bytes16) {
-        return MathLib.fromInt(2);
-    }
-
-    /**
-     * @notice Returns 3 as a quadruple-precision constant.
-     */
-    function THREE() external pure returns (bytes16) {
-        return MathLib.fromInt(3);
-    }
-
-    /**
-     * @notice Returns 4 as a quadruple-precision constant.
-     */
-    function FOUR() external pure returns (bytes16) {
-        return MathLib.fromInt(4);
-    }
-
-
-    // ------------------------------------------------------------------------
     // Quadruple helper constructors
     // ------------------------------------------------------------------------
 
@@ -129,14 +94,6 @@ contract RootFindingHarness {
     // ------------------------------------------------------------------------
     // Utilities
     // ------------------------------------------------------------------------
-
-    /**
-     * @notice Returns 0 as a quadruple-precision constant.
-     * @return Quadruple-precision zero.
-     */
-    function ZERO() external pure returns (bytes16) {
-        return QZERO;
-    }
 
     /**
      * @notice Compares two quadruple-precision values.

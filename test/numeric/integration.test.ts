@@ -13,9 +13,6 @@ import type { Contract } from "ethers";
 
 type IntegrationHarness = Contract & {
   // helpers
-  ZERO(): Promise<string>;
-  ONE(): Promise<string>;
-  TWO(): Promise<string>;
   qFromInt(x: number | bigint): Promise<string>;
   qFromUInt(x: number | bigint): Promise<string>;
   qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
@@ -106,9 +103,9 @@ describe("Integration Library via IntegrationHarness", function () {
     for (const s of sigs) sel[s.split("(")[0]] = ethers.id(s).slice(0, 10);
 
     // quad constants
-    q.zero = await harness.ZERO();
-    q.one = await harness.ONE();
-    q.two = await harness.TWO();
+    q.zero = await harness.qFromInt(0);
+    q.one = await harness.qFromInt(1);
+    q.two = await harness.qFromInt(2);
     q.mOne = await harness.qFromInt(-1);
     q.mTwo = await harness.qFromInt(-2);
 

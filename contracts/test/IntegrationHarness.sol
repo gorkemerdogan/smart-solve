@@ -20,30 +20,6 @@ contract IntegrationHarness {
     // ------------------------------------------------------------
 
     /**
-     * @notice Returns the quad-precision representation of 0.
-     * @return q Quad-precision number equal to 0.
-     */
-    function ZERO() external pure returns (bytes16) {
-        return MathLib.fromInt(0);
-    }
-
-    /**
-     * @notice Returns the quad-precision representation of 1.
-     * @return q Quad-precision number equal to 1.
-     */
-    function ONE() external pure returns (bytes16) {
-        return MathLib.fromInt(1);
-    }
-
-    /**
-     * @notice Returns the quad-precision representation of 2.
-     * @return q Quad-precision number equal to 2.
-     */
-    function TWO() external pure returns (bytes16) {
-        return MathLib.fromInt(2);
-    }
-
-    /**
      * @notice Converts an int256 into its quad-precision representation.
      * @param x Signed integer value.
      * @return q Quad-precision number representing x.
