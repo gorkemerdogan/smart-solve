@@ -36,7 +36,6 @@ library QuadConstants {
 
     /// @return 0.5 as quad
     function HALF() internal pure returns (bytes16) {
-        // 1 / 2
         return fromFrac(1, 2);
     }
 
@@ -87,7 +86,7 @@ library QuadConstants {
         return fromFrac(1, 1_000_000_000_000);
     }
 
-    /// @return 1e-15 as quad (default minTol in your numeric config)
+    /// @return 1e-15 as quad (default minTol in numeric config)
     function EPS_1e15() internal pure returns (bytes16) {
         return fromFrac(1, 1_000_000_000_000_000);
     }
@@ -95,6 +94,11 @@ library QuadConstants {
     /// @return 1e-18 as quad (for “too strict, must clamp up” tests)
     function EPS_1e18() internal pure returns (bytes16) {
         return fromFrac(1, 1_000_000_000_000_000_000);
+    }
+
+    /// @return 1e-30 as quad
+    function EPS_1e30() internal pure returns (bytes16) {
+        return 0x3cd203af9ee756159b00000000000000;
     }
 
     // -------------------------------------------------------------
