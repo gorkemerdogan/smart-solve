@@ -49,39 +49,87 @@ library MathLib {
         FLOOR
     ───────────────────────────────────────────────────────────*/
 
-    function floorQuad(bytes16 x) public pure returns (bytes16) {
-        // If x >= 0: floor = trunc
+    /**
+    * @notice Compute floor(x) in IEEE-754 quadruple precision.
+    * @dev Uses truncation logic because ABDKMathQuad does not provide floor().
+    *
+    *  Rules:
+    *   - If x >= 0: floor(x) = trunc(x)
+    *   - If x < 0 and x is an integer: floor(x) = x
+    *   - If x < 0 and x is not an integer: floor(x) = trunc(x) - 1
+    *
+    * @param x Input number in quadruple precision (bytes16).
+    *
+    * @return floorX The floor of x, also in quadruple precision.
+    */
+    function floorQuad(bytes16 x) public pure returns (bytes16 floorX) {
+        // -----------------------------------------------------
+        // Case 1: x >= 0
+        // Truncation and floor are equivalent for non-negative
+        // numbers because both move toward zero.
+        // -----------------------------------------------------
         if (cmp(x, fromInt(0)) >= 0) {
-            int256 ti = toInt(x);          // truncate
-            return fromInt(ti);
+            int256 ti = toInt(x);      // remove fractional part toward zero
+            return fromInt(ti);        // floor(x) = trunc(x)
         }
 
-        // x < 0
-        int256 ti2 = toInt(x);             // truncate toward zero
-        bytes16 b = fromInt(ti2);
+        // -----------------------------------------------------
+        // Case 2: x < 0
+        // Truncation (toward zero) moves upward for negatives.
+        //
+        // Examples:
+        //   x = -2.3 → trunc = -2 → floor = -3
+        //   x = -4.0 → trunc = -4 → floor = -4
+        // -----------------------------------------------------
+        int256 ti2 = toInt(x);         // truncate toward zero
+        bytes16 b  = fromInt(ti2);     // convert to quad
 
-        // If x is already integer, floor(x) == x
+        // If trunc(x) equals x exactly, x is already an integer.
         if (cmp(b, x) == 0) {
             return b;
         }
 
-        // else: floor(x) = trunc(x) - 1
+        // Negative non-integer case: floor = trunc(x) - 1
         return sub(b, fromInt(1));
     }
 
-    function floorInt(bytes16 x) public pure returns (int256) {
+    /**
+    * @notice Compute floor(x) and return it as a signed integer (int256).
+    * @dev Logic is consistent with floorQuad(), but directly returns int256.
+    *
+    *  - If x >= 0: floor(x) = trunc(x)
+    *  - If x < 0 and x is integer: floor(x) = x
+    *  - If x < 0 and x not integer: floor(x) = trunc(x) - 1
+    *
+    *  Safe because toInt() already reverts if out of int256 range.
+    *
+    * @param x Input number in quadruple precision (bytes16).
+    *
+    * @return floorI The floor of x as a signed integer.
+    */
+    function floorInt(bytes16 x) public pure returns (int256 floorI) {
+        // -----------------------------------------------------
+        // Case 1: x >= 0
+        // trunc(x) moves toward zero → equivalent to floor(x)
+        // -----------------------------------------------------
         if (cmp(x, fromInt(0)) >= 0) {
-            return toInt(x); // trunc = floor
+            return toInt(x); // floor = trunc
         }
 
-        int256 ti = toInt(x); // trunc
-        bytes16 t = fromInt(ti);
+        // -----------------------------------------------------
+        // Case 2: x < 0
+        // trunc still moves upward; adjust for non-integers.
+        // -----------------------------------------------------
+        int256 ti = toInt(x);         // truncation
+        bytes16 t = fromInt(ti);      // convert back to quad
 
+        // If exact integer, return as-is.
         if (cmp(t, x) == 0) {
-            return ti; // already integer
+            return ti;
         }
 
-        return ti - 1; // subtract 1 for negative non-integers
+        // Negative non-integer: subtract 1
+        return ti - 1;
     }
 
     /*──────────────────────────────────────────────────────────
