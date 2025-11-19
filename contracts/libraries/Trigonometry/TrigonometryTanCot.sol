@@ -2,8 +2,6 @@
 pragma solidity ^0.8.20;
 
 import { MathLib } from "../MathLib.sol";
-import { QuadConstants as QC } from "../QuadConstants.sol";
-import { TrigonometryHelpers as TH } from "./TrigonometryHelpers.sol";
 import { TrigonometrySinCos as TSC } from "./TrigonometrySinCos.sol";
 
 library TrigonometryTanCot {
@@ -29,7 +27,7 @@ library TrigonometryTanCot {
         bytes16 s = TSC.sin(x);
         bytes16 c = TSC.cos(x);
 
-        if (TH.isNaN(s) || TH.isNaN(c)) return QNAN;
+        if (MathLib.isNaN(s) || MathLib.isNaN(c)) return QNAN;
 
         // tan undefined when cos ≈ 0
         if (MathLib.cmp(MathLib.abs(c), TINY) < 0)
@@ -55,7 +53,7 @@ library TrigonometryTanCot {
         bytes16 s = TSC.sin(x);
         bytes16 c = TSC.cos(x);
 
-        if (TH.isNaN(s) || TH.isNaN(c)) return QNAN;
+        if (MathLib.isNaN(s) || MathLib.isNaN(c)) return QNAN;
 
         // cot undefined when sin ≈ 0
         if (MathLib.cmp(MathLib.abs(s), TINY) < 0)
