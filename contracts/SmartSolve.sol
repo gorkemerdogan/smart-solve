@@ -4,25 +4,39 @@ pragma solidity ^0.8.20;
 import { LibSmartSolve } from "./libraries/LibSmartSolve.sol";
 import { IDiamondCut } from "./interfaces/IDiamondCut.sol";
 
-/*
- * =============== SmartSolve.sol ===============
+/**
+ * @title SmartSolve
+ * @notice Primary diamond (EIP-2535) proxy contract for the SmartSolve system.
  *
- * The "diamond contract" (the proxy).
- * Holds the storage (via LibSmartSolve).
- * Forwards calls to the right facet using `delegatecall`.
+ * @dev
+ * Implements the diamond storage and facet routing pattern using LibSmartSolve.
+ * This contract contains:
+ *   - Constructor: initializes ownership and installs the DiamondCutFacet
+ *   - fallback(): routes function selectors to the correct facet via delegatecall
+ *   - receive(): enables the diamond to accept ETH
  *
- * Constructor:
- * - Sets the initial owner
- * - Registers the DiamondCutFacet so upgrades are possible
+ * The diamond itself stores:
+ *   - Facet registry
+ *   - Selector-to-facet mapping
+ *   - Ownership and supported interface data
  *
- * Functions:
- * - fallback() → catches all calls, routes to correct facet
- * - receive() → handles plain ETH transfers
+ * The actual logic is implemented in facets; SmartSolve acts strictly as the proxy.
  */
-
 contract SmartSolve {
+
+    /**
+     * @notice Deploys the diamond and installs initial upgrade capability.
+     *
+     * @param _owner Address to set as the initial contract owner.
+     * @param _diamondCutFacet Address of the facet providing the diamondCut function.
+     *
+     * @dev
+     * Steps performed:
+     *   1. Set contract owner in diamond storage.
+     *   2. Register `diamondCut` selector under the provided facet, enabling upgrades.
+     *   3. No initialization call is executed (init = address(0)).
+     */
     constructor(address _owner, address _diamondCutFacet) {
-        // Set contract owner
         LibSmartSolve.setContractOwner(_owner);
 
         // Register diamondCut function so upgrades are possible
@@ -36,14 +50,25 @@ contract SmartSolve {
             action: IDiamondCut.FacetCutAction.Add
         });
 
+        // Store facet and finalize upgrade step
         LibSmartSolve.diamondCut(cut, address(0), "");
     }
 
-    /// @notice Routes calls to the right facet
+    /**
+     * @notice Fallback function routing all non-existing function calls to the correct facet.
+     *
+     * @dev
+     * Mechanism:
+     *   - Looks up msg.sig in selectorToFacetAndPosition
+     *   - Executes delegatecall to the corresponding facet
+     *   - Returns or bubbles up any revert reason
+     *
+     * Reverts if no facet implements the given selector.
+     */
     fallback() external payable {
         LibSmartSolve.DiamondStorage storage ds = LibSmartSolve.diamondStorage();
 
-        // Find facet for the function selector
+        // Locate facet for the function selector
         address facet = ds.selectorToFacetAndPosition[msg.sig].facetAddress;
         require(facet != address(0), "SmartSolve: Function not found");
 
@@ -62,6 +87,9 @@ contract SmartSolve {
         }
     }
 
-    /// @notice Allows contract to receive ETH
+    /**
+     * @notice Accepts direct ETH transfers sent to the diamond.
+     * @dev ETH may be consumed by facets implementing payable logic.
+     */
     receive() external payable {}
 }
