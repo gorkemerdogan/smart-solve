@@ -58,35 +58,12 @@ library TrigonometrySinCos {
         // c5 = -1/11!
         // c6 =  1/13!
 
-        bytes16 c1 = MathLib.neg(MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(6)          // 3! = 6
-        ));
-
-        bytes16 c2 = MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(120)        // 5! = 120
-        );
-
-        bytes16 c3 = MathLib.neg(MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(5040)       // 7! = 5040
-        ));
-
-        bytes16 c4 = MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(362880)     // 9! = 362880
-        );
-
-        bytes16 c5 = MathLib.neg(MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(39916800)   // 11! = 39916800
-        ));
-
-        bytes16 c6 = MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(6227020800) // 13! = 6227020800
-        );
+        bytes16 c1 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(6)));         // 3! = 6
+        bytes16 c2 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(120));        // 5! = 120
+        bytes16 c3 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(5040)));      // 7! = 5040
+        bytes16 c4 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(362880));     // 9! = 362880
+        bytes16 c5 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(39916800)));  // 11! = 39916800
+        bytes16 c6 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(6227020800)); // 13! = 6227020800
 
         // Horner: y = c6; y = c5 + z*y; ...; y = c1 + z*y;
         bytes16 y = c6;
@@ -124,35 +101,12 @@ library TrigonometrySinCos {
         // d5 = -1/10!
         // d6 =  1/12!
 
-        bytes16 d1 = MathLib.neg(MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(2)          // 2! = 2
-        ));
-
-        bytes16 d2 = MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(24)         // 4! = 24
-        );
-
-        bytes16 d3 = MathLib.neg(MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(720)        // 6! = 720
-        ));
-
-        bytes16 d4 = MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(40320)      // 8! = 40320
-        );
-
-        bytes16 d5 = MathLib.neg(MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(3628800)    // 10! = 3628800
-        ));
-
-        bytes16 d6 = MathLib.div(
-            MathLib.fromUInt(1),
-            MathLib.fromUInt(479001600)  // 12! = 479001600
-        );
+        bytes16 d1 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(2)));        // 2! = 2
+        bytes16 d2 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(24));        // 4! = 24
+        bytes16 d3 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(720)));      // 6! = 720
+        bytes16 d4 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(40320));     // 8! = 40320
+        bytes16 d5 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(3628800)));  // 10! = 3628800
+        bytes16 d6 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(479001600)); // 12! = 479001600
 
         // Horner: q = d6; q = d5 + z*q; ...; q = d1 + z*q;
         bytes16 q = d6;
