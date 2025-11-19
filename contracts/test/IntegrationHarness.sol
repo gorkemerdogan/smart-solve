@@ -65,17 +65,17 @@ contract IntegrationHarness {
     }
 
     /// f(x) = x
-    function f_x(bytes16 x) external pure returns (bytes16) {
+    function f_linear(bytes16 x) external pure returns (bytes16) {
         return x;
     }
 
     /// f(x) = x^2
-    function f_x2(bytes16 x) external pure returns (bytes16) {
+    function f_square(bytes16 x) external pure returns (bytes16) {
         return x.mul(x);
     }
 
     /// f(x) = x^3
-    function f_x3(bytes16 x) external pure returns (bytes16) {
+    function f_cube(bytes16 x) external pure returns (bytes16) {
         return x.mul(x).mul(x);
     }
 
@@ -134,7 +134,7 @@ contract IntegrationHarness {
 
     // ---------- Wrappers around Integration library ----------
 
-    function trap(
+    function trapezoidal (
         address target,
         bytes4 sel,
         bytes16 a,
