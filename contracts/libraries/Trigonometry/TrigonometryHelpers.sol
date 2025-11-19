@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import { MathLib } from "../MathLib.sol";
 import { QuadConstants as QC } from "../QuadConstants.sol";
-import { TrigonometricConstants as CS } from "./TrigonometricConstants.sol";
 
 library TrigonometryHelpers {
 
@@ -47,13 +46,5 @@ library TrigonometryHelpers {
             | (cosNeg << 2);
 
         return (xr, mask);
-    }
-
-    /**
-     * @dev Check if x is NaN in IEEE-754 quad format.
-     * NaN is defined as: exponent all 1s AND mantissa != 0.
-     */
-    function isNaN(bytes16 x) internal pure returns (bool) {
-        return MathLib.isNaN(x);
     }
 }
