@@ -32,11 +32,6 @@ library Integration {
         }
     }
 
-    /// @dev true if a == 0 (handles -0 via cmp).
-    function _isZero(bytes16 a) private pure returns (bool) {
-        return MathLib.cmp(a, QZERO) == 0;
-    }
-
     /// @dev Common validation similar to Java validateCommon:
     ///      - target nonzero
     ///      - n > 0
@@ -50,11 +45,6 @@ library Integration {
         require(target != address(0), "Integration: target is zero");
         require(n > 0, "Integration: n must be > 0");
         require(MathLib.cmp(b, a) >= 0, "Integration: upper bound b must be >= a");
-    }
-
-    /// @dev Convert uint256 to quad (bytes16) using MathLib.
-    function _fromUInt(uint256 x) private pure returns (bytes16) {
-        return MathLib.fromUInt(x);
     }
 
     // ================================================================
@@ -86,8 +76,8 @@ library Integration {
         _validateCommon(target, a, b, n);
 
         // h = (b - a) / n
-        bytes16 h = b.sub(a).div(_fromUInt(n));
-        if (_isZero(h)) {
+        bytes16 h = b.sub(a).div(MathLib.fromUInt(n));
+        if (MathLib.cmp(h, QZERO) == 0) {
             return QZERO; // a == b
         }
 
@@ -99,7 +89,7 @@ library Integration {
 
         // i = 1..n-1: sum += f(a + i*h)
         for (uint256 i = 1; i < n; i++) {
-            bytes16 xi = a.add(h.mul(_fromUInt(i)));
+            bytes16 xi = a.add(h.mul(MathLib.fromUInt(i)));
             sum = sum.add(_eval(target, fSelector, xi));
         }
 
@@ -135,8 +125,8 @@ library Integration {
         _validateCommon(target, a, b, n);
         require(n % 2 == 0, "Integration: Simpson 1/3 requires even n");
 
-        bytes16 h = b.sub(a).div(_fromUInt(n));
-        if (_isZero(h)) {
+        bytes16 h = b.sub(a).div(MathLib.fromUInt(n));
+        if (MathLib.cmp(h, QZERO) == 0) {
             return QZERO; // a == b
         }
 
@@ -144,7 +134,7 @@ library Integration {
         bytes16 sumEven = QZERO; // i = 2,4,6,...,n-2
 
         for (uint256 i = 1; i < n; i++) {
-            bytes16 xi = a.add(h.mul(_fromUInt(i)));
+            bytes16 xi = a.add(h.mul(MathLib.fromUInt(i)));
             bytes16 fx = _eval(target, fSelector, xi);
             if (i % 2 == 1) {
                 sumOdd = sumOdd.add(fx);
@@ -194,8 +184,8 @@ library Integration {
         _validateCommon(target, a, b, n);
         require(n % 3 == 0, "Integration: Simpson 3/8 requires n % 3 == 0");
 
-        bytes16 h = b.sub(a).div(_fromUInt(n));
-        if (_isZero(h)) {
+        bytes16 h = b.sub(a).div(MathLib.fromUInt(n));
+        if (MathLib.cmp(h, QZERO) == 0) {
             return QZERO; // a == b
         }
 
@@ -203,7 +193,7 @@ library Integration {
         bytes16 sumNot3 = QZERO;  // i not multiple of 3: 1,2,4,5,...,n-1 (excluding multiples of 3)
 
         for (uint256 i = 1; i < n; i++) {
-            bytes16 xi = a.add(h.mul(_fromUInt(i)));
+            bytes16 xi = a.add(h.mul(MathLib.fromUInt(i)));
             bytes16 fx = _eval(target, fSelector, xi);
             if (i % 3 == 0) {
                 sum3 = sum3.add(fx);
