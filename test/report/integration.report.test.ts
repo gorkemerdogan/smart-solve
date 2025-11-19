@@ -68,7 +68,18 @@ describe("Integration Library via IntegrationHarness", function () {
   let qPI: string;
 
   before(async () => {
-    const HF = await ethers.getContractFactory("IntegrationHarness");
+    // Deploy MathLib (library)
+    const MathLibFactory = await ethers.getContractFactory("MathLib");
+    const mathlib = await MathLibFactory.deploy();
+    await mathlib.waitForDeployment();
+
+    // Deploy IntegrationHarness with library linking
+    const HF = await ethers.getContractFactory("IntegrationHarness", {
+      libraries: {
+        MathLib: await mathlib.getAddress(),
+      },
+    });
+
     h = (await HF.deploy()) as unknown as IntegrationHarness;
     await h.waitForDeployment();
     target = await h.getAddress();
