@@ -41,16 +41,16 @@ library Polynomial {
     }
 
     /**
-    * @notice Evaluate a monic polynomial at x using Horner’s method.
-    *         The leading coefficient is implicitly 1, so the input excludes it.
-    *         p(x) = x^n + coeffs[n-1] * x^(n-1) + ... + coeffs[1] * x + coeffs[0]
-    *
-    * @param coeffs  Lower coefficients in ascending order: [a0, a1, ..., a_{n-1}]
-    * @param x       Evaluation point (bytes16, ABDK quad)
-    * @return y      p(x) as bytes16 (ABDK quad)
-    *
-    * Gas note: iterates once over coeffs, O(n), no storage.
-    */
+     * @notice Evaluate a monic polynomial at x using Horner’s method.
+     *         The leading coefficient is implicitly 1, so the input excludes it.
+     *         p(x) = x^n + coeffs[n-1] * x^(n-1) + ... + coeffs[1] * x + coeffs[0]
+     *
+     * @param coeffs  Lower coefficients in ascending order: [a0, a1, ..., a_{n-1}]
+     * @param x       Evaluation point (bytes16, ABDK quad)
+     * @return y      p(x) as bytes16 (ABDK quad)
+     *
+     * Gas note: iterates once over coeffs, O(n), no storage.
+     */
     function evalHornerMonic(bytes16[] memory coeffs, bytes16 x) internal pure returns (bytes16 y) {
         // Degree-1 monic: p(x) = x
         if (coeffs.length == 0) {
@@ -102,10 +102,12 @@ library Polynomial {
 
 
     /**
-    * @notice Polynomial addition: out[i] = coeffs_a[i] + coeffs_b[i]
-    * @param coeffs_a coeffs of first polynomial (bytes16[])
-    * @param coeffs_b coeffs of second polynomial (bytes16[])
-    */
+     * @notice Computes coefficient-wise polynomial addition.
+     * @dev Missing terms are treated as zero. Returns a zero polynomial when both inputs are empty.
+     * @param coeffs_a Coefficients of the first polynomial.
+     * @param coeffs_b Coefficients of the second polynomial.
+     * @return out Coefficient array representing coeffs_a + coeffs_b.
+     */
     function add(bytes16[] memory coeffs_a, bytes16[] memory coeffs_b) internal pure returns (bytes16[] memory out) {
         if (coeffs_a.length == 0 && coeffs_b.length == 0) return _zeroPoly();
         if (coeffs_a.length == 0) return coeffs_b;
@@ -122,8 +124,12 @@ library Polynomial {
     }
 
     /**
-    * @notice Polynomial subtraction: out[i] = coeffs_a[i] - coeffs_b[i]
-    */
+     * @notice Computes coefficient-wise polynomial subtraction.
+     * @dev Missing terms are treated as zero. When coeffs_a is empty, returns -coeffs_b.
+     * @param coeffs_a Minuend polynomial coefficients.
+     * @param coeffs_b Subtrahend polynomial coefficients.
+     * @return out Resulting coefficients representing coeffs_a - coeffs_b.
+     */
     function sub(bytes16[] memory coeffs_a, bytes16[] memory coeffs_b) internal pure returns (bytes16[] memory out) {
         if (coeffs_a.length == 0 && coeffs_b.length == 0) return _zeroPoly();
         if (coeffs_a.length == 0) {
@@ -145,12 +151,16 @@ library Polynomial {
     }
 
     /**
-    * @notice Scalar multiplication: out[i] = coeffs[i] * k
-    */
+     * @notice Multiplies each coefficient of a polynomial by a scalar.
+     * @dev Returns a zero polynomial when the input is empty or the scalar is zero.
+     * @param coeffs Polynomial coefficients.
+     * @param k Scalar multiplier encoded as bytes16.
+     * @return out Coefficients after scalar multiplication.
+     */
     function mulScalar(bytes16[] memory coeffs, bytes16 k) internal pure returns (bytes16[] memory out) {
         if (coeffs.length == 0) return _zeroPoly();
         // If k == 0 => zero polynomial
-        if (_isZero(k)) return _zeroPoly();
+        if (MathLib.isZero(k)) return _zeroPoly();
 
         out = new bytes16[](coeffs.length);
         for (uint256 i = 0; i < coeffs.length; i++) {
@@ -160,14 +170,17 @@ library Polynomial {
     }
 
     /**
-    * @notice Polynomial convolution: (a * b)
-    * @dev If either is zero, returns [0]
-    */
+     * @notice Computes polynomial multiplication via convolution.
+     * @dev Returns a zero polynomial if either polynomial is zero. Complexity is O(n*m).
+     * @param coeffs_a First polynomial coefficients.
+     * @param coeffs_b Second polynomial coefficients.
+     * @return out Resulting coefficients representing the convolution product.
+     */
     function mul(bytes16[] memory coeffs_a, bytes16[] memory coeffs_b) internal pure returns (bytes16[] memory out) {
         if (coeffs_a.length == 0 || coeffs_b.length == 0) return _zeroPoly();
         // quick zero checks (optional)
-        if (coeffs_a.length == 1 && _isZero(coeffs_a[0])) return _zeroPoly();
-        if (coeffs_b.length == 1 && _isZero(coeffs_b[0])) return _zeroPoly();
+        if (coeffs_a.length == 1 && MathLib.isZero(coeffs_a[0])) return _zeroPoly();
+        if (coeffs_b.length == 1 && MathLib.isZero(coeffs_b[0])) return _zeroPoly();
 
         out = new bytes16[](coeffs_a.length + coeffs_b.length - 1);
         for (uint256 i = 0; i < coeffs_a.length; i++) {
@@ -179,14 +192,13 @@ library Polynomial {
         return out;
     }
 
-    // --- calculus ---
-
     /**
-    * @notice Indefinite integral with constant C: q'(x)=p(x), q(0)=C
-    * @param coeffs polynomial coefficients coeffs[i] for x^i
-    * @param C constant term for the integral (bytes16)
-    * @return out coefficients for q(x)
-    */
+     * @notice Computes the coefficients of the indefinite integral of a polynomial.
+     * @dev Produces q(x) such that q'(x) = p(x) and q(0) = C.
+     * @param coeffs Polynomial coefficients in ascending powers.
+     * @param C Constant of integration encoded as bytes16.
+     * @return out Coefficients of the integral polynomial.
+     */
     function integral(bytes16[] memory coeffs, bytes16 C) internal pure returns (bytes16[] memory out) {
         if (coeffs.length == 0) {
             out = new bytes16[](1);
@@ -202,9 +214,13 @@ library Polynomial {
     }
 
     /**
-    * @notice Extended Horner: compute p(x) and p’(x) in one pass.
-    * @return px = p(x), dpx = p’(x)
-    */
+     * @notice Computes both p(x) and p’(x) in a single pass using an extended Horner method.
+     * @dev Iterates once through all coefficients, producing both function and derivative values.
+     * @param coeffs Polynomial coefficients in ascending powers.
+     * @param x Evaluation point encoded as bytes16.
+     * @return px Value of the polynomial p(x).
+     * @return dpx Value of the derivative p’(x).
+     */
     function evaluateWithDerivative(bytes16[] memory coeffs, bytes16 x)
         internal
         pure
@@ -221,15 +237,14 @@ library Polynomial {
     }
 
     /**
-    * @notice Synthetic division by (x - root) for polynomials with asc coeffs.
-    *         Given P(x) = a0 + a1*x + ... + an*x^n, returns Q(x) and remainder R such that:
-    *         P(x) = (x - root) * Q(x) + R
-    *
-    * @param coeffs  Polynomial coefficients in ascending powers: [a0, a1, ..., an]
-    * @param root    The root r in (x - r) as bytes16 (ABDK quad)
-    * @return q      Quotient coefficients in ascending powers, length = max(1, n-1)
-    * @return r      Remainder as bytes16 (ABDK quad)
-    */
+     * @notice Performs synthetic division of a polynomial by (x - root).
+     * @dev Given P(x) = a0 + a1 x + ... + an x^n, returns Q(x) and remainder r such that:
+     *      P(x) = (x - root) * Q(x) + r. Inputs must be in ascending powers.
+     * @param coeffs Polynomial coefficients in ascending powers.
+     * @param root The value r for division by (x - r), encoded as bytes16.
+     * @return q Quotient coefficients in ascending powers.
+     * @return r Remainder term encoded as bytes16.
+     */
     function syntheticDivide(bytes16[] memory coeffs, bytes16 root) internal pure returns (bytes16[] memory q, bytes16 r) {
         uint256 n = coeffs.length;
         if (n == 0) {
@@ -266,29 +281,36 @@ library Polynomial {
 
     // --- Helpers ---
 
+    /**
+     * @notice Constructs a zero polynomial.
+     * @dev Internal use only. Allocates a single-term polynomial representing 0.
+     * @return z A polynomial with one coefficient equal to zero.
+     */
     function _zeroPoly() private pure returns (bytes16[] memory z) {
         z = new bytes16[](1);
         z[0] = QZERO;
     }
 
-    function _isZero(bytes16 c) private pure returns (bool) {
-        return MathLib.cmp(c, QZERO) == 0;
-    }
-
     /**
-    * @notice Returns degree (highest i with non-zero coeff); zero poly -> 0
-    */
+     * @notice Computes the degree of a polynomial.
+     * @dev Returns the highest index with a nonzero coefficient. Zero polynomial returns 0.
+     * @param coeffs Polynomial coefficients in ascending powers.
+     * @return Degree of the polynomial.
+     */
     function degree(bytes16[] memory coeffs) internal pure returns (uint256) {
         if (coeffs.length == 0) return 0;
         for (uint256 i = coeffs.length; i > 0; i--) {
-            if (!_isZero(coeffs[i - 1])) return i - 1;
+            if (!MathLib.isZero(coeffs[i - 1])) return i - 1;
         }
         return 0;
     }
 
     /**
-    * @notice Optionally trim trailing zeros to canonical length.
-    */
+     * @notice Removes trailing zeros from the coefficient array.
+     * @dev Produces a canonical representation with the minimal degree equivalent polynomial.
+     * @param coeffs Polynomial coefficients in ascending powers.
+     * @return out Trimmed coefficient array.
+     */
     function trimTrailingZeros(bytes16[] memory coeffs) internal pure returns (bytes16[] memory out) {
         if (coeffs.length == 0) return _zeroPoly();
         uint256 deg = degree(coeffs);
