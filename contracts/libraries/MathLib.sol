@@ -96,6 +96,57 @@ library MathLib {
         return ABDKMathQuad.isNaN(a);
     }
 
+    /**
+     * @notice Compares two floating-point numbers for "approximate equality"
+     * using a combined absolute and relative tolerance.
+     * @param a First value
+     * @param b Second value
+     * @param absTol The absolute tolerance (good for comparisons near zero)
+     * @param relTol The relative tolerance (scales with magnitude of a and b)
+     */
+    function nearlyEqual(bytes16 a, bytes16 b, bytes16 absTol, bytes16 relTol) internal pure returns (bool) {
+        // diff = |a - b|
+        bytes16 diff = abs(sub(a, b));
+
+        // |a| and |b|
+        bytes16 absA = abs(a);
+        bytes16 absB = abs(b);
+
+        // largest = max(|a|, |b|) using cmp
+        bytes16 largest = cmp(absA, absB) >= 0 ? absA : absB;
+
+        // scaled = largest * relTol
+        bytes16 scaled = mul(largest, relTol);
+
+        // tolerance = max(absTol, scaled) using cmp
+        bytes16 tolerance = cmp(absTol, scaled) >= 0 ? absTol : scaled;
+
+        // nearlyEqual ⇔ |a - b| <= tolerance
+        return cmp(diff, tolerance) <= 0;
+    }
+
+    /**
+     * @notice Restricts a value x to stay within a lower bound (lo) and upper bound (hi).
+     * @dev Reverts if lo > hi.
+     * @param x The value to clamp (bytes16)
+     * @param lo The lower bound (bytes16)
+     * @param hi The upper bound (bytes16)
+     * @return The clamped value (bytes16)
+     */
+    function clamp(bytes16 x, bytes16 lo, bytes16 hi) internal pure returns (bytes16) {
+        // Ensure lo <= hi
+        require(ABDKMathQuad.cmp(lo, hi) <= 0, "Scalar: lo must be <= hi");
+
+        // If x < lo → return lo
+        if (ABDKMathQuad.cmp(x, lo) < 0) { return lo; }
+
+        // If x > hi → return hi
+        if (ABDKMathQuad.cmp(x, hi) > 0) { return hi; }
+
+        // Otherwise x is inside [lo, hi]
+        return x;
+    }
+
     /*──────────────────────────────────────────────────────────
         CONVERSIONS
     ───────────────────────────────────────────────────────────*/
