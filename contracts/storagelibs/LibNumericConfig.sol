@@ -35,19 +35,19 @@ library LibNumericConfig {
     /// Setters
 
     /**
-     * @notice Update min tolerance in storage
-     * @param minTol The new min tolerance value as ABDKMathQuad (bytes16)
-     */
-    function setMinTol(bytes16 minTol) internal {
-        cfg().minTol = minTol;
-    }
-
-    /**
      * @notice Update tolerance in storage
      * @param tol The new tolerance value as ABDKMathQuad (bytes16)
      */
     function setTol(bytes16 tol) internal {
         cfg().tol = tol;
+    }
+    
+    /**
+     * @notice Update min tolerance in storage
+     * @param minTol The new min tolerance value as ABDKMathQuad (bytes16)
+     */
+    function setMinTol(bytes16 minTol) internal {
+        cfg().minTol = minTol;
     }
 
     /**
