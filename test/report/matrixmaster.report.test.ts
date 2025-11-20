@@ -522,18 +522,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const rows = 3n;
             const cols = 4n;
             await touchGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [
-                rows,
-                cols,
-                seed,
-            ]);
+            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed]);
 
-            const m1 = asMatrix(
-                await harness.randomUniformHarness(rows, cols, seed),
-            );
-            const m2 = asMatrix(
-                await harness.randomUniformHarness(rows, cols, seed),
-            );
+            const m1 = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
+            const m2 = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
 
             expect(m1.rows).to.equal(rows);
             expect(m1.cols).to.equal(cols);
@@ -567,18 +559,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const rows = 2n;
             const cols = 3n;
             await touchGas(harness, "randomUniformHarness", [rows, cols, seed1]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [
-                rows,
-                cols,
-                seed1,
-            ]);
+            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed1]);
 
-            const m1 = asMatrix(
-                await harness.randomUniformHarness(rows, cols, seed1),
-            );
-            const m2 = asMatrix(
-                await harness.randomUniformHarness(rows, cols, seed2),
-            );
+            const m1 = asMatrix(await harness.randomUniformHarness(rows, cols, seed1));
+            const m2 = asMatrix(await harness.randomUniformHarness(rows, cols, seed2));
 
             expect(m1.data.length).to.equal(6);
             expect(m2.data.length).to.equal(6);
@@ -606,11 +590,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const seed = ethers.keccak256(ethers.toUtf8Bytes("range-check"));
 
             await touchGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [
-                rows,
-                cols,
-                seed,
-            ]);
+            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed]);
 
             const m = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
             const zeroQ = await qInt(0);
@@ -644,14 +624,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const seed = ethers.keccak256(ethers.toUtf8Bytes("ru-1xN"));
 
             await touchGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [
-                rows,
-                cols,
-                seed,
-            ]);
-            const m = asMatrix(
-                await harness.randomUniformHarness(rows, cols, seed),
-            );
+            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed]);
+            const m = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
 
             expect(m.rows).to.equal(rows);
             expect(m.cols).to.equal(cols);
@@ -677,14 +651,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const seed = ethers.keccak256(ethers.toUtf8Bytes("ru-Nx1"));
 
             await touchGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [
-                rows,
-                cols,
-                seed,
-            ]);
-            const m = asMatrix(
-                await harness.randomUniformHarness(rows, cols, seed),
-            );
+            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed]);
+            const m = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
 
             expect(m.rows).to.equal(rows);
             expect(m.cols).to.equal(cols);
@@ -710,14 +678,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const seed = ethers.keccak256(ethers.toUtf8Bytes("ru-diversity"));
 
             await touchGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [
-                rows,
-                cols,
-                seed,
-            ]);
-            const m = asMatrix(
-                await harness.randomUniformHarness(rows, cols, seed),
-            );
+            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed]);
+            const m = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
             const zeroQ = await qInt(0);
 
             const distinct = new Set(m.data);
@@ -772,7 +734,6 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
         });
 
         it("zeros : vector shapes 1xN return all-zero vectors", async function () {
-
             t++;
             const rows = 1n;
             const cols = 5n;
@@ -804,7 +765,6 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
         });
 
         it("zeros : vector shapes  Nx1 return all-zero vectors", async function () {
-
             t++;
             const rows = 5n;
             const cols = 1n;
@@ -933,26 +893,11 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const I = asMatrix(await harness.eyeHarness(n));
 
             await touchGas(harness, "transposeHarness", [I.rows, I.cols, I.data]);
-            const gas = await estimateGas(harness, "transposeHarness", [
-                I.rows,
-                I.cols,
-                I.data,
-            ]);
-            const IT = asMatrix(
-                await harness.transposeHarness(I.rows, I.cols, I.data),
-            );
+            const gas = await estimateGas(harness, "transposeHarness", [I.rows, I.cols, I.data]);
+            const IT = asMatrix(await harness.transposeHarness(I.rows, I.cols, I.data));
 
             // I^T should be bitwise identical to I
-            expect(
-                await harness.matricesExactEqual(
-                    I.rows,
-                    I.cols,
-                    I.data,
-                    IT.rows,
-                    IT.cols,
-                    IT.data,
-                ),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(I.rows, I.cols, I.data, IT.rows, IT.cols, IT.data)).to.equal(true);
 
             printBlock({
                 t,
@@ -990,13 +935,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const col = 2n;
 
             await touchGas(harness, "getHarness", [rows, cols, vals, row, col]);
-            const gas = await estimateGas(harness, "getHarness", [
-                rows,
-                cols,
-                vals,
-                row,
-                col,
-            ]);
+            const gas = await estimateGas(harness, "getHarness", [rows, cols, vals, row, col]);
             const v = await harness.getHarness(rows, cols, vals, row, col); // row=1,col=2 -> 6
             expect(v.toLowerCase()).to.equal(vals[5].toLowerCase());
 
@@ -1025,16 +964,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "getHarness", [rows, cols, vals, 2n, 0n]);
-            const gas1 = await estimateGas(harness, "getHarness", [
-                rows,
-                cols,
-                vals,
-                2n,
-                0n,
-            ]);
-            await expect(
-                harness.getHarness(rows, cols, vals, 2n, 0n), // row=2 out of range
-            ).to.be.revertedWith("MatrixMaster: index out of bounds");
+            const gas1 = await estimateGas(harness, "getHarness", [rows, cols, vals, 2n, 0n]);
+            await expect(harness.getHarness(rows, cols, vals, 2n, 0n)).to.be.revertedWith("MatrixMaster: index out of bounds");  // row=2 out of range
 
             printBlock({
                 t,
@@ -1049,17 +980,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
 
             await touchGas(harness, "getHarness", [rows, cols, vals, 0n, 2n]);
-            const gas2 = await estimateGas(harness, "getHarness", [
-                rows,
-                cols,
-                vals,
-                0n,
-                2n,
-            ]);
+            const gas2 = await estimateGas(harness, "getHarness", [rows, cols, vals, 0n, 2n]);
 
-            await expect(
-                harness.getHarness(rows, cols, vals, 0n, 2n), // col=2 out of range
-            ).to.be.revertedWith("MatrixMaster: index out of bounds");
+            await expect(harness.getHarness(rows, cols, vals, 0n, 2n)).to.be.revertedWith("MatrixMaster: index out of bounds"); // col=2 out of range
 
             printBlock({
                 t,
@@ -1087,17 +1010,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const col = 0n;
 
             await touchGas(harness, "setHarness", [rows, cols, init, row, col, one]);
-            const gas = await estimateGas(harness, "setHarness", [
-                rows,
-                cols,
-                init,
-                row,
-                col,
-                one,
-            ]);
-            const out = asMatrix(
-                await harness.setHarness(rows, cols, init, row, col, one),
-            );
+            const gas = await estimateGas(harness, "setHarness", [rows, cols, init, row, col, one]);
+            const out = asMatrix(await harness.setHarness(rows, cols, init, row, col, one));
             expect(out.rows).to.equal(rows);
             expect(out.cols).to.equal(cols);
 
@@ -1128,17 +1042,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "setHarness", [rows, cols, init, 2n, 0n, zero]);
-            const gas1 = await estimateGas(harness, "setHarness", [
-                rows,
-                cols,
-                init,
-                2n,
-                0n,
-                zero,
-            ]);
-            await expect(
-                harness.setHarness(rows, cols, init, 2n, 0n, zero),
-            ).to.be.revertedWith("MatrixMaster: index out of bounds");
+            const gas1 = await estimateGas(harness, "setHarness", [rows, cols, init, 2n, 0n, zero]);
+            await expect(harness.setHarness(rows, cols, init, 2n, 0n, zero)).to.be.revertedWith("MatrixMaster: index out of bounds");
 
             printBlock({
                 t,
@@ -1153,17 +1058,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
 
             await touchGas(harness, "setHarness", [rows, cols, init, 0n, 2n, zero]);
-            const gas2 = await estimateGas(harness, "setHarness", [
-                rows,
-                cols,
-                init,
-                0n,
-                2n,
-                zero,
-            ]);
-            await expect(
-                harness.setHarness(rows, cols, init, 0n, 2n, zero),
-            ).to.be.revertedWith("MatrixMaster: index out of bounds");
+            const gas2 = await estimateGas(harness, "setHarness", [rows, cols, init, 0n, 2n, zero]);
+            await expect(harness.setHarness(rows, cols, init, 0n, 2n, zero)).to.be.revertedWith("MatrixMaster: index out of bounds");
 
             printBlock({
                 t,
@@ -1189,13 +1085,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             // (0,0)
             await touchGas(harness, "getHarness", [rows, cols, vals, 0n, 0n]);
-            const gas1 = await estimateGas(harness, "getHarness", [
-                rows,
-                cols,
-                vals,
-                0n,
-                0n,
-            ]);
+            const gas1 = await estimateGas(harness, "getHarness", [rows, cols, vals, 0n, 0n]);
             const topLeft = await harness.getHarness(rows, cols, vals, 0n, 0n);
             expect(topLeft.toLowerCase()).to.equal(vals[0].toLowerCase());
 
@@ -1215,27 +1105,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const lastRow = rows - 1n;
             const lastCol = cols - 1n;
 
-            await touchGas(harness, "getHarness", [
-                rows,
-                cols,
-                vals,
-                lastRow,
-                lastCol,
-            ]);
-            const gas2 = await estimateGas(harness, "getHarness", [
-                rows,
-                cols,
-                vals,
-                lastRow,
-                lastCol,
-            ]);
-            const bottomRight = await harness.getHarness(
-                rows,
-                cols,
-                vals,
-                lastRow,
-                lastCol,
-            );
+            await touchGas(harness, "getHarness", [rows, cols, vals, lastRow, lastCol]);
+            const gas2 = await estimateGas(harness, "getHarness", [rows, cols, vals, lastRow, lastCol]);
+            const bottomRight = await harness.getHarness(rows, cols, vals, lastRow, lastCol);
             const expectedIdx = Number(lastRow * cols + lastCol);
             expect(bottomRight.toLowerCase()).to.equal(
                 vals[expectedIdx].toLowerCase(),
@@ -1269,13 +1141,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const expectedVal = vals[expectedIdx];
 
             await touchGas(harness, "getHarness", [rows, cols, vals, row, col]);
-            const gas = await estimateGas(harness, "getHarness", [
-                rows,
-                cols,
-                vals,
-                row,
-                col,
-            ]);
+            const gas = await estimateGas(harness, "getHarness", [rows, cols, vals, row, col]);
             const v = await harness.getHarness(rows, cols, vals, row, col);
             expect(v.toLowerCase()).to.equal(expectedVal.toLowerCase());
 
@@ -1305,25 +1171,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const col = 1n;
 
             await touchGas(harness, "setHarness", [rows, cols, init, row, col, one]);
-            const gas = await estimateGas(harness, "setHarness", [
-                rows,
-                cols,
-                init,
-                row,
-                col,
-                one,
-            ]);
-            const out = asMatrix(
-                await harness.setHarness(rows, cols, init, row, col, one),
-            );
+            const gas = await estimateGas(harness, "setHarness", [rows, cols, init, row, col, one]);
+            const out = asMatrix(await harness.setHarness(rows, cols, init, row, col, one));
 
-            const readBack = await harness.getHarness(
-                out.rows,
-                out.cols,
-                out.data,
-                row,
-                col,
-            );
+            const readBack = await harness.getHarness(out.rows, out.cols, out.data, row, col);
             expect(readBack.toLowerCase()).to.equal(one.toLowerCase());
 
             printBlock({
@@ -1359,44 +1210,13 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const colStart = 1n;
             const colEnd = 3n;
 
-            await touchGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                rowStart,
-                rowEnd,
-                colStart,
-                colEnd,
-            ]);
-            const gas = await estimateGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                rowStart,
-                rowEnd,
-                colStart,
-                colEnd,
-            ]);
-            const s = asMatrix(
-                await harness.sliceHarness(
-                    rows,
-                    cols,
-                    vals,
-                    rowStart,
-                    rowEnd,
-                    colStart,
-                    colEnd,
-                ),
-            );
+            await touchGas(harness, "sliceHarness", [rows, cols, vals, rowStart, rowEnd, colStart, colEnd]);
+            const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, rowStart, rowEnd, colStart, colEnd]);
+            const s = asMatrix(await harness.sliceHarness(rows, cols, vals, rowStart, rowEnd, colStart, colEnd));
             expect(s.rows).to.equal(2n);
             expect(s.cols).to.equal(2n);
 
-            const expected = [
-                await qInt(6),
-                await qInt(7),
-                await qInt(10),
-                await qInt(11),
-            ];
+            const expected = [await qInt(6), await qInt(7), await qInt(10), await qInt(11)];
 
             expect(s.data.length).to.equal(4);
             for (let i = 0; i < 4; ++i) {
@@ -1426,29 +1246,14 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const rows = 3n;
             const cols = 4n;
             await touchGas(harness, "sliceHarness", [rows, cols, vals, 1n, 2n, 0n, 4n]);
-            const gas = await estimateGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                1n,
-                2n,
-                0n,
-                4n,
-            ]);
+            const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, 1n, 2n, 0n, 4n]);
 
             // row 1 only, all cols -> [5,6,7,8]
-            const s = asMatrix(
-                await harness.sliceHarness(rows, cols, vals, 1n, 2n, 0n, 4n),
-            );
+            const s = asMatrix(await harness.sliceHarness(rows, cols, vals, 1n, 2n, 0n, 4n));
             expect(s.rows).to.equal(1n);
             expect(s.cols).to.equal(4n);
 
-            const expected = [
-                await qInt(5),
-                await qInt(6),
-                await qInt(7),
-                await qInt(8),
-            ];
+            const expected = [await qInt(5), await qInt(6), await qInt(7), await qInt(8)];
             for (let i = 0; i < 4; ++i) {
                 expect(s.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
@@ -1477,28 +1282,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             // rowStart >= rowEnd
             {
                 t++;
-                await touchGas(harness, "sliceHarness", [
-                    rows,
-                    cols,
-                    vals,
-                    1n,
-                    1n,
-                    0n,
-                    2n,
-                ]);
-                const gas = await estimateGas(harness, "sliceHarness", [
-                    rows,
-                    cols,
-                    vals,
-                    1n,
-                    1n,
-                    0n,
-                    2n,
-                ]);
+                await touchGas(harness, "sliceHarness", [rows, cols, vals, 1n, 1n, 0n, 2n]);
+                const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, 1n, 1n, 0n, 2n]);
 
-                await expect(
-                    harness.sliceHarness(rows, cols, vals, 1n, 1n, 0n, 2n),
-                ).to.be.revertedWith("MatrixMaster: invalid slice range");
+                await expect(harness.sliceHarness(rows, cols, vals, 1n, 1n, 0n, 2n)).to.be.revertedWith("MatrixMaster: invalid slice range");
 
                 printBlock({
                     t,
@@ -1515,28 +1302,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             // colStart >= colEnd
             {
-                await touchGas(harness, "sliceHarness", [
-                    rows,
-                    cols,
-                    vals,
-                    0n,
-                    1n,
-                    2n,
-                    2n,
-                ]);
-                const gas = await estimateGas(harness, "sliceHarness", [
-                    rows,
-                    cols,
-                    vals,
-                    0n,
-                    1n,
-                    2n,
-                    2n,
-                ]);
-
-                await expect(
-                    harness.sliceHarness(rows, cols, vals, 0n, 1n, 2n, 2n),
-                ).to.be.revertedWith("MatrixMaster: invalid slice range");
+                await touchGas(harness, "sliceHarness", [rows, cols, vals, 0n, 1n, 2n, 2n]);
+                const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, 0n, 1n, 2n, 2n]);
+                await expect(harness.sliceHarness(rows, cols, vals, 0n, 1n, 2n, 2n)).to.be.revertedWith("MatrixMaster: invalid slice range");
 
                 printBlock({
                     t,
@@ -1553,28 +1321,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             // rowEnd > rows
             {
-                await touchGas(harness, "sliceHarness", [
-                    rows,
-                    cols,
-                    vals,
-                    0n,
-                    3n,
-                    0n,
-                    2n,
-                ]);
-                const gas = await estimateGas(harness, "sliceHarness", [
-                    rows,
-                    cols,
-                    vals,
-                    0n,
-                    3n,
-                    0n,
-                    2n,
-                ]);
-
-                await expect(
-                    harness.sliceHarness(rows, cols, vals, 0n, 3n, 0n, 2n),
-                ).to.be.revertedWith("MatrixMaster: slice out of bounds");
+                await touchGas(harness, "sliceHarness", [rows, cols, vals, 0n, 3n, 0n, 2n]);
+                const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, 0n, 3n, 0n, 2n]);
+                await expect(harness.sliceHarness(rows, cols, vals, 0n, 3n, 0n, 2n)).to.be.revertedWith("MatrixMaster: slice out of bounds");
 
                 printBlock({
                     t,
@@ -1591,28 +1340,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             // colEnd > cols
             {
-                await touchGas(harness, "sliceHarness", [
-                    rows,
-                    cols,
-                    vals,
-                    0n,
-                    2n,
-                    0n,
-                    4n,
-                ]);
-                const gas = await estimateGas(harness, "sliceHarness", [
-                    rows,
-                    cols,
-                    vals,
-                    0n,
-                    2n,
-                    0n,
-                    4n,
-                ]);
-
-                await expect(
-                    harness.sliceHarness(rows, cols, vals, 0n, 2n, 0n, 4n),
-                ).to.be.revertedWith("MatrixMaster: slice out of bounds");
+                await touchGas(harness, "sliceHarness", [rows, cols, vals, 0n, 2n, 0n, 4n]);
+                const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, 0n, 2n, 0n, 4n]);
+                await expect(harness.sliceHarness(rows, cols, vals, 0n, 2n, 0n, 4n)).to.be.revertedWith("MatrixMaster: slice out of bounds");
 
                 printBlock({
                     t,
@@ -1650,35 +1380,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 await qInt(11),
             ];
 
-            await touchGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                rowStart,
-                rowEnd,
-                colStart,
-                colEnd,
-            ]);
-            const gas = await estimateGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                rowStart,
-                rowEnd,
-                colStart,
-                colEnd,
-            ]);
-            const s = asMatrix(
-                await harness.sliceHarness(
-                    rows,
-                    cols,
-                    vals,
-                    rowStart,
-                    rowEnd,
-                    colStart,
-                    colEnd,
-                ),
-            );
+            await touchGas(harness, "sliceHarness", [rows, cols, vals, rowStart, rowEnd, colStart, colEnd]);
+            const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, rowStart, rowEnd, colStart, colEnd]);
+            const s = asMatrix(await harness.sliceHarness(rows, cols, vals, rowStart, rowEnd, colStart, colEnd));
 
             expect(s.rows).to.equal(3n);
             expect(s.cols).to.equal(1n);
@@ -1711,23 +1415,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const dstRows = 3n;
             const dstCols = 4n;
 
-            await touchGas(harness, "reshapeHarness", [
-                srcRows,
-                srcCols,
-                vals,
-                dstRows,
-                dstCols,
-            ]);
-            const gas = await estimateGas(harness, "reshapeHarness", [
-                srcRows,
-                srcCols,
-                vals,
-                dstRows,
-                dstCols,
-            ]);
-            const r = asMatrix(
-                await harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols),
-            );
+            await touchGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+            const gas = await estimateGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+            const r = asMatrix(await harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols));
+
             expect(r.rows).to.equal(dstRows);
             expect(r.cols).to.equal(dstCols);
             expect(r.data.length).to.equal(12);
@@ -1761,24 +1452,11 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const dstRows = 4n;
             const dstCols = 2n;
 
-            await touchGas(harness, "reshapeHarness", [
-                srcRows,
-                srcCols,
-                vals,
-                dstRows,
-                dstCols,
-            ]);
-            const gas = await estimateGas(harness, "reshapeHarness", [
-                srcRows,
-                srcCols,
-                vals,
-                dstRows,
-                dstCols,
-            ]);
+            await touchGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+            const gas = await estimateGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+
             // 2x3 -> area=6; 4x2 -> area=8 => revert
-            await expect(
-                harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols),
-            ).to.be.revertedWith("MatrixMaster: reshape area mismatch");
+            await expect(harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols)).to.be.revertedWith("MatrixMaster: reshape area mismatch");
 
             printBlock({
                 t,
@@ -1807,35 +1485,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const colStart = 0n;
             const colEnd = cols;
 
-            await touchGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                rowStart,
-                rowEnd,
-                colStart,
-                colEnd,
-            ]);
-            const gas = await estimateGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                rowStart,
-                rowEnd,
-                colStart,
-                colEnd,
-            ]);
-            const s = asMatrix(
-                await harness.sliceHarness(
-                    rows,
-                    cols,
-                    vals,
-                    rowStart,
-                    rowEnd,
-                    colStart,
-                    colEnd,
-                ),
-            );
+            await touchGas(harness, "sliceHarness", [rows, cols, vals, rowStart, rowEnd, colStart, colEnd]);
+            const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, rowStart, rowEnd, colStart, colEnd]);
+            const s = asMatrix(await harness.sliceHarness(rows, cols, vals, rowStart, rowEnd, colStart, colEnd));
 
             expect(s.rows).to.equal(rows);
             expect(s.cols).to.equal(cols);
@@ -1872,36 +1524,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const colStart = 0n;
             const colEnd = 3n;
 
-            await touchGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                rowStart,
-                rowEnd,
-                colStart,
-                colEnd,
-            ]);
-            const gas = await estimateGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                rowStart,
-                rowEnd,
-                colStart,
-                colEnd,
-            ]);
-
-            const s = asMatrix(
-                await harness.sliceHarness(
-                    rows,
-                    cols,
-                    vals,
-                    rowStart,
-                    rowEnd,
-                    colStart,
-                    colEnd,
-                ),
-            );
+            await touchGas(harness, "sliceHarness", [rows, cols, vals, rowStart, rowEnd, colStart, colEnd]);
+            const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, rowStart, rowEnd, colStart, colEnd]);
+            const s = asMatrix(await harness.sliceHarness(rows, cols, vals, rowStart, rowEnd, colStart, colEnd));
 
             expect(s.rows).to.equal(1n);
             expect(s.cols).to.equal(3n);
@@ -1938,35 +1563,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const colStart = 2n;
             const colEnd = 3n;
 
-            await touchGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                rowStart,
-                rowEnd,
-                colStart,
-                colEnd,
-            ]);
-            const gas = await estimateGas(harness, "sliceHarness", [
-                rows,
-                cols,
-                vals,
-                rowStart,
-                rowEnd,
-                colStart,
-                colEnd,
-            ]);
-            const s = asMatrix(
-                await harness.sliceHarness(
-                    rows,
-                    cols,
-                    vals,
-                    rowStart,
-                    rowEnd,
-                    colStart,
-                    colEnd,
-                ),
-            );
+            await touchGas(harness, "sliceHarness", [rows, cols, vals, rowStart, rowEnd, colStart, colEnd]);
+            const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, rowStart, rowEnd, colStart, colEnd]);
+            const s = asMatrix(await harness.sliceHarness(rows, cols, vals, rowStart, rowEnd, colStart, colEnd));
 
             expect(s.rows).to.equal(3n);
             expect(s.cols).to.equal(1n);
@@ -2000,23 +1599,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const dstRows = 1n;
             const dstCols = 6n;
 
-            await touchGas(harness, "reshapeHarness", [
-                srcRows,
-                srcCols,
-                vals,
-                dstRows,
-                dstCols,
-            ]);
-            const gas = await estimateGas(harness, "reshapeHarness", [
-                srcRows,
-                srcCols,
-                vals,
-                dstRows,
-                dstCols,
-            ]);
-            const r = asMatrix(
-                await harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols),
-            );
+            await touchGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+            const gas = await estimateGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+            const r = asMatrix(await harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols));
 
             expect(r.rows).to.equal(dstRows);
             expect(r.cols).to.equal(dstCols);
@@ -2049,23 +1634,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const dstRows = 2n;
             const dstCols = 3n;
 
-            await touchGas(harness, "reshapeHarness", [
-                srcRows,
-                srcCols,
-                vals,
-                dstRows,
-                dstCols,
-            ]);
-            const gas = await estimateGas(harness, "reshapeHarness", [
-                srcRows,
-                srcCols,
-                vals,
-                dstRows,
-                dstCols,
-            ]);
-            const r = asMatrix(
-                await harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols),
-            );
+            await touchGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+            const gas = await estimateGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+            const r = asMatrix(await harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols));
 
             expect(r.rows).to.equal(dstRows);
             expect(r.cols).to.equal(dstCols);
@@ -2098,26 +1669,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const rows1 = 3n;
             const cols1 = 2n;
 
-            await touchGas(harness, "reshapeHarness", [
-                rows0,
-                cols0,
-                vals,
-                rows1,
-                cols1,
-            ]);
-            const gas = await estimateGas(harness, "reshapeHarness", [
-                rows0,
-                cols0,
-                vals,
-                rows1,
-                cols1,
-            ]);
-            const r1 = asMatrix(
-                await harness.reshapeHarness(rows0, cols0, vals, rows1, cols1),
-            );
-            const r2 = asMatrix(
-                await harness.reshapeHarness(r1.rows, r1.cols, r1.data, rows0, cols0),
-            );
+            await touchGas(harness, "reshapeHarness", [rows0, cols0, vals, rows1, cols1]);
+            const gas = await estimateGas(harness, "reshapeHarness", [rows0, cols0, vals, rows1, cols1]);
+            const r1 = asMatrix(await harness.reshapeHarness(rows0, cols0, vals, rows1, cols1));
+            const r2 = asMatrix(await harness.reshapeHarness(r1.rows, r1.cols, r1.data, rows0, cols0));
 
             expect(r2.rows).to.equal(rows0);
             expect(r2.cols).to.equal(cols0);
@@ -2160,14 +1715,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 3n;
 
             await touchGas(harness, "transposeHarness", [rows, cols, vals]);
-            const gas = await estimateGas(harness, "transposeHarness", [
-                rows,
-                cols,
-                vals,
-            ]);
-            const tMat = asMatrix(
-                await harness.transposeHarness(rows, cols, vals),
-            );
+            const gas = await estimateGas(harness, "transposeHarness", [rows, cols, vals]);
+            const tMat = asMatrix(await harness.transposeHarness(rows, cols, vals));
             expect(tMat.rows).to.equal(3n);
             expect(tMat.cols).to.equal(2n);
 
@@ -2206,14 +1755,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const A = asMatrix(await harness.randomUniformHarness(n, n, seed));
 
             await touchGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
-            const gas = await estimateGas(harness, "transposeHarness", [
-                A.rows,
-                A.cols,
-                A.data,
-            ]);
-            const AT = asMatrix(
-                await harness.transposeHarness(A.rows, A.cols, A.data),
-            );
+            const gas = await estimateGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
+            const AT = asMatrix(await harness.transposeHarness(A.rows, A.cols, A.data));
 
             expect(AT.rows).to.equal(n);
             expect(AT.cols).to.equal(n);
@@ -2251,14 +1794,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const A = asMatrix(await harness.randomUniformHarness(n, n, seed));
 
             await touchGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
-            const gas = await estimateGas(harness, "transposeHarness", [
-                A.rows,
-                A.cols,
-                A.data,
-            ]);
-            const AT = asMatrix(
-                await harness.transposeHarness(A.rows, A.cols, A.data),
-            );
+            const gas = await estimateGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
+            const AT = asMatrix(await harness.transposeHarness(A.rows, A.cols, A.data));
 
             expect(AT.rows).to.equal(n);
             expect(AT.cols).to.equal(n);
@@ -2303,27 +1840,12 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const c: bigint = 70n;
 
             // setHarness(rows, cols, data, row, col, value)
-            const A = asMatrix(
-                await harness.setHarness(
-                    zeroMat.rows,
-                    zeroMat.cols,
-                    zeroMat.data,
-                    r,
-                    c,
-                    one,
-                ),
-            );
+            const A = asMatrix(await harness.setHarness(zeroMat.rows, zeroMat.cols, zeroMat.data, r, c, one));
 
             await touchGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
-            const gas = await estimateGas(harness, "transposeHarness", [
-                A.rows,
-                A.cols,
-                A.data,
-            ]);
+            const gas = await estimateGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
 
-            const AT = asMatrix(
-                await harness.transposeHarness(A.rows, A.cols, A.data),
-            );
+            const AT = asMatrix(await harness.transposeHarness(A.rows, A.cols, A.data));
 
             expect(AT.rows).to.equal(cols);
             expect(AT.cols).to.equal(rows);
@@ -2375,15 +1897,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 3n;
 
             await touchGas(harness, "transposeHarness", [rows, cols, vals]);
-            const gas = await estimateGas(harness, "transposeHarness", [
-                rows,
-                cols,
-                vals,
-            ]);
+            const gas = await estimateGas(harness, "transposeHarness", [rows, cols, vals]);
             const t1 = asMatrix(await harness.transposeHarness(rows, cols, vals));
-            const t2 = asMatrix(
-                await harness.transposeHarness(t1.rows, t1.cols, t1.data),
-            );
+            const t2 = asMatrix(await harness.transposeHarness(t1.rows, t1.cols, t1.data));
 
             expect(t2.rows).to.equal(rows);
             expect(t2.cols).to.equal(cols);
@@ -2418,14 +1934,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
 
             await touchGas(harness, "transposeHarness", [rows, cols, vals]);
-            const gas = await estimateGas(harness, "transposeHarness", [
-                rows,
-                cols,
-                vals,
-            ]);
-            const tMat = asMatrix(
-                await harness.transposeHarness(rows, cols, vals),
-            );
+            const gas = await estimateGas(harness, "transposeHarness", [rows, cols, vals]);
+            const tMat = asMatrix(await harness.transposeHarness(rows, cols, vals));
 
             expect(tMat.rows).to.equal(4n);
             expect(tMat.cols).to.equal(1n);
@@ -2458,14 +1968,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
 
             await touchGas(harness, "transposeHarness", [rows, cols, vals]);
-            const gas = await estimateGas(harness, "transposeHarness", [
-                rows,
-                cols,
-                vals,
-            ]);
-            const tMat = asMatrix(
-                await harness.transposeHarness(rows, cols, vals),
-            );
+            const gas = await estimateGas(harness, "transposeHarness", [rows, cols, vals]);
+            const tMat = asMatrix(await harness.transposeHarness(rows, cols, vals));
 
             expect(tMat.rows).to.equal(1n);
             expect(tMat.cols).to.equal(4n);
@@ -2493,14 +1997,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const vals = [await qInt(13)];
 
             await touchGas(harness, "transposeHarness", [rows, cols, vals]);
-            const gas = await estimateGas(harness, "transposeHarness", [
-                rows,
-                cols,
-                vals,
-            ]);
-            const tMat = asMatrix(
-                await harness.transposeHarness(rows, cols, vals),
-            );
+            const gas = await estimateGas(harness, "transposeHarness", [rows, cols, vals]);
+            const tMat = asMatrix(await harness.transposeHarness(rows, cols, vals));
 
             expect(tMat.rows).to.equal(rows);
             expect(tMat.cols).to.equal(cols);
@@ -2534,24 +2032,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "addHarness", [rows, cols, a, rows, cols, b]);
-            const gas = await estimateGas(harness, "addHarness", [
-                rows,
-                cols,
-                a,
-                rows,
-                cols,
-                b,
-            ]);
-            const c = asMatrix(
-                await harness.addHarness(rows, cols, a, rows, cols, b),
-            );
 
-            const expected = [
-                await qInt(6),
-                await qInt(8),
-                await qInt(10),
-                await qInt(12),
-            ];
+            const gas = await estimateGas(harness, "addHarness", [rows, cols, a, rows, cols, b]);
+            const c = asMatrix(await harness.addHarness(rows, cols, a, rows, cols, b));
+            const expected = [await qInt(6), await qInt(8), await qInt(10), await qInt(12)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -2576,17 +2060,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const b = [await qInt(5), await qInt(6), await qInt(7), await qInt(8)];
 
             await touchGas(harness, "addHarness", [2n, 2n, a, 1n, 4n, b]);
-            const gas = await estimateGas(harness, "addHarness", [
-                2n,
-                2n,
-                a,
-                1n,
-                4n,
-                b,
-            ]);
-            await expect(
-                harness.addHarness(2n, 2n, a, 1n, 4n, b),
-            ).to.be.revertedWith("MatrixMaster: shape mismatch");
+            const gas = await estimateGas(harness, "addHarness", [2n, 2n, a, 1n, 4n, b]);
+            await expect(harness.addHarness(2n, 2n, a, 1n, 4n, b)).to.be.revertedWith("MatrixMaster: shape mismatch");
 
             printBlock({
                 t,
@@ -2614,24 +2089,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "subHarness", [rows, cols, a, rows, cols, b]);
-            const gas = await estimateGas(harness, "subHarness", [
-                rows,
-                cols,
-                a,
-                rows,
-                cols,
-                b,
-            ]);
-            const c = asMatrix(
-                await harness.subHarness(rows, cols, a, rows, cols, b),
-            );
-
-            const expected = [
-                await qInt(5),
-                await qInt(6),
-                await qInt(7),
-                await qInt(8),
-            ];
+            const gas = await estimateGas(harness, "subHarness", [rows, cols, a, rows, cols, b]);
+            const c = asMatrix(await harness.subHarness(rows, cols, a, rows, cols, b));
+            const expected = [await qInt(5), await qInt(6), await qInt(7), await qInt(8)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -2656,17 +2116,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const b = [await qInt(5), await qInt(6), await qInt(7), await qInt(8)];
 
             await touchGas(harness, "subHarness", [2n, 2n, a, 1n, 4n, b]);
-            const gas = await estimateGas(harness, "subHarness", [
-                2n,
-                2n,
-                a,
-                1n,
-                4n,
-                b,
-            ]);
-            await expect(
-                harness.subHarness(2n, 2n, a, 1n, 4n, b),
-            ).to.be.revertedWith("MatrixMaster: shape mismatch");
+            const gas = await estimateGas(harness, "subHarness", [2n, 2n, a, 1n, 4n, b]);
+            await expect(harness.subHarness(2n, 2n, a, 1n, 4n, b)).to.be.revertedWith("MatrixMaster: shape mismatch");
 
             printBlock({
                 t,
@@ -2689,21 +2140,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "mulScalarHarness", [rows, cols, a, k]);
-            const gas = await estimateGas(harness, "mulScalarHarness", [
-                rows,
-                cols,
-                a,
-                k,
-            ]);
-            const c = asMatrix(
-                await harness.mulScalarHarness(rows, cols, a, k),
-            );
-            const expected = [
-                await qInt(3),
-                await qInt(6),
-                await qInt(9),
-                await qInt(12),
-            ];
+            const gas = await estimateGas(harness, "mulScalarHarness", [rows, cols, a, k]);
+            const c = asMatrix(await harness.mulScalarHarness(rows, cols, a, k));
+            const expected = [await qInt(3), await qInt(6), await qInt(9), await qInt(12)];
+
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
@@ -2734,15 +2174,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "mulScalarHarness", [rows, cols, a, k]);
-            const gas = await estimateGas(harness, "mulScalarHarness", [
-                rows,
-                cols,
-                a,
-                k,
-            ]);
-            const c = asMatrix(
-                await harness.mulScalarHarness(rows, cols, a, k),
-            );
+            const gas = await estimateGas(harness, "mulScalarHarness", [rows, cols, a, k]);
+            const c = asMatrix(await harness.mulScalarHarness(rows, cols, a, k));
 
             // Treat both +0 and -0 encodings as valid zeros.
             for (const v of c.data) {
@@ -2775,22 +2208,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "mulScalarHarness", [rows, cols, a, k]);
-            const gas = await estimateGas(harness, "mulScalarHarness", [
-                rows,
-                cols,
-                a,
-                k,
-            ]);
-            const c = asMatrix(
-                await harness.mulScalarHarness(rows, cols, a, k),
-            );
-
-            const expected = [
-                await qInt(-1),
-                await qInt(2),
-                await qInt(-3),
-                await qInt(4),
-            ];
+            const gas = await estimateGas(harness, "mulScalarHarness", [rows, cols, a, k]);
+            const c = asMatrix(await harness.mulScalarHarness(rows, cols, a, k));
+            const expected = [await qInt(-1), await qInt(2), await qInt(-3), await qInt(4)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -2829,15 +2249,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const tiny = tinyMat.data[0];
 
             await touchGas(harness, "mulScalarHarness", [rows, cols, a, tiny]);
-            const gas = await estimateGas(harness, "mulScalarHarness", [
-                rows,
-                cols,
-                a,
-                tiny,
-            ]);
-            const c = asMatrix(
-                await harness.mulScalarHarness(rows, cols, a, tiny),
-            );
+            const gas = await estimateGas(harness, "mulScalarHarness", [rows, cols, a, tiny]);
+            const c = asMatrix(await harness.mulScalarHarness(rows, cols, a, tiny));
 
             const zeroQ = await qInt(0);
             const zeroBI = BigInt(zeroQ);
@@ -2877,15 +2290,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "divScalarHarness", [rows, cols, a, k]);
-            const gas = await estimateGas(harness, "divScalarHarness", [
-                rows,
-                cols,
-                a,
-                k,
-            ]);
-            const c = asMatrix(
-                await harness.divScalarHarness(rows, cols, a, k),
-            );
+            const gas = await estimateGas(harness, "divScalarHarness", [rows, cols, a, k]);
+            const c = asMatrix(await harness.divScalarHarness(rows, cols, a, k));
 
             const one = await qInt(1);
             const three = await qInt(3);
@@ -2921,15 +2327,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "divScalarHarness", [rows, cols, vals, zero]);
-            const gas = await estimateGas(harness, "divScalarHarness", [
-                rows,
-                cols,
-                vals,
-                zero,
-            ]);
-            await expect(
-                harness.divScalarHarness(rows, cols, vals, zero),
-            ).to.be.revertedWith("MatrixMaster: division by zero");
+            const gas = await estimateGas(harness, "divScalarHarness", [rows, cols, vals, zero]);
+            await expect(harness.divScalarHarness(rows, cols, vals, zero)).to.be.revertedWith("MatrixMaster: division by zero");
 
             printBlock({
                 t,
@@ -2957,22 +2356,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "divScalarHarness", [rows, cols, a, k]);
-            const gas = await estimateGas(harness, "divScalarHarness", [
-                rows,
-                cols,
-                a,
-                k,
-            ]);
-            const c = asMatrix(
-                await harness.divScalarHarness(rows, cols, a, k),
-            );
+            const gas = await estimateGas(harness, "divScalarHarness", [rows, cols, a, k]);
+            const c = asMatrix(await harness.divScalarHarness(rows, cols, a, k));
 
-            const expected = [
-                await qInt(-1),
-                await qInt(-2),
-                await qInt(-3),
-                await qInt(-4),
-            ];
+            const expected = [await qInt(-1), await qInt(-2), await qInt(-3), await qInt(-4)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -3011,15 +2398,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const tiny = tinyMat.data[0];
 
             await touchGas(harness, "divScalarHarness", [rows, cols, a, tiny]);
-            const gas = await estimateGas(harness, "divScalarHarness", [
-                rows,
-                cols,
-                a,
-                tiny,
-            ]);
-            const c = asMatrix(
-                await harness.divScalarHarness(rows, cols, a, tiny),
-            );
+            const gas = await estimateGas(harness, "divScalarHarness", [rows, cols, a, tiny]);
+            const c = asMatrix(await harness.divScalarHarness(rows, cols, a, tiny));
 
             const zeroQ = await qInt(0);
             const zeroBI = BigInt(zeroQ);
@@ -3064,24 +2444,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "addHarness", [rows, cols, a, rows, cols, b]);
-            const gas = await estimateGas(harness, "addHarness", [
-                rows,
-                cols,
-                a,
-                rows,
-                cols,
-                b,
-            ]);
-            const c = asMatrix(
-                await harness.addHarness(rows, cols, a, rows, cols, b),
-            );
-
-            const expected = [
-                await qInt(4),   // -1 + 5
-                await qInt(-8),  // -2 + (-6)
-                await qInt(0),   // 3 + (-3)
-                await qInt(6),   // 4 + 2
-            ];
+            const gas = await estimateGas(harness, "addHarness", [rows, cols, a, rows, cols, b]);
+            const c = asMatrix(await harness.addHarness(rows, cols, a, rows, cols, b));
+            const expected = [await qInt(4), await qInt(-8), await qInt(0), await qInt(6)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -3112,44 +2477,11 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
 
             const zeroMat = asMatrix(await harness.zerosHarness(rows, cols));
+            await touchGas(harness, "addHarness", [rows, cols, A, zeroMat.rows, zeroMat.cols, zeroMat.data]);
+            const gas = await estimateGas(harness, "addHarness", [rows, cols, A, zeroMat.rows, zeroMat.cols, zeroMat.data]);
+            const sum = asMatrix(await harness.addHarness(rows, cols, A, zeroMat.rows, zeroMat.cols, zeroMat.data));
 
-            await touchGas(harness, "addHarness", [
-                rows,
-                cols,
-                A,
-                zeroMat.rows,
-                zeroMat.cols,
-                zeroMat.data,
-            ]);
-            const gas = await estimateGas(harness, "addHarness", [
-                rows,
-                cols,
-                A,
-                zeroMat.rows,
-                zeroMat.cols,
-                zeroMat.data,
-            ]);
-            const sum = asMatrix(
-                await harness.addHarness(
-                    rows,
-                    cols,
-                    A,
-                    zeroMat.rows,
-                    zeroMat.cols,
-                    zeroMat.data,
-                ),
-            );
-
-            expect(
-                await harness.matricesExactEqual(
-                    rows,
-                    cols,
-                    A,
-                    sum.rows,
-                    sum.cols,
-                    sum.data,
-                ),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(rows, cols, A, sum.rows, sum.cols, sum.data)).to.equal(true);
 
             printBlock({
                 t,
@@ -3182,24 +2514,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const cols = 2n;
 
             await touchGas(harness, "subHarness", [rows, cols, a, rows, cols, b]);
-            const gas = await estimateGas(harness, "subHarness", [
-                rows,
-                cols,
-                a,
-                rows,
-                cols,
-                b,
-            ]);
-            const c = asMatrix(
-                await harness.subHarness(rows, cols, a, rows, cols, b),
-            );
-
-            const expected = [
-                await qInt(-8), // -5 - 3
-                await qInt(6),  // 2 - (-4)
-                await qInt(-1), // 0 - 1
-                await qInt(9),  // 7 - (-2)
-            ];
+            const gas = await estimateGas(harness, "subHarness", [rows, cols, a, rows, cols, b]);
+            const c = asMatrix(await harness.subHarness(rows, cols, a, rows, cols, b));
+            const expected = [await qInt(-8), await qInt(6), await qInt(-1), await qInt(9)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -3230,17 +2547,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
 
             await touchGas(harness, "subHarness", [rows, cols, A, rows, cols, A]);
-            const gas = await estimateGas(harness, "subHarness", [
-                rows,
-                cols,
-                A,
-                rows,
-                cols,
-                A,
-            ]);
-            const diff = asMatrix(
-                await harness.subHarness(rows, cols, A, rows, cols, A),
-            );
+            const gas = await estimateGas(harness, "subHarness", [rows, cols, A, rows, cols, A]);
+            const diff = asMatrix(await harness.subHarness(rows, cols, A, rows, cols, A));
 
             const zero = await qInt(0);
             for (const v of diff.data) {
@@ -3288,27 +2596,13 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
 
             await touchGas(harness, "mulHarness", [2n, 3n, A, 3n, 2n, B]);
-            const gas = await estimateGas(harness, "mulHarness", [
-                2n,
-                3n,
-                A,
-                3n,
-                2n,
-                B,
-            ]);
-            const C = asMatrix(
-                await harness.mulHarness(2n, 3n, A, 3n, 2n, B),
-            );
+            const gas = await estimateGas(harness, "mulHarness", [2n, 3n, A, 3n, 2n, B]);
+            const C = asMatrix(await harness.mulHarness(2n, 3n, A, 3n, 2n, B));
+
             expect(C.rows).to.equal(2n);
             expect(C.cols).to.equal(2n);
 
-            // C = A·B = [[58,64],[139,154]]
-            const expected = [
-                await qInt(58),
-                await qInt(64),
-                await qInt(139),
-                await qInt(154),
-            ];
+            const expected = [await qInt(58), await qInt(64), await qInt(139), await qInt(154)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(C.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -3333,17 +2627,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const B = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)]; // 2x2
 
             await touchGas(harness, "mulHarness", [1n, 4n, A, 2n, 2n, B]);
-            const gas = await estimateGas(harness, "mulHarness", [
-                1n,
-                4n,
-                A,
-                2n,
-                2n,
-                B,
-            ]);
-            await expect(
-                harness.mulHarness(1n, 4n, A, 2n, 2n, B),
-            ).to.be.revertedWith("MatrixMaster: mul dims a.cols != b.rows");
+
+            const gas = await estimateGas(harness, "mulHarness", [1n, 4n, A, 2n, 2n, B]);
+            await expect(harness.mulHarness(1n, 4n, A, 2n, 2n, B)).to.be.revertedWith("MatrixMaster: mul dims a.cols != b.rows");
 
             printBlock({
                 t,
@@ -3392,68 +2678,18 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const C = { rows: n, cols: n, data: Cdata };
 
             // AplusB = A + B
-            const AplusB = asMatrix(
-                await harness.addHarness(A.rows, A.cols, A.data, B.rows, B.cols, B.data),
-            );
+            const AplusB = asMatrix(await harness.addHarness(A.rows, A.cols, A.data, B.rows, B.cols, B.data));
 
-            await touchGas(harness, "mulHarness", [
-                AplusB.rows,
-                AplusB.cols,
-                AplusB.data,
-                C.rows,
-                C.cols,
-                C.data,
-            ]);
-            const gas = await estimateGas(harness, "mulHarness", [
-                AplusB.rows,
-                AplusB.cols,
-                AplusB.data,
-                C.rows,
-                C.cols,
-                C.data,
-            ]);
+            await touchGas(harness, "mulHarness", [AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data]);
+            const gas = await estimateGas(harness, "mulHarness", [AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data]);
 
-            // Left side: (A + B)·C
-            const left = asMatrix(
-                await harness.mulHarness(
-                    AplusB.rows,
-                    AplusB.cols,
-                    AplusB.data,
-                    C.rows,
-                    C.cols,
-                    C.data,
-                ),
-            );
+            const left = asMatrix(await harness.mulHarness(AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data));
 
-            // Right side: A·C + B·C
-            const AC = asMatrix(
-                await harness.mulHarness(A.rows, A.cols, A.data, C.rows, C.cols, C.data),
-            );
-            const BC = asMatrix(
-                await harness.mulHarness(B.rows, B.cols, B.data, C.rows, C.cols, C.data),
-            );
-            const right = asMatrix(
-                await harness.addHarness(
-                    AC.rows,
-                    AC.cols,
-                    AC.data,
-                    BC.rows,
-                    BC.cols,
-                    BC.data,
-                ),
-            );
+            const AC = asMatrix(await harness.mulHarness(A.rows, A.cols, A.data, C.rows, C.cols, C.data));
+            const BC = asMatrix(await harness.mulHarness(B.rows, B.cols, B.data, C.rows, C.cols, C.data));
+            const right = asMatrix(await harness.addHarness(AC.rows, AC.cols, AC.data, BC.rows, BC.cols, BC.data));
 
-            // Now exact equality is expected and safe.
-            expect(
-                await harness.matricesExactEqual(
-                    left.rows,
-                    left.cols,
-                    left.data,
-                    right.rows,
-                    right.cols,
-                    right.data,
-                ),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(left.rows, left.cols, left.data, right.rows, right.cols, right.data)).to.equal(true);
 
             printBlock({
                 t,
@@ -3480,52 +2716,15 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const I = asMatrix(await harness.eyeHarness(2n));
 
             await touchGas(harness, "mulHarness", [2n, 2n, A, I.rows, I.cols, I.data]);
-            const gas1 = await estimateGas(harness, "mulHarness", [
-                2n,
-                2n,
-                A,
-                I.rows,
-                I.cols,
-                I.data,
-            ]);
-            const AI = asMatrix(
-                await harness.mulHarness(2n, 2n, A, I.rows, I.cols, I.data),
-            );
+            const gas1 = await estimateGas(harness, "mulHarness", [2n, 2n, A, I.rows, I.cols, I.data]);
+            const AI = asMatrix(await harness.mulHarness(2n, 2n, A, I.rows, I.cols, I.data));
 
             await touchGas(harness, "mulHarness", [I.rows, I.cols, I.data, 2n, 2n, A]);
-            const gas2 = await estimateGas(harness, "mulHarness", [
-                I.rows,
-                I.cols,
-                I.data,
-                2n,
-                2n,
-                A,
-            ]);
-            const IA = asMatrix(
-                await harness.mulHarness(I.rows, I.cols, I.data, 2n, 2n, A),
-            );
+            const gas2 = await estimateGas(harness, "mulHarness", [I.rows, I.cols, I.data, 2n, 2n, A]);
+            const IA = asMatrix(await harness.mulHarness(I.rows, I.cols, I.data, 2n, 2n, A));
 
-            expect(
-                await harness.matricesExactEqual(
-                    2n,
-                    2n,
-                    A,
-                    AI.rows,
-                    AI.cols,
-                    AI.data,
-                ),
-            ).to.equal(true);
-
-            expect(
-                await harness.matricesExactEqual(
-                    2n,
-                    2n,
-                    A,
-                    IA.rows,
-                    IA.cols,
-                    IA.data,
-                ),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(2n, 2n, A, AI.rows, AI.cols, AI.data)).to.equal(true);
+            expect(await harness.matricesExactEqual(2n, 2n, A, IA.rows, IA.cols, IA.data)).to.equal(true);
 
             printBlock({
                 t,
@@ -3557,32 +2756,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const zeroRight = asMatrix(await harness.zerosHarness(rowsA, colsA)); // 2x3
 
             // A·0 (2x3 · 3x2 → 2x2)
-            await touchGas(harness, "mulHarness", [
-                rowsA,
-                colsA,
-                A,
-                zeroLeft.rows,
-                zeroLeft.cols,
-                zeroLeft.data,
-            ]);
-            const gas1 = await estimateGas(harness, "mulHarness", [
-                rowsA,
-                colsA,
-                A,
-                zeroLeft.rows,
-                zeroLeft.cols,
-                zeroLeft.data,
-            ]);
-            const AZ = asMatrix(
-                await harness.mulHarness(
-                    rowsA,
-                    colsA,
-                    A,
-                    zeroLeft.rows,
-                    zeroLeft.cols,
-                    zeroLeft.data,
-                ),
-            );
+            await touchGas(harness, "mulHarness", [rowsA, colsA, A, zeroLeft.rows, zeroLeft.cols, zeroLeft.data]);
+            const gas1 = await estimateGas(harness, "mulHarness", [rowsA, colsA, A, zeroLeft.rows, zeroLeft.cols, zeroLeft.data]);
+            const AZ = asMatrix(await harness.mulHarness(rowsA, colsA, A, zeroLeft.rows, zeroLeft.cols, zeroLeft.data));
 
             const zero = await qInt(0);
             for (const v of AZ.data) {
@@ -3603,41 +2779,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             // 0·A (2x3 zero · 3x3? keep 0:2x3 · A:3x2)
             const zeroMatLeft = asMatrix(await harness.zerosHarness(rowsA, colsA)); // 2x3
-            const A3x2 = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(3),
-                await qInt(4),
-                await qInt(5),
-                await qInt(6),
-            ]; // reused as 3x2
-
-            await touchGas(harness, "mulHarness", [
-                zeroMatLeft.rows,
-                zeroMatLeft.cols,
-                zeroMatLeft.data,
-                3n,
-                2n,
-                A3x2,
-            ]);
-            const gas2 = await estimateGas(harness, "mulHarness", [
-                zeroMatLeft.rows,
-                zeroMatLeft.cols,
-                zeroMatLeft.data,
-                3n,
-                2n,
-                A3x2,
-            ]);
-            const ZA = asMatrix(
-                await harness.mulHarness(
-                    zeroMatLeft.rows,
-                    zeroMatLeft.cols,
-                    zeroMatLeft.data,
-                    3n,
-                    2n,
-                    A3x2,
-                ),
-            );
+            const A3x2 = [await qInt(1), await qInt(2), await qInt(3), await qInt(4), await qInt(5), await qInt(6)];
+            await touchGas(harness, "mulHarness", [zeroMatLeft.rows, zeroMatLeft.cols, zeroMatLeft.data, 3n, 2n, A3x2]);
+            const gas2 = await estimateGas(harness, "mulHarness", [zeroMatLeft.rows, zeroMatLeft.cols, zeroMatLeft.data, 3n, 2n, A3x2]);
+            const ZA = asMatrix(await harness.mulHarness(zeroMatLeft.rows, zeroMatLeft.cols, zeroMatLeft.data, 3n, 2n, A3x2));
 
             for (const v of ZA.data) {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
@@ -3684,22 +2829,12 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
 
             await touchGas(harness, "mulHarness", [2n, 3n, A, 3n, 4n, B]);
-            const gas = await estimateGas(harness, "mulHarness", [
-                2n,
-                3n,
-                A,
-                3n,
-                4n,
-                B,
-            ]);
-            const C = asMatrix(
-                await harness.mulHarness(2n, 3n, A, 3n, 4n, B),
-            );
+            const gas = await estimateGas(harness, "mulHarness", [2n, 3n, A, 3n, 4n, B]);
+            const C = asMatrix(await harness.mulHarness(2n, 3n, A, 3n, 4n, B));
 
             expect(C.rows).to.equal(2n);
             expect(C.cols).to.equal(4n);
 
-            // C = [[38,44,50,56],[83,98,113,128]]
             const expected = [
                 await qInt(38),
                 await qInt(44),
@@ -3736,25 +2871,14 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const col = [await qInt(4), await qInt(5), await qInt(6)];
 
             await touchGas(harness, "mulHarness", [1n, 3n, row, 3n, 1n, col]);
-            const gas = await estimateGas(harness, "mulHarness", [
-                1n,
-                3n,
-                row,
-                3n,
-                1n,
-                col,
-            ]);
-            const result = asMatrix(
-                await harness.mulHarness(1n, 3n, row, 3n, 1n, col),
-            );
+            const gas = await estimateGas(harness, "mulHarness", [1n, 3n, row, 3n, 1n, col]);
+            const result = asMatrix(await harness.mulHarness(1n, 3n, row, 3n, 1n, col));
 
             expect(result.rows).to.equal(1n);
             expect(result.cols).to.equal(1n);
 
             const expectedDot = await qInt(32); // 1*4 + 2*5 + 3*6 = 32
-            expect(result.data[0].toLowerCase()).to.equal(
-                expectedDot.toLowerCase(),
-            );
+            expect(result.data[0].toLowerCase()).to.equal(expectedDot.toLowerCase());
 
             printBlock({
                 t,
@@ -3777,17 +2901,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const row = [await qInt(4), await qInt(5), await qInt(6)];
 
             await touchGas(harness, "mulHarness", [3n, 1n, col, 1n, 3n, row]);
-            const gas = await estimateGas(harness, "mulHarness", [
-                3n,
-                1n,
-                col,
-                1n,
-                3n,
-                row,
-            ]);
-            const result = asMatrix(
-                await harness.mulHarness(3n, 1n, col, 1n, 3n, row),
-            );
+            const gas = await estimateGas(harness, "mulHarness", [3n, 1n, col, 1n, 3n, row]);
+            const result = asMatrix(await harness.mulHarness(3n, 1n, col, 1n, 3n, row));
 
             expect(result.rows).to.equal(3n);
             expect(result.cols).to.equal(3n);
@@ -3841,17 +2956,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const B = [tiny, tiny, tiny, tiny];
 
             await touchGas(harness, "mulHarness", [rows, cols, A, rows, cols, B]);
-            const gas = await estimateGas(harness, "mulHarness", [
-                rows,
-                cols,
-                A,
-                rows,
-                cols,
-                B,
-            ]);
-            const C = asMatrix(
-                await harness.mulHarness(rows, cols, A, rows, cols, B),
-            );
+            const gas = await estimateGas(harness, "mulHarness", [rows, cols, A, rows, cols, B]);
+            const C = asMatrix(await harness.mulHarness(rows, cols, A, rows, cols, B));
 
             const zeroQ = await qInt(0);
             const zeroBI = BigInt(zeroQ);
@@ -3913,17 +3019,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
 
             await touchGas(harness, "mulHarness", [rowsA, colsA, Adata, rowsB, colsB, Bdata]);
-            const gas = await estimateGas(harness, "mulHarness", [
-                rowsA,
-                colsA,
-                Adata,
-                rowsB,
-                colsB,
-                Bdata,
-            ]);
-            const C = asMatrix(
-                await harness.mulHarness(rowsA, colsA, Adata, rowsB, colsB, Bdata),
-            );
+            const gas = await estimateGas(harness, "mulHarness", [rowsA, colsA, Adata, rowsB, colsB, Bdata]);
+            const C = asMatrix(await harness.mulHarness(rowsA, colsA, Adata, rowsB, colsB, Bdata));
 
             expect(C.rows).to.equal(rowsA);
             expect(C.cols).to.equal(colsB);
@@ -4055,9 +3152,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             await touchGas(harness, "detHarness", [2n, 3n, A]);
             const gas = await estimateGas(harness, "detHarness", [2n, 3n, A]);
-            await expect(
-                harness.detHarness(2n, 3n, A),
-            ).to.be.revertedWith("MatrixMaster: matrix must be square");
+            await expect(harness.detHarness(2n, 3n, A)).to.be.revertedWith("MatrixMaster: matrix must be square");
 
             printBlock({
                 t,
@@ -4102,11 +3197,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const I = asMatrix(await harness.eyeHarness(n));
 
             await touchGas(harness, "detHarness", [I.rows, I.cols, I.data]);
-            const gas = await estimateGas(harness, "detHarness", [
-                I.rows,
-                I.cols,
-                I.data,
-            ]);
+            const gas = await estimateGas(harness, "detHarness", [I.rows, I.cols, I.data]);
             const det = await harness.detHarness(I.rows, I.cols, I.data);
             const one = await qInt(1);
 
@@ -4131,11 +3222,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const Z = asMatrix(await harness.zerosHarness(n, n));
 
             await touchGas(harness, "detHarness", [Z.rows, Z.cols, Z.data]);
-            const gas = await estimateGas(harness, "detHarness", [
-                Z.rows,
-                Z.cols,
-                Z.data,
-            ]);
+            const gas = await estimateGas(harness, "detHarness", [Z.rows, Z.cols, Z.data]);
             const det = await harness.detHarness(Z.rows, Z.cols, Z.data);
             const zero = await qInt(0);
 
@@ -4194,15 +3281,11 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             // Construct epsilon = 1 / 1000 in quad
             const one = await qInt(1);
             const big = await qInt(1000);
-            const tinyMat = asMatrix(
-                await harness.divScalarHarness(1n, 1n, [one], big),
-            );
+            const tinyMat = asMatrix(await harness.divScalarHarness(1n, 1n, [one], big));
             const eps = tinyMat.data[0];
 
             // Build 1 + eps via 1x1 addHarness
-            const onePlusEpsMat = asMatrix(
-                await harness.addHarness(1n, 1n, [one], 1n, 1n, [eps]),
-            );
+            const onePlusEpsMat = asMatrix(await harness.addHarness(1n, 1n, [one], 1n, 1n, [eps]));
             const onePlusEps = onePlusEpsMat.data[0];
 
             // A = [[1, 1],
@@ -4254,26 +3337,13 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
             await touchGas(harness, "inverseHarness", [2n, 2n, A]);
             const gas = await estimateGas(harness, "inverseHarness", [2n, 2n, A]);
-            const inv = asMatrix(
-                await harness.inverseHarness(2n, 2n, A),
-            );
+            const inv = asMatrix(await harness.inverseHarness(2n, 2n, A));
 
             // Check A·A⁻¹ == I
-            const prod = asMatrix(
-                await harness.mulHarness(2n, 2n, A, inv.rows, inv.cols, inv.data),
-            );
+            const prod = asMatrix(await harness.mulHarness(2n, 2n, A, inv.rows, inv.cols, inv.data));
             const I = asMatrix(await harness.eyeHarness(2n));
 
-            expect(
-                await harness.matricesExactEqual(
-                    prod.rows,
-                    prod.cols,
-                    prod.data,
-                    I.rows,
-                    I.cols,
-                    I.data,
-                ),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
 
             printBlock({
                 t,
@@ -4306,26 +3376,13 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             await touchGas(harness, "inverseHarness", [3n, 3n, Adata]);
             const gas = await estimateGas(harness, "inverseHarness", [3n, 3n, Adata]);
-            const invA = asMatrix(
-                await harness.inverseHarness(3n, 3n, Adata),
-            );
+            const invA = asMatrix(await harness.inverseHarness(3n, 3n, Adata));
 
             // Check A·A⁻¹ = I₃
-            const prod = asMatrix(
-                await harness.mulHarness(3n, 3n, Adata, invA.rows, invA.cols, invA.data),
-            );
+            const prod = asMatrix(await harness.mulHarness(3n, 3n, Adata, invA.rows, invA.cols, invA.data));
             const I = asMatrix(await harness.eyeHarness(3n));
 
-            expect(
-                await harness.matricesExactEqual(
-                    prod.rows,
-                    prod.cols,
-                    prod.data,
-                    I.rows,
-                    I.cols,
-                    I.data,
-                ),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
 
             printBlock({
                 t,
@@ -4351,21 +3408,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
             await touchGas(harness, "inverseHarness", [2n, 2n, A]);
             const gas = await estimateGas(harness, "inverseHarness", [2n, 2n, A]);
-            const inv = asMatrix(
-                await harness.inverseHarness(2n, 2n, A),
-            );
+            const inv = asMatrix(await harness.inverseHarness(2n, 2n, A));
 
             // inverse should equal A exactly
-            expect(
-                await harness.matricesExactEqual(
-                    2n,
-                    2n,
-                    A,
-                    inv.rows,
-                    inv.cols,
-                    inv.data,
-                ),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(2n, 2n, A, inv.rows, inv.cols, inv.data)).to.equal(true);
 
             printBlock({
                 t,
@@ -4391,9 +3437,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
             await touchGas(harness, "inverseHarness", [2n, 2n, A]);
             const gas = await estimateGas(harness, "inverseHarness", [2n, 2n, A]);
-            await expect(
-                harness.inverseHarness(2n, 2n, A),
-            ).to.be.revertedWith("MatrixMaster: singular matrix");
+            await expect(harness.inverseHarness(2n, 2n, A)).to.be.revertedWith("MatrixMaster: singular matrix");
 
             printBlock({
                 t,
@@ -4421,9 +3465,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             await touchGas(harness, "inverseHarness", [2n, 3n, A]);
             const gas = await estimateGas(harness, "inverseHarness", [2n, 3n, A]);
-            await expect(
-                harness.inverseHarness(2n, 3n, A),
-            ).to.be.revertedWith("MatrixMaster: matrix must be square");
+            await expect(harness.inverseHarness(2n, 3n, A)).to.be.revertedWith("MatrixMaster: matrix must be square");
 
             printBlock({
                 t,
@@ -4444,25 +3486,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const I = asMatrix(await harness.eyeHarness(n));
 
             await touchGas(harness, "inverseHarness", [I.rows, I.cols, I.data]);
-            const gas = await estimateGas(harness, "inverseHarness", [
-                I.rows,
-                I.cols,
-                I.data,
-            ]);
-            const invI = asMatrix(
-                await harness.inverseHarness(I.rows, I.cols, I.data),
-            );
+            const gas = await estimateGas(harness, "inverseHarness", [I.rows, I.cols, I.data]);
+            const invI = asMatrix(await harness.inverseHarness(I.rows, I.cols, I.data));
 
-            expect(
-                await harness.matricesExactEqual(
-                    I.rows,
-                    I.cols,
-                    I.data,
-                    invI.rows,
-                    invI.cols,
-                    invI.data,
-                ),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(I.rows, I.cols, I.data, invI.rows, invI.cols, invI.data)).to.equal(true);
 
             printBlock({
                 t,
@@ -4484,14 +3511,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             await touchGas(harness, "inverseHarness", [1n, 1n, A]);
             const gas = await estimateGas(harness, "inverseHarness", [1n, 1n, A]);
-            const inv = asMatrix(
-                await harness.inverseHarness(1n, 1n, A),
-            );
+            const inv = asMatrix(await harness.inverseHarness(1n, 1n, A));
 
             // Check A·A⁻¹ = [1]
-            const prod = asMatrix(
-                await harness.mulHarness(1n, 1n, A, inv.rows, inv.cols, inv.data),
-            );
+            const prod = asMatrix(await harness.mulHarness(1n, 1n, A, inv.rows, inv.cols, inv.data));
             const one = await qInt(1);
 
             expect(prod.rows).to.equal(1n);
@@ -4521,38 +3544,12 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const D = asMatrix(await harness.fromDiagonalHarness(diag));
 
             await touchGas(harness, "inverseHarness", [D.rows, D.cols, D.data]);
-            const gas = await estimateGas(harness, "inverseHarness", [
-                D.rows,
-                D.cols,
-                D.data,
-            ]);
-            const invD = asMatrix(
-                await harness.inverseHarness(D.rows, D.cols, D.data),
-            );
-
-            // D·D⁻¹ should be I
-            const prod = asMatrix(
-                await harness.mulHarness(
-                    D.rows,
-                    D.cols,
-                    D.data,
-                    invD.rows,
-                    invD.cols,
-                    invD.data,
-                ),
-            );
+            const gas = await estimateGas(harness, "inverseHarness", [D.rows, D.cols, D.data]);
+            const invD = asMatrix(await harness.inverseHarness(D.rows, D.cols, D.data));
+            const prod = asMatrix(await harness.mulHarness(D.rows, D.cols, D.data, invD.rows, invD.cols, invD.data));
             const I = asMatrix(await harness.eyeHarness(2n));
 
-            expect(
-                await harness.matricesExactEqual(
-                    prod.rows,
-                    prod.cols,
-                    prod.data,
-                    I.rows,
-                    I.cols,
-                    I.data,
-                ),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
 
             printBlock({
                 t,
@@ -4579,23 +3576,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             await touchGas(harness, "inverseHarness", [2n, 2n, A]);
             const gas = await estimateGas(harness, "inverseHarness", [2n, 2n, A]);
-            const invA = asMatrix(
-                await harness.inverseHarness(2n, 2n, A),
-            );
-            const invInvA = asMatrix(
-                await harness.inverseHarness(invA.rows, invA.cols, invA.data),
-            );
+            const invA = asMatrix(await harness.inverseHarness(2n, 2n, A));
+            const invInvA = asMatrix(await harness.inverseHarness(invA.rows, invA.cols, invA.data));
 
-            expect(
-                await harness.matricesExactEqual(
-                    2n,
-                    2n,
-                    A,
-                    invInvA.rows,
-                    invInvA.cols,
-                    invInvA.data,
-                ),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(2n, 2n, A, invInvA.rows, invInvA.cols, invInvA.data)).to.equal(true);
 
             printBlock({
                 t,
