@@ -177,10 +177,10 @@ describe("Integration Library via IntegrationHarness", function () {
       const gas = await estimateGas(h, "trapezoidal", [target, SEL.const5, q0, await h.qFromInt(10), 50]);
       printBlock(
         t,
-        "trapezoidal", 
-        "Constant function exact", 
+        "trapezoidal",
+        "Constant function exact",
         gas,
-        "f=5,[0,10]", 
+        "f=5,[0,10]",
         val, "50"
       );
       expect(val).to.be.a("string");

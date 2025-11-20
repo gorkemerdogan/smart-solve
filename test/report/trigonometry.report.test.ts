@@ -544,5 +544,4 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
     printBlock(t, "cot", "cot(0)=NaN", "~", "x=0", r, "NaN");
     expect(await h.isNaN(r)).to.be.true;
   });
-
 });

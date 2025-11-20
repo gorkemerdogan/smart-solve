@@ -131,7 +131,7 @@ describe("Polynomial (library) — Horner, Derivative, Arithmetic, Calculus (ABD
 
     it("handles negative x and negative coefficients", async function () {
       // f(x) = -1.5 + 0.5x - 2x^2 + 0.25x^3 at x = -0.8  => -3.308
-      const coeffs = [await qFrac(-3,2), await qFrac(1,2), await qInt(-2), await qFrac(1,4)];
+      const coeffs = [await qFrac(-3, 2), await qFrac(1, 2), await qInt(-2), await qFrac(1, 4)];
       const x = await qFrac(-4, 5);                // -0.8
       const expected = await qFrac(-3308, 1000);   // -3.308
       const out = await harness.evaluateHorners(coeffs, x);
@@ -161,16 +161,16 @@ describe("Polynomial (library) — Horner, Derivative, Arithmetic, Calculus (ABD
 
     it("derivative scales by i via fromInt(i): [-2.2, 6.6, -13.2]", async function () {
       // f(x) = 1.1 + (-2.2)x + 3.3x^2 + (-4.4)x^3
-      const coeffs = [await qFrac(11,10), await qFrac(-22,10), await qFrac(33,10), await qFrac(-44,10)];
+      const coeffs = [await qFrac(11, 10), await qFrac(-22, 10), await qFrac(33, 10), await qFrac(-44, 10)];
       const d = [...(await harness.derivative(coeffs))];
       expect(d.length).to.equal(3);
       /*expect(d[0].toLowerCase()).to.equal((await qFrac(-22,10)).toLowerCase());
       expect(d[1].toLowerCase()).to.equal((await qFrac(33,5)).toLowerCase());
       expect(d[2].toLowerCase()).to.equal((await qFrac(-66,5)).toLowerCase());*/
 
-      expectAlmostEqHex(d[0].toLowerCase(), (await qFrac(-22,10)).toLowerCase(), 1n);
-      expectAlmostEqHex(d[1].toLowerCase(), (await qFrac(33,5)).toLowerCase(), 1n);
-      expectAlmostEqHex(d[2].toLowerCase(), (await qFrac(-66,5)).toLowerCase(), 1n);
+      expectAlmostEqHex(d[0].toLowerCase(), (await qFrac(-22, 10)).toLowerCase(), 1n);
+      expectAlmostEqHex(d[1].toLowerCase(), (await qFrac(33, 5)).toLowerCase(), 1n);
+      expectAlmostEqHex(d[2].toLowerCase(), (await qFrac(-66, 5)).toLowerCase(), 1n);
     });
   });
 
@@ -180,8 +180,8 @@ describe("Polynomial (library) — Horner, Derivative, Arithmetic, Calculus (ABD
       const coeffs = [await qInt(5), await qInt(2), await qInt(3)];
       const x = await qFrac(6, 5); // 1.2
       const { px, dpx } = await harness.evaluateWithDerivative(coeffs, x);
-      expect(px.toLowerCase()).to.equal((await qFrac(293,25)).toLowerCase()); // 11.72
-      expect(dpx.toLowerCase()).to.equal((await qFrac(46,5)).toLowerCase());  // 9.2
+      expect(px.toLowerCase()).to.equal((await qFrac(293, 25)).toLowerCase()); // 11.72
+      expect(dpx.toLowerCase()).to.equal((await qFrac(46, 5)).toLowerCase());  // 9.2
     });
 
     it("returns (0,0) for empty coefficients", async function () {
@@ -283,11 +283,11 @@ describe("Polynomial (library) — Horner, Derivative, Arithmetic, Calculus (ABD
     });
 
     it("integral of empty polynomial returns [C]", async function () {
-        const C = await qInt(5);
-        const res = [...(await harness.integral([], C))];
-        expect(res.length).to.equal(1);
-        expect(res[0].toLowerCase()).to.equal(C.toLowerCase());
-      });
+      const C = await qInt(5);
+      const res = [...(await harness.integral([], C))];
+      expect(res.length).to.equal(1);
+      expect(res[0].toLowerCase()).to.equal(C.toLowerCase());
+    });
   });
 
   describe("Utilities (degree, trim)", function () {

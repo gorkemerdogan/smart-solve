@@ -151,7 +151,7 @@ function trim(n: number) {
   const a = Math.abs(n);
   if (a === 0) return "0";
   if (a >= 1e6 || a < 1e-6) return n.toExponential(6);
-  return n.toFixed(12).replace(/0+$/,"").replace(/\.$/,"");
+  return n.toFixed(12).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 // ------------------------ The Suite (full) ------------------------
