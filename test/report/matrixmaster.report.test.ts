@@ -3048,6 +3048,124 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
     });
 
     // =========================================================
+    // Matrix-Vector multiplication
+    // =========================================================
+
+    describe("Matrix multiplication", function () {
+        it("mulMatrixVector : 3x3 * 3x1 produces correct 3x1 result", async function () {
+            t++;
+
+            const A = [
+                await qInt(1), await qInt(2), await qInt(3),
+                await qInt(4), await qInt(5), await qInt(6),
+                await qInt(7), await qInt(8), await qInt(9),
+            ]; // 3×3
+
+            const x = [
+                await qInt(1),
+                await qInt(0),
+                await qInt(1),
+            ]; // 3×1
+
+            await touchGas(harness, "mulMatrixVectorHarness", [3n, 3n, A, 3n, 1n, x]);
+            const gas = await estimateGas(harness, "mulMatrixVectorHarness", [3n, 3n, A, 3n, 1n, x]);
+
+            const out = asMatrix(await harness.mulMatrixVectorHarness(3n, 3n, A, 3n, 1n, x));
+
+            const e0 = await qInt(4);
+            const e1 = await qInt(10);
+            const e2 = await qInt(16);
+
+            expect(out.rows).to.equal(3n);
+            expect(out.cols).to.equal(1n);
+            expect(out.data[0]).to.equal(e0);
+            expect(out.data[1]).to.equal(e1);
+            expect(out.data[2]).to.equal(e2);
+
+            printBlock({
+                t,
+                method: "mulMatrixVectorHarness",
+                explanation:
+                    "Multiplies a 3×3 dense quad matrix with a 3×1 column vector and validates rowwise dot-products.",
+                gas,
+                shapeIn: "A:3x3, x:3x1",
+                shapeOut: `${out.rows}x${out.cols}`,
+                inHex: `A=${fmtHexArr(A)}, x=${fmtHexArr(x)}`,
+                outHex: fmtHexArr(out.data),
+            });
+        });
+
+        it("mulMatrixVector : shape mismatch reverts", async function () {
+            t++;
+
+            const A = [
+                await qInt(1), await qInt(2), await qInt(3),
+                await qInt(4), await qInt(5), await qInt(6),
+                await qInt(7), await qInt(8), await qInt(9),
+            ]; // 3×3
+
+            const xBad = [
+                await qInt(1),
+                await qInt(2),
+            ]; // 2×1
+
+            await touchGas(harness, "mulMatrixVectorHarness", [3n, 3n, A, 2n, 1n, xBad]);
+            const gas = await estimateGas(harness, "mulMatrixVectorHarness", [3n, 3n, A, 2n, 1n, xBad]);
+
+            await expect(
+                harness.mulMatrixVectorHarness(3n, 3n, A, 2n, 1n, xBad)
+            ).to.be.revertedWith("MatrixMaster: mulMatrix dims a.cols != b.rows");
+
+            printBlock({
+                t,
+                method: "mulMatrixVectorHarness",
+                explanation:
+                    "Ensures A.cols == x.rows is required for matrix–vector multiplication; mismatched dims revert.",
+                gas,
+                shapeIn: "A:3x3, x:2x1",
+                shapeOut: "revert",
+                inHex: `A=${fmtHexArr(A)}, x=${fmtHexArr(xBad)}`,
+                outHex: "-",
+            });
+        });
+
+        it("mulMatrixVector : multiplying by zero vector yields zero output", async function () {
+            t++;
+
+            const A = [
+                await qInt(1), await qInt(2), await qInt(3), await qInt(4),
+                await qInt(5), await qInt(6), await qInt(7), await qInt(8),
+                await qInt(9), await qInt(10), await qInt(11), await qInt(12),
+                await qInt(13), await qInt(14), await qInt(15), await qInt(16),
+            ]; // 4×4
+
+            const zero = await qInt(0);
+            const xZero = [zero, zero, zero, zero]; // 4×1
+
+            await touchGas(harness, "mulMatrixVectorHarness", [4n, 4n, A, 4n, 1n, xZero]);
+            const gas = await estimateGas(harness, "mulMatrixVectorHarness", [4n, 4n, A, 4n, 1n, xZero]);
+
+            const out = asMatrix(await harness.mulMatrixVectorHarness(4n, 4n, A, 4n, 1n, xZero));
+
+            expect(out.rows).to.equal(4n);
+            expect(out.cols).to.equal(1n);
+            expect(out.data.every(v => v.toLowerCase() === zero.toLowerCase())).to.equal(true);
+
+            printBlock({
+                t,
+                method: "mulMatrixVectorHarness",
+                explanation:
+                    "Verifies that A·0 = 0 holds for quad-precision matrices: multiplying any 4×4 matrix by a zero vector returns a zero column vector.",
+                gas,
+                shapeIn: "A:4x4, x:4x1",
+                shapeOut: `${out.rows}x${out.cols}`,
+                inHex: `A=${fmtHexArr(A)}, x=${fmtHexArr(xZero)}`,
+                outHex: fmtHexArr(out.data),
+            });
+        });
+    });
+
+    // =========================================================
     // Determinant
     // =========================================================
 
