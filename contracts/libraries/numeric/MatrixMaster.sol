@@ -421,7 +421,7 @@ library MatrixMaster {
      * @return y = A * x (m×1 column vector)
      */
     function mulMatrixVector(Matrix memory A, Matrix memory x) internal pure returns (Matrix memory y) {
-        require(A.cols == x.rows, "MatrixMaster: mulMatrixVector dims mismatch");
+        require(A.cols == x.rows, "MatrixMaster: mulMatrix dims a.cols != b.rows"); // Used mulMatrix for consistency
         require(x.cols == 1, "MatrixMaster: x must be column vector");
 
         uint256 m = A.rows;
