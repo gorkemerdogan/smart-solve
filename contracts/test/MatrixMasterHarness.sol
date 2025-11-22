@@ -516,6 +516,21 @@ contract MatrixMasterHarness {
     }
 
     // =========================================================
+    // Vector randomization wrapper
+    // =========================================================
+
+    /**
+    * @notice Wrapper for MatrixMaster.randomVector (n × 1).
+    */
+    function randomVectorHarness(
+        uint256 n,
+        bytes32 seed
+    ) external pure returns (uint256, uint256, bytes16[] memory) {
+        MatrixMaster.Matrix memory v = MatrixMaster.randomVector(n, seed);
+        return _fromMatrix(v);
+    }
+
+    // =========================================================
     // Convergence check wrapper
     // =========================================================
 
