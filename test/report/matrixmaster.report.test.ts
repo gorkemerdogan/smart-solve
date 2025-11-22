@@ -57,7 +57,7 @@ type MatrixMasterHarness = Contract & {
     normalizeVectorHarness(vRows: bigint, vCols: bigint, vData: string[]): Promise<[bigint, bigint, string[]]>;
 
     // convergence
-    hasConvergedHarness(prevEig: string, currEig: string, tol: string): Promise<boolean>;
+    hasConvergedHarness(xRows: bigint, xCols: bigint, xData: string[], yRows: bigint, yCols: bigint, yData: string[], tol: string): Promise<boolean>;
 };
 
 async function newHarness(): Promise<MatrixMasterHarness> {
