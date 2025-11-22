@@ -112,7 +112,7 @@ type MatrixMasterHarness = Contract & {
     ): Promise<[bigint, bigint, string[]]>;
 
     // matrix multiplication
-    mulHarness(
+    mulMatrixHarness(
         aRows: bigint,
         aCols: bigint,
         aData: string[],
@@ -2574,7 +2574,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
     // =========================================================
 
     describe("Matrix multiplication", function () {
-        it("mul : valid multiplication", async function () {
+        it("mulMatrix : valid multiplication", async function () {
             t++;
             // A (2x3): [[1,2,3],[4,5,6]]
             const A = [
@@ -2595,9 +2595,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 await qInt(12),
             ];
 
-            await touchGas(harness, "mulHarness", [2n, 3n, A, 3n, 2n, B]);
-            const gas = await estimateGas(harness, "mulHarness", [2n, 3n, A, 3n, 2n, B]);
-            const C = asMatrix(await harness.mulHarness(2n, 3n, A, 3n, 2n, B));
+            await touchGas(harness, "mulMatrixHarness", [2n, 3n, A, 3n, 2n, B]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [2n, 3n, A, 3n, 2n, B]);
+            const C = asMatrix(await harness.mulMatrixHarness(2n, 3n, A, 3n, 2n, B));
 
             expect(C.rows).to.equal(2n);
             expect(C.cols).to.equal(2n);
@@ -2610,7 +2610,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Computes a standard 2x3·3x2 product and validates dense triple-loop multiplication.",
                 gas,
@@ -2621,19 +2621,19 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("mul : shape mismatch reverts", async function () {
+        it("mulMatrix : shape mismatch reverts", async function () {
             t++;
             const A = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)]; // 2x2
             const B = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)]; // 2x2
 
-            await touchGas(harness, "mulHarness", [1n, 4n, A, 2n, 2n, B]);
+            await touchGas(harness, "mulMatrixHarness", [1n, 4n, A, 2n, 2n, B]);
 
-            const gas = await estimateGas(harness, "mulHarness", [1n, 4n, A, 2n, 2n, B]);
-            await expect(harness.mulHarness(1n, 4n, A, 2n, 2n, B)).to.be.revertedWith("MatrixMaster: mul dims a.cols != b.rows");
+            const gas = await estimateGas(harness, "mulMatrixHarness", [1n, 4n, A, 2n, 2n, B]);
+            await expect(harness.mulMatrixHarness(1n, 4n, A, 2n, 2n, B)).to.be.revertedWith("MatrixMaster: mulMatrix dims a.cols != b.rows");
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Ensures multiplication enforces a.cols == b.rows and fails on incompatible shapes.",
                 gas,
@@ -2644,7 +2644,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("mul : 10x10 bilinearity (A+B)·C == A·C + B·C (small integer matrices)", async function () {
+        it("mulMatrix : 10x10 bilinearity (A+B)·C == A·C + B·C (small integer matrices)", async function () {
             t++;
             const n = 10n;
             const size = Number(n);
@@ -2680,20 +2680,20 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             // AplusB = A + B
             const AplusB = asMatrix(await harness.addHarness(A.rows, A.cols, A.data, B.rows, B.cols, B.data));
 
-            await touchGas(harness, "mulHarness", [AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data]);
-            const gas = await estimateGas(harness, "mulHarness", [AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data]);
+            await touchGas(harness, "mulMatrixHarness", [AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data]);
 
-            const left = asMatrix(await harness.mulHarness(AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data));
+            const left = asMatrix(await harness.mulMatrixHarness(AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data));
 
-            const AC = asMatrix(await harness.mulHarness(A.rows, A.cols, A.data, C.rows, C.cols, C.data));
-            const BC = asMatrix(await harness.mulHarness(B.rows, B.cols, B.data, C.rows, C.cols, C.data));
+            const AC = asMatrix(await harness.mulMatrixHarness(A.rows, A.cols, A.data, C.rows, C.cols, C.data));
+            const BC = asMatrix(await harness.mulMatrixHarness(B.rows, B.cols, B.data, C.rows, C.cols, C.data));
             const right = asMatrix(await harness.addHarness(AC.rows, AC.cols, AC.data, BC.rows, BC.cols, BC.data));
 
             expect(await harness.matricesExactEqual(left.rows, left.cols, left.data, right.rows, right.cols, right.data)).to.equal(true);
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Verifies full 10x10 bilinearity using small integer matrices where quad arithmetic is exact: (A+B)·C = A·C + B·C bit-for-bit.",
                 gas,
@@ -2704,7 +2704,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("mul : identity property A·I == A and I·A == A", async function () {
+        it("mulMatrix : identity property A·I == A and I·A == A", async function () {
             t++;
             // A 2x2
             const A = [
@@ -2715,20 +2715,20 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ];
             const I = asMatrix(await harness.createIdentityMatrixHarness(2n));
 
-            await touchGas(harness, "mulHarness", [2n, 2n, A, I.rows, I.cols, I.data]);
-            const gas1 = await estimateGas(harness, "mulHarness", [2n, 2n, A, I.rows, I.cols, I.data]);
-            const AI = asMatrix(await harness.mulHarness(2n, 2n, A, I.rows, I.cols, I.data));
+            await touchGas(harness, "mulMatrixHarness", [2n, 2n, A, I.rows, I.cols, I.data]);
+            const gas1 = await estimateGas(harness, "mulMatrixHarness", [2n, 2n, A, I.rows, I.cols, I.data]);
+            const AI = asMatrix(await harness.mulMatrixHarness(2n, 2n, A, I.rows, I.cols, I.data));
 
-            await touchGas(harness, "mulHarness", [I.rows, I.cols, I.data, 2n, 2n, A]);
-            const gas2 = await estimateGas(harness, "mulHarness", [I.rows, I.cols, I.data, 2n, 2n, A]);
-            const IA = asMatrix(await harness.mulHarness(I.rows, I.cols, I.data, 2n, 2n, A));
+            await touchGas(harness, "mulMatrixHarness", [I.rows, I.cols, I.data, 2n, 2n, A]);
+            const gas2 = await estimateGas(harness, "mulMatrixHarness", [I.rows, I.cols, I.data, 2n, 2n, A]);
+            const IA = asMatrix(await harness.mulMatrixHarness(I.rows, I.cols, I.data, 2n, 2n, A));
 
             expect(await harness.matricesExactEqual(2n, 2n, A, AI.rows, AI.cols, AI.data)).to.equal(true);
             expect(await harness.matricesExactEqual(2n, 2n, A, IA.rows, IA.cols, IA.data)).to.equal(true);
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Multiplies a matrix by the identity on both sides and confirms invariance of A.",
                 gas: `${gas1} / ${gas2}`,
@@ -2739,7 +2739,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("mul : A·0 = 0 and 0·A = 0", async function () {
+        it("mulMatrix : A·0 = 0 and 0·A = 0", async function () {
             t++;
             const A = [
                 await qInt(1),
@@ -2756,9 +2756,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const zeroRight = asMatrix(await harness.zerosHarness(rowsA, colsA)); // 2x3
 
             // A·0 (2x3 · 3x2 → 2x2)
-            await touchGas(harness, "mulHarness", [rowsA, colsA, A, zeroLeft.rows, zeroLeft.cols, zeroLeft.data]);
-            const gas1 = await estimateGas(harness, "mulHarness", [rowsA, colsA, A, zeroLeft.rows, zeroLeft.cols, zeroLeft.data]);
-            const AZ = asMatrix(await harness.mulHarness(rowsA, colsA, A, zeroLeft.rows, zeroLeft.cols, zeroLeft.data));
+            await touchGas(harness, "mulMatrixHarness", [rowsA, colsA, A, zeroLeft.rows, zeroLeft.cols, zeroLeft.data]);
+            const gas1 = await estimateGas(harness, "mulMatrixHarness", [rowsA, colsA, A, zeroLeft.rows, zeroLeft.cols, zeroLeft.data]);
+            const AZ = asMatrix(await harness.mulMatrixHarness(rowsA, colsA, A, zeroLeft.rows, zeroLeft.cols, zeroLeft.data));
 
             const zero = await qInt(0);
             for (const v of AZ.data) {
@@ -2767,7 +2767,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Multiplies A by a zero matrix on the right and confirms the result is all zeros.",
                 gas: gas1,
@@ -2780,9 +2780,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             // 0·A (2x3 zero · 3x3? keep 0:2x3 · A:3x2)
             const zeroMatLeft = asMatrix(await harness.zerosHarness(rowsA, colsA)); // 2x3
             const A3x2 = [await qInt(1), await qInt(2), await qInt(3), await qInt(4), await qInt(5), await qInt(6)];
-            await touchGas(harness, "mulHarness", [zeroMatLeft.rows, zeroMatLeft.cols, zeroMatLeft.data, 3n, 2n, A3x2]);
-            const gas2 = await estimateGas(harness, "mulHarness", [zeroMatLeft.rows, zeroMatLeft.cols, zeroMatLeft.data, 3n, 2n, A3x2]);
-            const ZA = asMatrix(await harness.mulHarness(zeroMatLeft.rows, zeroMatLeft.cols, zeroMatLeft.data, 3n, 2n, A3x2));
+            await touchGas(harness, "mulMatrixHarness", [zeroMatLeft.rows, zeroMatLeft.cols, zeroMatLeft.data, 3n, 2n, A3x2]);
+            const gas2 = await estimateGas(harness, "mulMatrixHarness", [zeroMatLeft.rows, zeroMatLeft.cols, zeroMatLeft.data, 3n, 2n, A3x2]);
+            const ZA = asMatrix(await harness.mulMatrixHarness(zeroMatLeft.rows, zeroMatLeft.cols, zeroMatLeft.data, 3n, 2n, A3x2));
 
             for (const v of ZA.data) {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
@@ -2790,7 +2790,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Multiplies a zero matrix on the left by A and ensures the result is still all zeros.",
                 gas: gas2,
@@ -2801,7 +2801,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("mul : non-square 2×3 · 3×4 multiplication", async function () {
+        it("mulMatrix : non-square 2×3 · 3×4 multiplication", async function () {
             t++;
             // A (2x3): [[1,2,3],[4,5,6]]
             const A = [
@@ -2828,9 +2828,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 await qInt(12),
             ];
 
-            await touchGas(harness, "mulHarness", [2n, 3n, A, 3n, 4n, B]);
-            const gas = await estimateGas(harness, "mulHarness", [2n, 3n, A, 3n, 4n, B]);
-            const C = asMatrix(await harness.mulHarness(2n, 3n, A, 3n, 4n, B));
+            await touchGas(harness, "mulMatrixHarness", [2n, 3n, A, 3n, 4n, B]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [2n, 3n, A, 3n, 4n, B]);
+            const C = asMatrix(await harness.mulMatrixHarness(2n, 3n, A, 3n, 4n, B));
 
             expect(C.rows).to.equal(2n);
             expect(C.cols).to.equal(4n);
@@ -2852,7 +2852,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Multiplies a 2x3 matrix by a 3x4 matrix and validates each of the 8 output entries.",
                 gas,
@@ -2863,16 +2863,16 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("mul : vector inner product (1×N · N×1)", async function () {
+        it("mulMatrix : vector inner product (1×N · N×1)", async function () {
             t++;
             // row: [1,2,3] as 1x3
             const row = [await qInt(1), await qInt(2), await qInt(3)];
             // col: [4,5,6] as 3x1
             const col = [await qInt(4), await qInt(5), await qInt(6)];
 
-            await touchGas(harness, "mulHarness", [1n, 3n, row, 3n, 1n, col]);
-            const gas = await estimateGas(harness, "mulHarness", [1n, 3n, row, 3n, 1n, col]);
-            const result = asMatrix(await harness.mulHarness(1n, 3n, row, 3n, 1n, col));
+            await touchGas(harness, "mulMatrixHarness", [1n, 3n, row, 3n, 1n, col]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [1n, 3n, row, 3n, 1n, col]);
+            const result = asMatrix(await harness.mulMatrixHarness(1n, 3n, row, 3n, 1n, col));
 
             expect(result.rows).to.equal(1n);
             expect(result.cols).to.equal(1n);
@@ -2882,7 +2882,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Performs a 1x3 · 3x1 inner product and checks the resulting 1x1 scalar equals the dot product.",
                 gas,
@@ -2893,16 +2893,16 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("mul : vector outer product (N×1 · 1×N)", async function () {
+        it("mulMatrix : vector outer product (N×1 · 1×N)", async function () {
             t++;
             // col: [1,2,3] as 3x1
             const col = [await qInt(1), await qInt(2), await qInt(3)];
             // row: [4,5,6] as 1x3
             const row = [await qInt(4), await qInt(5), await qInt(6)];
 
-            await touchGas(harness, "mulHarness", [3n, 1n, col, 1n, 3n, row]);
-            const gas = await estimateGas(harness, "mulHarness", [3n, 1n, col, 1n, 3n, row]);
-            const result = asMatrix(await harness.mulHarness(3n, 1n, col, 1n, 3n, row));
+            await touchGas(harness, "mulMatrixHarness", [3n, 1n, col, 1n, 3n, row]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [3n, 1n, col, 1n, 3n, row]);
+            const result = asMatrix(await harness.mulMatrixHarness(3n, 1n, col, 1n, 3n, row));
 
             expect(result.rows).to.equal(3n);
             expect(result.cols).to.equal(3n);
@@ -2927,7 +2927,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Computes the outer product of a 3x1 and 1x3 vector and verifies the resulting 3x3 rank-1 matrix.",
                 gas,
@@ -2938,7 +2938,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("mul : stability with tiny entries (no underflow, result stays small but non-zero)", async function () {
+        it("mulMatrix : stability with tiny entries (no underflow, result stays small but non-zero)", async function () {
             t++;
             const rows = 2n;
             const cols = 2n;
@@ -2955,9 +2955,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const A = [tiny, tiny, tiny, tiny];
             const B = [tiny, tiny, tiny, tiny];
 
-            await touchGas(harness, "mulHarness", [rows, cols, A, rows, cols, B]);
-            const gas = await estimateGas(harness, "mulHarness", [rows, cols, A, rows, cols, B]);
-            const C = asMatrix(await harness.mulHarness(rows, cols, A, rows, cols, B));
+            await touchGas(harness, "mulMatrixHarness", [rows, cols, A, rows, cols, B]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [rows, cols, A, rows, cols, B]);
+            const C = asMatrix(await harness.mulMatrixHarness(rows, cols, A, rows, cols, B));
 
             const zeroQ = await qInt(0);
             const zeroBI = BigInt(zeroQ);
@@ -2973,7 +2973,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Multiplies two tiny-valued matrices and checks outputs remain small, positive, and non-zero (no underflow).",
                 gas,
@@ -2984,7 +2984,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("mul : zero row in A produces zero row in A·B", async function () {
+        it("mulMatrix : zero row in A produces zero row in A·B", async function () {
             t++;
             const rowsA = 3n;
             const colsA = 4n;
@@ -3018,9 +3018,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 await qInt(8),
             ];
 
-            await touchGas(harness, "mulHarness", [rowsA, colsA, Adata, rowsB, colsB, Bdata]);
-            const gas = await estimateGas(harness, "mulHarness", [rowsA, colsA, Adata, rowsB, colsB, Bdata]);
-            const C = asMatrix(await harness.mulHarness(rowsA, colsA, Adata, rowsB, colsB, Bdata));
+            await touchGas(harness, "mulMatrixHarness", [rowsA, colsA, Adata, rowsB, colsB, Bdata]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [rowsA, colsA, Adata, rowsB, colsB, Bdata]);
+            const C = asMatrix(await harness.mulMatrixHarness(rowsA, colsA, Adata, rowsB, colsB, Bdata));
 
             expect(C.rows).to.equal(rowsA);
             expect(C.cols).to.equal(colsB);
@@ -3035,7 +3035,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "mulHarness",
+                method: "mulMatrixHarness",
                 explanation:
                     "Uses a 3x4 matrix with a fully zero last row and checks the corresponding row of A·B remains exactly zero.",
                 gas,
@@ -3340,7 +3340,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const inv = asMatrix(await harness.inverseHarness(2n, 2n, A));
 
             // Check A·A⁻¹ == I
-            const prod = asMatrix(await harness.mulHarness(2n, 2n, A, inv.rows, inv.cols, inv.data));
+            const prod = asMatrix(await harness.mulMatrixHarness(2n, 2n, A, inv.rows, inv.cols, inv.data));
             const I = asMatrix(await harness.createIdentityMatrixHarness(2n));
 
             expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
@@ -3379,7 +3379,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const invA = asMatrix(await harness.inverseHarness(3n, 3n, Adata));
 
             // Check A·A⁻¹ = I₃
-            const prod = asMatrix(await harness.mulHarness(3n, 3n, Adata, invA.rows, invA.cols, invA.data));
+            const prod = asMatrix(await harness.mulMatrixHarness(3n, 3n, Adata, invA.rows, invA.cols, invA.data));
             const I = asMatrix(await harness.createIdentityMatrixHarness(3n));
 
             expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
@@ -3514,7 +3514,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const inv = asMatrix(await harness.inverseHarness(1n, 1n, A));
 
             // Check A·A⁻¹ = [1]
-            const prod = asMatrix(await harness.mulHarness(1n, 1n, A, inv.rows, inv.cols, inv.data));
+            const prod = asMatrix(await harness.mulMatrixHarness(1n, 1n, A, inv.rows, inv.cols, inv.data));
             const one = await qInt(1);
 
             expect(prod.rows).to.equal(1n);
@@ -3546,7 +3546,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             await touchGas(harness, "inverseHarness", [D.rows, D.cols, D.data]);
             const gas = await estimateGas(harness, "inverseHarness", [D.rows, D.cols, D.data]);
             const invD = asMatrix(await harness.inverseHarness(D.rows, D.cols, D.data));
-            const prod = asMatrix(await harness.mulHarness(D.rows, D.cols, D.data, invD.rows, invD.cols, invD.data));
+            const prod = asMatrix(await harness.mulMatrixHarness(D.rows, D.cols, D.data, invD.rows, invD.cols, invD.data));
             const I = asMatrix(await harness.createIdentityMatrixHarness(2n));
 
             expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);

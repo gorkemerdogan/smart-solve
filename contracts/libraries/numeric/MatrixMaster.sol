@@ -77,7 +77,7 @@ library MatrixMaster {
      * @param b Right operand
      */
     modifier checkMulShape(Matrix memory a, Matrix memory b) {
-        require(a.cols == b.rows, "MatrixMaster: mul dims a.cols != b.rows");
+        require(a.cols == b.rows, "MatrixMaster: mulMatrix dims a.cols != b.rows");
         _;
     }
 
@@ -386,7 +386,7 @@ library MatrixMaster {
      * @param b Right operand matrix
      * @return c Product matrix
      */
-    function mul(Matrix memory a, Matrix memory b) internal pure checkMulShape(a, b) returns (Matrix memory c) {
+    function mulMatrix(Matrix memory a, Matrix memory b) internal pure checkMulShape(a, b) returns (Matrix memory c) {
         uint256 m = a.rows;
         uint256 k = a.cols;
         uint256 n = b.cols;

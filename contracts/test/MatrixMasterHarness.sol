@@ -394,7 +394,7 @@ contract MatrixMasterHarness {
     /**
      * @notice Wrapper for MatrixMaster.mul.
      */
-    function mulHarness(
+    function mulMatrixHarness(
         uint256 aRows,
         uint256 aCols,
         bytes16[] calldata aData,
@@ -404,7 +404,7 @@ contract MatrixMasterHarness {
     ) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory a = _toMatrix(aRows, aCols, aData);
         MatrixMaster.Matrix memory b = _toMatrix(bRows, bCols, bData);
-        MatrixMaster.Matrix memory c = MatrixMaster.mul(a, b);
+        MatrixMaster.Matrix memory c = MatrixMaster.mulMatrix(a, b);
         return _fromMatrix(c);
     }
 
