@@ -408,7 +408,7 @@ library MatrixMaster {
         c = Matrix({ rows: m, cols: n, data: data });
     }
 
-        // ──────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────
     // Matrix × Vector multiplication (A is m×n, x is n×1)
     // ──────────────────────────────────────────────────────────
 
@@ -441,6 +441,109 @@ library MatrixMaster {
         }
 
         y = Matrix({ rows: m, cols: 1, data: out });
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // Vector utilities (dot, norm, normalization, random vector)
+    // ──────────────────────────────────────────────────────────
+
+    /**
+     * @notice Compute dot product of two column vectors (n×1).
+     * @dev Requires both vectors to be column vectors with identical lengths.
+     * @param a First vector (n×1)
+     * @param b Second vector (n×1)
+     * @return s Scalar dot product = Σ_i a[i] * b[i]
+     */
+    function dot(Matrix memory a, Matrix memory b) internal pure checkSameShape(a, b) returns (bytes16 s) {
+        require(a.cols == 1 && b.cols == 1, "MatrixMaster: dot requires column vectors");
+
+        uint256 n = a.rows;
+        bytes16 acc = QZERO;
+
+        for (uint256 i = 0; i < n; ++i) {
+            acc = acc.add(a.data[i].mul(b.data[i]));
+        }
+
+        s = acc;
+    }
+
+    /**
+     * @notice Compute Euclidean 2-norm ||v||₂ of a column vector (n×1).
+     * @param v Input vector (n×1)
+     * @return nrm Vector norm = sqrt(dot(v, v))
+     */
+    function norm(Matrix memory v) internal pure returns (bytes16 nrm) {
+        require(v.cols == 1, "MatrixMaster: norm requires column vector");
+
+        bytes16 d = dot(v, v);
+        nrm = MathLib.sqrt(d);
+    }
+
+    /**
+     * @notice Normalize a column vector v into v / ||v||₂.
+     * @dev    Reverts if vector has zero norm.
+     * @param v Input vector (n×1)
+     * @return out Normalized vector with unit Euclidean norm
+     */
+    function normalize(Matrix memory v) internal pure returns (Matrix memory out) {
+        require(v.cols == 1, "MatrixMaster: normalize requires column vector");
+
+        bytes16 nrm = norm(v);
+        require(MathLib.cmp(nrm, QZERO) != 0, "MatrixMaster: cannot normalize zero vector");
+
+        out = divScalar(v, nrm); // v / ||v||
+    }
+
+    /**
+     * @notice Create a pseudo-random column vector (n×1) with entries in [0,1).
+     * @dev    Uses deterministic keccak-based generation, NOT secure randomness.
+     * @param n    Dimension of the vector (n > 0)
+     * @param seed Seed value used to generate pseudo-random entries
+     * @return v Column vector (n×1) with pseudo-random entries
+     */
+    function randomVector(uint256 n, bytes32 seed) internal pure validDims(n, 1) returns (Matrix memory v) {
+        bytes16[] memory data = new bytes16[](n);
+        bytes16 denom = MathLib.fromUInt(2**64);
+
+        for (uint256 i = 0; i < n; ++i) {
+            uint64 r;
+            bytes32 h = keccak256(abi.encodePacked(seed, i));
+
+            assembly {
+                r := shr(192, h) // top 64 bits
+            }
+
+            bytes16 num = MathLib.fromUInt(uint256(r));
+            data[i] = num.div(denom);
+        }
+
+        v = Matrix({ rows: n, cols: 1, data: data });
+    }
+
+    /**
+     * @notice Check approximate convergence between two vectors via L2 tolerance.
+     * @dev Computes ||vNew - vOld||₂ and compares to `tol`.
+     * @param vNew New iterate (n×1)
+     * @param vOld Previous iterate (n×1)
+     * @param tol  Convergence tolerance (positive scalar)
+     * @return ok True if ||vNew - vOld|| < tol
+     */
+    function converged(Matrix memory vNew, Matrix memory vOld, bytes16 tol)
+        internal
+        pure
+        checkSameShape(vNew, vOld)
+        returns (bool ok)
+    {
+        require(vNew.cols == 1, "MatrixMaster: converged requires vectors");
+
+        // diff = vNew - vOld
+        Matrix memory diff = sub(vNew, vOld);
+
+        // ||diff||
+        bytes16 d = norm(diff);
+
+        // d < tol ?
+        ok = (MathLib.cmp(d, tol) < 0);
     }
 
     // ──────────────────────────────────────────────────────────
