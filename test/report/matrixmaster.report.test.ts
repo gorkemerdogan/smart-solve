@@ -14,125 +14,50 @@ type MatrixMasterHarness = Contract & {
     qFromUInt(n: bigint): Promise<string>;
 
     // matrix comparison helpers
-    matricesExactEqual(
-        aRows: bigint,
-        aCols: bigint,
-        aData: string[],
-        bRows: bigint,
-        bCols: bigint,
-        bData: string[],
-    ): Promise<boolean>;
+    matricesExactEqual(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<boolean>;
 
     // creation
     zerosHarness(rows: bigint, cols: bigint): Promise<[bigint, bigint, string[]]>;
     onesHarness(rows: bigint, cols: bigint): Promise<[bigint, bigint, string[]]>;
     createIdentityMatrixHarness(n: bigint): Promise<[bigint, bigint, string[]]>;
     fromDiagonalHarness(diag: string[]): Promise<[bigint, bigint, string[]]>;
-    randomUniformHarness(
-        rows: bigint,
-        cols: bigint,
-        seed: string,
-    ): Promise<[bigint, bigint, string[]]>;
+    randomUniformHarness(rows: bigint, cols: bigint, seed: string): Promise<[bigint, bigint, string[]]>;
 
     // element access
-    getHarness(
-        rows: bigint,
-        cols: bigint,
-        dataFlat: string[],
-        row: bigint,
-        col: bigint,
-    ): Promise<string>;
-
-    setHarness(
-        rows: bigint,
-        cols: bigint,
-        dataFlat: string[],
-        row: bigint,
-        col: bigint,
-        val: string,
-    ): Promise<[bigint, bigint, string[]]>;
+    getHarness(rows: bigint, cols: bigint, dataFlat: string[], row: bigint, col: bigint): Promise<string>;
+    setHarness(rows: bigint, cols: bigint, dataFlat: string[], row: bigint, col: bigint, val: string): Promise<[bigint, bigint, string[]]>;
 
     // slice & reshape
-    sliceHarness(
-        rows: bigint,
-        cols: bigint,
-        dataFlat: string[],
-        rowStart: bigint,
-        rowEnd: bigint,
-        colStart: bigint,
-        colEnd: bigint,
-    ): Promise<[bigint, bigint, string[]]>;
-
-    reshapeHarness(
-        rows: bigint,
-        cols: bigint,
-        dataFlat: string[],
-        newRows: bigint,
-        newCols: bigint,
-    ): Promise<[bigint, bigint, string[]]>;
+    sliceHarness(rows: bigint, cols: bigint, dataFlat: string[], rowStart: bigint, rowEnd: bigint, colStart: bigint, colEnd: bigint): Promise<[bigint, bigint, string[]]>;
+    reshapeHarness(rows: bigint, cols: bigint, dataFlat: string[], newRows: bigint, newCols: bigint): Promise<[bigint, bigint, string[]]>;
 
     // transpose
-    transposeHarness(
-        rows: bigint,
-        cols: bigint,
-        dataFlat: string[],
-    ): Promise<[bigint, bigint, string[]]>;
+    transposeHarness(rows: bigint, cols: bigint, dataFlat: string[]): Promise<[bigint, bigint, string[]]>;
 
     // elementwise arithmetic
-    addHarness(
-        aRows: bigint,
-        aCols: bigint,
-        aData: string[],
-        bRows: bigint,
-        bCols: bigint,
-        bData: string[],
-    ): Promise<[bigint, bigint, string[]]>;
-
-    subHarness(
-        aRows: bigint,
-        aCols: bigint,
-        aData: string[],
-        bRows: bigint,
-        bCols: bigint,
-        bData: string[],
-    ): Promise<[bigint, bigint, string[]]>;
-
-    mulScalarHarness(
-        rows: bigint,
-        cols: bigint,
-        dataFlat: string[],
-        k: string,
-    ): Promise<[bigint, bigint, string[]]>;
-
-    divScalarHarness(
-        rows: bigint,
-        cols: bigint,
-        dataFlat: string[],
-        k: string,
-    ): Promise<[bigint, bigint, string[]]>;
+    addHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
+    subHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
+    mulScalarHarness(rows: bigint, cols: bigint, dataFlat: string[], k: string): Promise<[bigint, bigint, string[]]>;
+    divScalarHarness(rows: bigint, cols: bigint, dataFlat: string[], k: string): Promise<[bigint, bigint, string[]]>;
 
     // matrix multiplication
-    mulMatrixHarness(
-        aRows: bigint,
-        aCols: bigint,
-        aData: string[],
-        bRows: bigint,
-        bCols: bigint,
-        bData: string[],
-    ): Promise<[bigint, bigint, string[]]>;
+    mulMatrixHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
+
+    // matrix-vector multiplication
+    mulMatrixVectorHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
+
+    // dot product
+    dotHarness(xRows: bigint, xCols: bigint, xData: string[], yRows: bigint, yCols: bigint, yData: string[]): Promise<string>;
 
     // determinant & inverse
-    detHarness(
-        rows: bigint,
-        cols: bigint,
-        dataFlat: string[],
-    ): Promise<string>;
+    detHarness(rows: bigint, cols: bigint, dataFlat: string[]): Promise<string>;
+    inverseHarness(rows: bigint, cols: bigint, dataFlat: string[]): Promise<[bigint, bigint, string[]]>;
 
-    inverseHarness(
-        rows: bigint,
-        cols: bigint,
-        dataFlat: string[],
-    ): Promise<[bigint, bigint, string[]]>;
+    // normalization
+    normalizeVectorHarness(vRows: bigint, vCols: bigint, vData: string[]): Promise<[bigint, bigint, string[]]>;
+
+    // convergence
+    hasConvergedHarness(prevEig: string, currEig: string, tol: string): Promise<boolean>;
 };
 
 async function newHarness(): Promise<MatrixMasterHarness> {
