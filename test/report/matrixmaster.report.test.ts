@@ -3704,4 +3704,113 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
     });
+
+    // =========================================================
+    // Norm & Normalize
+    // =========================================================
+    describe("Norm & Normalize", function () {
+        
+        // --- Norm ---
+        it("norm : computes Euclidean norm of 3-4-5 triangle", async function () {
+            t++;
+            // Vector [3, 4]^T -> Norm should be 5
+            const v = [await qInt(3), await qInt(4)]; 
+            
+            await touchGas(harness, "normHarness", [2n, 1n, v]);
+            const gas = await estimateGas(harness, "normHarness", [2n, 1n, v]);
+            const out = await harness.normHarness(2n, 1n, v);
+
+            const expected = await qInt(5);
+
+            expect(out.toLowerCase()).to.equal(expected.toLowerCase());
+
+            printBlock({
+                t,
+                method: "normHarness",
+                explanation: "Computes ||v|| for vector [3, 4].",
+                gas,
+                shapeIn: "2x1",
+                shapeOut: "scalar",
+                inHex: `v=${fmtHexArr(v)}`,
+                outHex: out,
+            });
+        });
+
+        it("norm : reverts on row vector", async function () {
+            t++;
+            // Pass as Row Vector (1 row, 2 cols) -> Should revert
+            const v = [await qInt(1), await qInt(1)];
+
+            await touchGas(harness, "normHarness", [1n, 2n, v]);
+            const gas = await estimateGas(harness, "normHarness", [1n, 2n, v]);
+
+            await expect(harness.normHarness(1n, 2n, v)).to.be.revertedWith("MatrixMaster: norm requires column vector");
+
+            printBlock({
+                t,
+                method: "normHarness",
+                explanation: "norm : reverts on row vector.",
+                gas,
+                shapeIn: "1x1",
+                shapeOut: "scalar",
+                inHex: `v=${fmtHexArr(v)}`,
+                outHex: "-",
+            });
+        });
+
+        // --- Normalize ---
+        it("normalize : scales vector to unit length", async function () {
+            t++;
+            const v = [await qInt(3), await qInt(0), await qInt(4)];
+
+            await touchGas(harness, "normalizeHarness", [3n, 1n, v]);
+            const gas = await estimateGas(harness, "normalizeHarness", [3n, 1n, v]);
+            const result = await harness.normalizeHarness(3n, 1n, v);
+
+            const data = result.data || result[2];
+
+            // expected = [3/5, 0, 4/5]
+            const five = await qInt(5);
+            const ex0 = (await harness.divScalarHarness(1n, 1n, [await qInt(3)], five))[2][0];
+            const ex1 = await qInt(0);
+            const ex2 = (await harness.divScalarHarness(1n, 1n, [await qInt(4)], five))[2][0];
+
+            expect(data[0].toLowerCase()).to.equal(ex0.toLowerCase());
+            expect(data[1].toLowerCase()).to.equal(ex1.toLowerCase());
+            expect(data[2].toLowerCase()).to.equal(ex2.toLowerCase());
+
+            printBlock({
+                t,
+                method: "normalizeHarness",
+                explanation: "Normalizes [3,0,4] into unit vector (3/5, 0, 4/5) using quad math.",
+                gas,
+                shapeIn: "3x1",
+                shapeOut: "3x1",
+                inHex: `v=${fmtHexArr(v)}`,
+                outHex: fmtHexArr(data),
+            });
+        });
+
+        it("normalize : reverts on zero vector", async function () {
+            t++;
+            // Norm is 0, cannot divide by zero -> revert
+            const v = [await qInt(0), await qInt(0)];
+
+            await touchGas(harness, "normalizeHarness", [2n, 1n, v]);
+            const gas = await estimateGas(harness, "normalizeHarness", [2n, 1n, v]);
+
+            await expect(harness.normalizeHarness(2n, 1n, v)).to.be.revertedWith("MatrixMaster: cannot normalize zero vector");
+
+            printBlock({
+                t,
+                method: "normHarness",
+                explanation: "norm : reverts on row vector.",
+                gas,
+                shapeIn: "1x1",
+                shapeOut: "scalar",
+                inHex: `v=${fmtHexArr(v)}`,
+                outHex: "-",
+            });
+        });
+    });
 });
