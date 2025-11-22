@@ -491,13 +491,13 @@ contract MatrixMasterHarness {
      * @dev Input must be vector-shaped: (n×1) or (1×n).
      * @return norm  l₂-vector norm ||v||₂
      */
-    function norm2Harness(
+    function normHarness(
         uint256 rows,
         uint256 cols,
         bytes16[] calldata dataFlat
     ) external pure returns (bytes16 norm) {
         MatrixMaster.Matrix memory v = _toMatrix(rows, cols, dataFlat);
-        return MatrixMaster.norm2(v);
+        return MatrixMaster.norm(v);
     }
 
     /**

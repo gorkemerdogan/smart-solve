@@ -528,7 +528,7 @@ library MatrixMaster {
      * @param tol  Convergence tolerance (positive scalar)
      * @return ok True if ||vNew - vOld|| < tol
      */
-    function converged(Matrix memory vNew, Matrix memory vOld, bytes16 tol)
+    function hasConverged(Matrix memory vNew, Matrix memory vOld, bytes16 tol)
         internal
         pure
         checkSameShape(vNew, vOld)
