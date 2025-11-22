@@ -408,6 +408,41 @@ library MatrixMaster {
         c = Matrix({ rows: m, cols: n, data: data });
     }
 
+        // ──────────────────────────────────────────────────────────
+    // Matrix × Vector multiplication (A is m×n, x is n×1)
+    // ──────────────────────────────────────────────────────────
+
+    /**
+     * @notice Multiply matrix A (m×n) by vector x (n×1). Result is (m×1).
+     * @dev Much faster than full matrix×matrix mulMatrix for power iteration.
+     *
+     * @param A Matrix (m×n)
+     * @param x Vector as matrix (n×1)
+     * @return y = A * x (m×1 column vector)
+     */
+    function mulMatrixVector(Matrix memory A, Matrix memory x) internal pure returns (Matrix memory y) {
+        require(A.cols == x.rows, "MatrixMaster: mulMatrixVector dims mismatch");
+        require(x.cols == 1, "MatrixMaster: x must be column vector");
+
+        uint256 m = A.rows;
+        uint256 n = A.cols;
+
+        bytes16[] memory out = new bytes16[](m);
+        bytes16 acc;
+
+        for (uint256 i = 0; i < m; ++i) {
+            acc = QZERO;
+            for (uint256 j = 0; j < n; ++j) {
+                bytes16 a_ij = A.data[_idx(n, i, j)];
+                bytes16 x_j = x.data[j];
+                acc = acc.add(a_ij.mul(x_j));
+            }
+            out[i] = acc;
+        }
+
+        y = Matrix({ rows: m, cols: 1, data: out });
+    }
+
     // ──────────────────────────────────────────────────────────
     // Determinant via LU decomposition with partial pivoting
     // ──────────────────────────────────────────────────────────
