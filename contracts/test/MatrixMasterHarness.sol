@@ -182,12 +182,12 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.eye.
+     * @notice Wrapper for MatrixMaster.createIdentityMatrix.
      */
-    function eyeHarness(
+    function createIdentityMatrixHarness(
         uint256 n
     ) external pure returns (uint256, uint256, bytes16[] memory) {
-        MatrixMaster.Matrix memory m = MatrixMaster.eye(n);
+        MatrixMaster.Matrix memory m = MatrixMaster.createIdentityMatrix(n);
         return _fromMatrix(m);
     }
 

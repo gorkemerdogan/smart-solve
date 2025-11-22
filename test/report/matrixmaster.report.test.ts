@@ -26,7 +26,7 @@ type MatrixMasterHarness = Contract & {
     // creation
     zerosHarness(rows: bigint, cols: bigint): Promise<[bigint, bigint, string[]]>;
     onesHarness(rows: bigint, cols: bigint): Promise<[bigint, bigint, string[]]>;
-    eyeHarness(n: bigint): Promise<[bigint, bigint, string[]]>;
+    createIdentityMatrixHarness(n: bigint): Promise<[bigint, bigint, string[]]>;
     fromDiagonalHarness(diag: string[]): Promise<[bigint, bigint, string[]]>;
     randomUniformHarness(
         rows: bigint,
@@ -352,13 +352,13 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("eye : produces valid identity", async function () {
+        it("Identity Matrix : produces valid identity", async function () {
             t++;
             const n = 3n;
-            await touchGas(harness, "eyeHarness", [n]);
-            const gas = await estimateGas(harness, "eyeHarness", [n]);
+            await touchGas(harness, "createIdentityMatrixHarness", [n]);
+            const gas = await estimateGas(harness, "createIdentityMatrixHarness", [n]);
 
-            const m = asMatrix(await harness.eyeHarness(n));
+            const m = asMatrix(await harness.createIdentityMatrixHarness(n));
             const zero = await qInt(0);
             const one = await qInt(1);
 
@@ -379,7 +379,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "eyeHarness",
+                method: "createIdentityMatrixHarness",
                 explanation:
                     "Builds a square identity matrix with ones on the diagonal and strict zeros elsewhere.",
                 gas,
@@ -390,19 +390,19 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("eye : n = 0 reverts", async function () {
+        it("Identity Matrix : n = 0 reverts", async function () {
             t++;
             const n = 0n;
-            await touchGas(harness, "eyeHarness", [n]);
-            const gas = await estimateGas(harness, "eyeHarness", [n]);
+            await touchGas(harness, "createIdentityMatrixHarness", [n]);
+            const gas = await estimateGas(harness, "createIdentityMatrixHarness", [n]);
 
-            await expect(harness.eyeHarness(n)).to.be.revertedWith(
+            await expect(harness.createIdentityMatrixHarness(n)).to.be.revertedWith(
                 "MatrixMaster: n must be > 0",
             );
 
             printBlock({
                 t,
-                method: "eyeHarness",
+                method: "createIdentityMatrixHarness",
                 explanation:
                     "Ensures identity construction rejects zero-sized matrices via dimension guard.",
                 gas,
@@ -886,11 +886,11 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("eye : transpose(identity) = identity", async function () {
+        it("Identity Matrix : transpose(identity) = identity", async function () {
             t++;
             const n = 3n;
 
-            const I = asMatrix(await harness.eyeHarness(n));
+            const I = asMatrix(await harness.createIdentityMatrixHarness(n));
 
             await touchGas(harness, "transposeHarness", [I.rows, I.cols, I.data]);
             const gas = await estimateGas(harness, "transposeHarness", [I.rows, I.cols, I.data]);
@@ -2713,7 +2713,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 await qInt(5),
                 await qInt(7),
             ];
-            const I = asMatrix(await harness.eyeHarness(2n));
+            const I = asMatrix(await harness.createIdentityMatrixHarness(2n));
 
             await touchGas(harness, "mulHarness", [2n, 2n, A, I.rows, I.cols, I.data]);
             const gas1 = await estimateGas(harness, "mulHarness", [2n, 2n, A, I.rows, I.cols, I.data]);
@@ -3194,7 +3194,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
         it("det : identity matrix has determinant 1", async function () {
             t++;
             const n = 3n;
-            const I = asMatrix(await harness.eyeHarness(n));
+            const I = asMatrix(await harness.createIdentityMatrixHarness(n));
 
             await touchGas(harness, "detHarness", [I.rows, I.cols, I.data]);
             const gas = await estimateGas(harness, "detHarness", [I.rows, I.cols, I.data]);
@@ -3341,7 +3341,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             // Check A·A⁻¹ == I
             const prod = asMatrix(await harness.mulHarness(2n, 2n, A, inv.rows, inv.cols, inv.data));
-            const I = asMatrix(await harness.eyeHarness(2n));
+            const I = asMatrix(await harness.createIdentityMatrixHarness(2n));
 
             expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
 
@@ -3380,7 +3380,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             // Check A·A⁻¹ = I₃
             const prod = asMatrix(await harness.mulHarness(3n, 3n, Adata, invA.rows, invA.cols, invA.data));
-            const I = asMatrix(await harness.eyeHarness(3n));
+            const I = asMatrix(await harness.createIdentityMatrixHarness(3n));
 
             expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
 
@@ -3483,7 +3483,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
         it("inverse : identity matrix is its own inverse", async function () {
             t++;
             const n = 3n;
-            const I = asMatrix(await harness.eyeHarness(n));
+            const I = asMatrix(await harness.createIdentityMatrixHarness(n));
 
             await touchGas(harness, "inverseHarness", [I.rows, I.cols, I.data]);
             const gas = await estimateGas(harness, "inverseHarness", [I.rows, I.cols, I.data]);
@@ -3547,7 +3547,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const gas = await estimateGas(harness, "inverseHarness", [D.rows, D.cols, D.data]);
             const invD = asMatrix(await harness.inverseHarness(D.rows, D.cols, D.data));
             const prod = asMatrix(await harness.mulHarness(D.rows, D.cols, D.data, invD.rows, invD.cols, invD.data));
-            const I = asMatrix(await harness.eyeHarness(2n));
+            const I = asMatrix(await harness.createIdentityMatrixHarness(2n));
 
             expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
 

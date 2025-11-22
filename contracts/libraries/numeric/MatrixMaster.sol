@@ -135,7 +135,7 @@ library MatrixMaster {
      * @param n Matrix dimension (n > 0)
      * @return m Identity matrix with 1 on diagonal and 0 elsewhere
      */
-    function eye(uint256 n) internal pure returns (Matrix memory m) {
+    function createIdentityMatrix(uint256 n) internal pure returns (Matrix memory m) {
         require(n > 0, "MatrixMaster: n must be > 0");
         bytes16[] memory data = new bytes16[](n * n);
         bytes16 one = MathLib.fromInt(1);
