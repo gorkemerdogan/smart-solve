@@ -80,7 +80,6 @@ async function newHarness(): Promise<MatrixMasterHarness> {
 }
 
 // Small helpers for working with the harness
-
 function asMatrix(tuple: [bigint, bigint, string[]]) {
     const [rows, cols, data] = tuple;
     return { rows, cols, data: [...data] };
@@ -3087,6 +3086,74 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 inHex: `A=${fmtHexArr(A)}, x=${fmtHexArr(xZero)}`,
                 outHex: fmtHexArr(out.data),
             });
+        });
+    });
+
+    // =========================================================
+    // Dot product
+    // =========================================================
+    describe("Dot product", function () {
+        it("dot : basic 3-element vectors", async function () {
+            t++;
+
+            const a = [await qInt(1), await qInt(2), await qInt(3)];
+            const b = [await qInt(4), await qInt(5), await qInt(6)];
+
+            // FIX: Swap dimensions to 3 rows, 1 col
+            await touchGas(harness, "dotHarness", [3n, 1n, a, 3n, 1n, b]);
+            const gas = await estimateGas(harness, "dotHarness", [3n, 1n, a, 3n, 1n, b]);
+            const out = await harness.dotHarness(3n, 1n, a, 3n, 1n, b);
+
+            const expected = await qInt(32);
+
+            expect(out.toLowerCase()).to.equal(expected.toLowerCase());
+
+            printBlock({
+                t,
+                method: "dotHarness",
+                explanation: "Computes dot product for 3-element vectors.",
+                gas,
+                shapeIn: "3x1 · 3x1", // Update label
+                shapeOut: "scalar",
+                inHex: `a=${fmtHexArr(a)}, b=${fmtHexArr(b)}`,
+                outHex: out,
+            });
+        });
+
+        it("dot : negative entries", async function () {
+            t++;
+
+            const a = [await qInt(-2), await qInt(3)];
+            const b = [await qInt(5), await qInt(-4)];
+
+            // FIX: Swap dimensions to 2 rows, 1 col
+            await touchGas(harness, "dotHarness", [2n, 1n, a, 2n, 1n, b]);
+            const gas = await estimateGas(harness, "dotHarness", [2n, 1n, a, 2n, 1n, b]);
+            const out = await harness.dotHarness(2n, 1n, a, 2n, 1n, b);
+
+            const expected = await qInt(-22);
+
+            expect(out.toLowerCase()).to.equal(expected.toLowerCase());
+
+            // ... printBlock update ...
+        });
+
+        it("dot : length mismatch reverts", async function () {
+            t++;
+
+            const a = [await qInt(1), await qInt(2)];
+            const b = [await qInt(3)];
+
+            // FIX: Swap dimensions so cols=1. 
+            // Now it will pass the first require, and fail the second (length) require.
+            await touchGas(harness, "dotHarness", [2n, 1n, a, 1n, 1n, b]);
+            const gas = await estimateGas(harness, "dotHarness", [2n, 1n, a, 1n, 1n, b]);
+
+            await expect(
+                harness.dotHarness(2n, 1n, a, 1n, 1n, b)
+            ).to.be.revertedWith("MatrixMaster: dot length mismatch");
+
+            // ... printBlock update ...
         });
     });
 
