@@ -409,6 +409,27 @@ contract MatrixMasterHarness {
     }
 
     // =========================================================
+    // Matrix-Vector multiplication wrapper
+    // =========================================================
+
+    /**
+     * @notice Wrapper for MatrixMaster.mulMatrixVector.
+     */
+    function mulMatrixVectorHarness(
+        uint256 aRows,
+        uint256 aCols,
+        bytes16[] calldata aData,
+        uint256 bRows,
+        uint256 bCols,
+        bytes16[] calldata bData
+    ) external pure returns (uint256, uint256, bytes16[] memory) {
+        MatrixMaster.Matrix memory a = _toMatrix(aRows, aCols, aData);
+        MatrixMaster.Matrix memory b = _toMatrix(bRows, bCols, bData);
+        MatrixMaster.Matrix memory c = MatrixMaster.mulMatrixVector(a, b);
+        return _fromMatrix(c);
+    }
+
+    // =========================================================
     // Determinant wrapper
     // =========================================================
 
