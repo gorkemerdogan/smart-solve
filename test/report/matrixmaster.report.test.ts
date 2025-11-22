@@ -3813,4 +3813,150 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
     });
+
+    // =========================================================
+    // Utilities: Random & Converged
+    // =========================================================
+    describe("Utils: Random & Converged", function () {
+
+        // =========================================================
+        // Random Vector
+        // =========================================================
+
+        it("randomVector : generates deterministic n x 1 vector", async function () {
+            t++;
+            const n = 5n;
+            const seed = ethers.ZeroHash;
+
+            await touchGas(harness, "randomVectorHarness", [n, seed]);
+            const gas = await estimateGas(harness, "randomVectorHarness", [n, seed]);
+
+            const res1 = await harness.randomVectorHarness(n, seed);
+            const res2 = await harness.randomVectorHarness(n, seed);
+
+            const [rows1, cols1, data1] = res1;
+            const [rows2, cols2, data2] = res2;
+
+            expect(rows1).to.equal(n);
+            expect(cols1).to.equal(1n);
+            expect(rows2).to.equal(n);
+            expect(cols2).to.equal(1n);
+            expect(data1).to.deep.equal(data2); // deterministic for fixed seed
+
+            printBlock({
+                t,
+                method: "randomVectorHarness",
+                explanation: "Deterministic generation with fixed seed, returns a stable 5x1 vector.",
+                gas,
+                shapeIn: `n=${n}`,
+                shapeOut: "5x1",
+                inHex: `seed=${seed}`,
+                outHex: fmtHexArr(data1),
+            });
+        });
+
+        it("randomVector : different seeds produce different vectors", async function () {
+            t++;
+            const n = 5n;
+            const seedA = ethers.ZeroHash;
+            const seedB = ethers.keccak256(ethers.toUtf8Bytes("another"));
+
+            await touchGas(harness, "randomVectorHarness", [n, seedA]);
+            await touchGas(harness, "randomVectorHarness", [n, seedB]);
+
+            const gasA = await estimateGas(harness, "randomVectorHarness", [n, seedA]);
+            const gasB = await estimateGas(harness, "randomVectorHarness", [n, seedB]);
+            const gas = gasA + gasB;
+
+            const resA = await harness.randomVectorHarness(n, seedA);
+            const resB = await harness.randomVectorHarness(n, seedB);
+
+            const [, , dataA] = resA;
+            const [, , dataB] = resB;
+
+            expect(dataA).to.not.deep.equal(dataB); // different seed -> different vector
+
+            printBlock({
+                t,
+                method: "randomVectorHarness",
+                explanation: "Different seeds must yield different pseudo-random vectors.",
+                gas,
+                shapeIn: `n=${n}`,
+                shapeOut: "5x1",
+                inHex: `seedA=${seedA}, seedB=${seedB}`,
+                outHex: "vectors differ",
+            });
+        });
+
+        // =========================================================
+        // Converged
+        // =========================================================
+
+        it("hasConverged : detects convergence within tolerance", async function () {
+            t++;
+
+            // vOld = [0, 0], vNew = [1, 0]
+            // ||vNew - vOld||₂ = 1
+            const vOld = [await qInt(0), await qInt(0)];
+            const vNew = [await qInt(1), await qInt(0)];
+
+            // tolPass = 2  → 1 < 2  => true
+            // tolFail = 1  → 1 < 1  => false (strict inequality)
+            const tolPass = await qInt(2);
+            const tolFail = await qInt(1);
+
+            await touchGas(harness, "hasConvergedHarness", [
+                2n, 1n, vNew,
+                2n, 1n, vOld,
+                tolPass,
+            ]);
+
+            const gas = await estimateGas(harness, "hasConvergedHarness", [
+                2n, 1n, vNew,
+                2n, 1n, vOld,
+                tolPass,
+            ]);
+
+            const yes = await harness.hasConvergedHarness(
+                2n, 1n, vNew,
+                2n, 1n, vOld,
+                tolPass,
+            );
+
+            const no = await harness.hasConvergedHarness(
+                2n, 1n, vNew,
+                2n, 1n, vOld,
+                tolFail,
+            );
+
+            expect(yes).to.equal(true);
+            expect(no).to.equal(false);
+
+            printBlock({
+                t,
+                method: "hasConvergedHarness",
+                explanation: "Checks whether ||vNew - vOld||₂ < tol (here 1 < 2 is true, 1 < 1 is false).",
+                gas,
+                shapeIn: "2x1, 2x1",
+                shapeOut: "bool",
+                inHex: `tolPass=${tolPass}, tolFail=${tolFail}`,
+                outHex: yes ? "true" : "false",
+            });
+        });
+
+        it("hasConverged : reverts on row vectors", async function () {
+            const vRow = [await qInt(1), await qInt(2)];
+            const tol = await qInt(1);
+
+            await expect(
+                harness.hasConvergedHarness(
+                    1n, 2n, vRow,
+                    1n, 2n, vRow,
+                    tol,
+                ),
+            ).to.be.revertedWith("MatrixMaster: converged requires vectors");
+        });
+    });
+
+
 });
