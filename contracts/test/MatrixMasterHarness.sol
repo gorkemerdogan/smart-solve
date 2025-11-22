@@ -430,6 +430,26 @@ contract MatrixMasterHarness {
     }
 
     // =========================================================
+    // Vector dot product wrapper
+    // =========================================================
+
+    /**
+     * @notice Wrapper for MatrixMaster.dot.
+     */
+    function dotHarness(
+        uint256 aRows,
+        uint256 aCols,
+        bytes16[] calldata aData,
+        uint256 bRows,
+        uint256 bCols,
+        bytes16[] calldata bData
+    ) external pure returns (bytes16 d) {
+        MatrixMaster.Matrix memory a = _toMatrix(aRows, aCols, aData);
+        MatrixMaster.Matrix memory b = _toMatrix(bRows, bCols, bData);
+        return MatrixMaster.dot(a, b);
+    }
+
+    // =========================================================
     // Determinant wrapper
     // =========================================================
 
@@ -460,5 +480,59 @@ contract MatrixMasterHarness {
         MatrixMaster.Matrix memory a = _toMatrix(rows, cols, dataFlat);
         MatrixMaster.Matrix memory invA = MatrixMaster.inverse(a);
         return _fromMatrix(invA);
+    }
+
+    // =========================================================
+    // Vector norm (l₂) & normalization wrappers
+    // =========================================================
+
+    /**
+     * @notice Wrapper for MatrixMaster.norm2.
+     * @dev Input must be vector-shaped: (n×1) or (1×n).
+     * @return norm  l₂-vector norm ||v||₂
+     */
+    function norm2Harness(
+        uint256 rows,
+        uint256 cols,
+        bytes16[] calldata dataFlat
+    ) external pure returns (bytes16 norm) {
+        MatrixMaster.Matrix memory v = _toMatrix(rows, cols, dataFlat);
+        return MatrixMaster.norm2(v);
+    }
+
+    /**
+     * @notice Wrapper for MatrixMaster.normalize, computing v / ||v||₂.
+     * @dev Reverts on zero vector.  
+     * @return (rows, cols, data)  normalized vector with unit l₂ norm
+     */
+    function normalizeHarness(
+        uint256 rows,
+        uint256 cols,
+        bytes16[] calldata dataFlat
+    ) external pure returns (uint256, uint256, bytes16[] memory) {
+        MatrixMaster.Matrix memory v = _toMatrix(rows, cols, dataFlat);
+        MatrixMaster.Matrix memory out = MatrixMaster.normalize(v);
+        return _fromMatrix(out);
+    }
+
+    // =========================================================
+    // Convergence check wrapper
+    // =========================================================
+
+    /**
+     * @notice Wrapper for MatrixMaster.hasConverged.
+     */
+    function hasConvergedHarness(
+        uint256 xRows,
+        uint256 xCols,
+        bytes16[] calldata xData,
+        uint256 yRows,
+        uint256 yCols,
+        bytes16[] calldata yData,
+        bytes16 tol
+    ) external pure returns (bool ok) {
+        MatrixMaster.Matrix memory x = _toMatrix(xRows, xCols, xData);
+        MatrixMaster.Matrix memory y = _toMatrix(yRows, yCols, yData);
+        return MatrixMaster.hasConverged(x, y, tol);
     }
 }
