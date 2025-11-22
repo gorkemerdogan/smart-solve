@@ -454,13 +454,13 @@ library MatrixMaster {
      * @param b Second vector (n×1)
      * @return s Scalar dot product = Σ_i a[i] * b[i]
      */
-    function dot(Matrix memory a, Matrix memory b) internal pure checkSameShape(a, b) returns (bytes16 s) {
+    function dot(Matrix memory a, Matrix memory b) internal pure returns (bytes16 s) {
         require(a.cols == 1 && b.cols == 1, "MatrixMaster: dot requires column vectors");
+        require(a.rows == b.rows, "MatrixMaster: dot length mismatch");
 
-        uint256 n = a.rows;
         bytes16 acc = QZERO;
 
-        for (uint256 i = 0; i < n; ++i) {
+        for (uint256 i = 0; i < a.rows; ++i) {
             acc = acc.add(a.data[i].mul(b.data[i]));
         }
 
