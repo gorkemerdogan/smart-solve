@@ -16,11 +16,13 @@ library LibNumericConfig {
     * @param tol Numerical tolerance encoded as bytes16
     * @param minTol Minimum allowable tolerance encoded as bytes16
     * @param maxIter Maximum iteration count for numeric loops
+    * @param maxIter Differentiation step
     */
     struct NumericConfig {
         bytes16 tol;
         bytes16 minTol;
         uint256 maxIter;
+        bytes16 diffStep;
     }
 
     /**
@@ -36,7 +38,7 @@ library LibNumericConfig {
     // ------------------------------------------------------------
     //  Setters
     // ------------------------------------------------------------
-    
+
     /**
      * @notice Update tolerance in storage
      * @param tol The new tolerance value as ABDKMathQuad (bytes16)
@@ -66,7 +68,7 @@ library LibNumericConfig {
      * @param _h The step size in IEEE-754 binary128 (bytes16).
      */
     function setDiffStep(bytes16 _h) internal {
-        layout().diffStep = _h;
+        cfg().diffStep = _h;
     }
 
     // ------------------------------------------------------------
@@ -90,6 +92,6 @@ library LibNumericConfig {
      * @dev Returns 0 (QZERO) if uninitialized. 
      */
     function getDiffStep() internal view returns (bytes16) {
-        return layout().diffStep;
+        return cfg().diffStep;
     }
 }
