@@ -2688,6 +2688,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             for (const v of AZ.data) {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
             }
+            t++;
 
             printBlock({
                 t,
