@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import { MathLib } from "../MathLib.sol";
 import { QuadConstants as QC } from "../QuadConstants.sol";
+import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 
 /**
  * @title MatrixMaster
@@ -716,5 +717,70 @@ library MatrixMaster {
         }
 
         invA = Matrix({ rows: n, cols: n, data: invData });
+    }
+
+    /**
+     * @notice Approximate the dominant eigenvalue/eigenvector of a square matrix A using power iteration.
+     *
+     * @dev
+     *  Steps:
+     *    1. Initialize x₀ using randomVector(n, seed).
+     *    2. Repeat:
+     *         y = A * x
+     *         x_new = normalize(y)
+     *         stop if hasConverged(x_new, x, tol)
+     *    3. lambda ≈ x^T (A x)
+     *
+     *  - A must be (n×n)
+     *  - Uses cfg().maxIter from LibNumericConfig
+     *  - tol must be > 0
+     *
+     * @param A     Input square matrix
+     * @param seed  Seed for deterministic initial vector
+     * @param tol   Convergence tolerance
+     *
+     * @return lambda    Dominant eigenvalue approximation
+     * @return x         Dominant eigenvector (n×1 unit vector)
+     */
+    function powerIteration(
+        Matrix memory A,
+        bytes32 seed,
+        bytes16 tol
+    )
+        internal
+        view
+        isSquare(A)
+        returns (bytes16 lambda, Matrix memory x)
+    {
+        uint256 n = A.rows;
+
+        require(MathLib.cmp(tol, QZERO) > 0, "MatrixMaster: tol must be > 0");
+
+        // Load from LibNumericConfig
+        uint256 maxIter = LibNumericConfig.getMaxIter();
+
+        // Initial vector x₀ (n×1)
+        x = randomVector(n, seed);
+        x = normalize(x);
+
+        for (uint256 iter = 0; iter < maxIter; ++iter) {
+            // y = A * x
+            Matrix memory y = mulMatrixVector(A, x);
+
+            // x_new = normalize(y)
+            Matrix memory xNew = normalize(y);
+
+            // Check convergence: ||x_new - x|| < tol
+            if (hasConverged(xNew, x, tol)) {
+                x = xNew;
+                break;
+            }
+
+            x = xNew;
+        }
+
+        // Rayleigh quotient: lambda = x^T (A x)
+        Matrix memory Ax = mulMatrixVector(A, x);
+        lambda = dot(x, Ax);
     }
 }

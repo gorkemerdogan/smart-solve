@@ -3938,4 +3938,129 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ).to.be.revertedWith("MatrixMaster: converged requires vectors");
         });
     });
+
+    // =========================================================
+    // Power Iteration
+    // =========================================================
+    describe("PowerIteration", function () {
+        it("powerIteration : diagonal 2x2 matrix returns dominant eigenvalue 5", async function () {
+            t++;
+
+            const five = await qInt(5);
+            const two = await qInt(2);
+
+            // A = [ [5,0],
+            //       [0,2] ]
+            const A = [five, qInt(0), qInt(0), two];
+
+            const seed = ethers.ZeroHash;
+            const tol = await harness.qFromFrac(1n, 1000000n); // 1e-6
+
+            await touchGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
+            const gas = await estimateGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
+
+            const [lambda, xRows, xCols, xData] = await harness.powerIterationHarness(
+                2n, 2n, A, seed, tol
+            );
+
+            const expected = five
+            const diff = BigInt(lambda) > BigInt(expected)
+                ? BigInt(lambda) - BigInt(expected)
+                : BigInt(expected) - BigInt(lambda);
+
+            expect(diff).to.be.lt(BigInt(tol));
+
+            printBlock({
+                t,
+                method: "powerIterationHarness",
+                explanation: "Diagonal matrix diag(5,2) -> eigenvalue = 5.",
+                gas,
+                shapeIn: "2x2",
+                shapeOut: "eigenvalue + eigenvector",
+                inHex: `A=${A}`,
+                outHex: `lambda=${lambda}, x=${fmtHexArr(xData)}`
+            });
+        });
+
+        it("powerIteration : symmetric 2x2 matrix returns dominant eigenvalue 4", async function () {
+            t++;
+
+            const three = await qInt(3);
+            const one = await qInt(1);
+
+            // A = [3,1; 1,3]
+            const A = [three, one, one, three];
+
+            const seed = ethers.ZeroHash;
+            const tol = await harness.qFromFrac(1n, 1000000n);
+
+            await touchGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
+            const gas = await estimateGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
+
+            const [lambda, xRows, xCols, xData] = await harness.powerIterationHarness(
+                2n, 2n, A, seed, tol
+            );
+
+            const expectedEigen = await qInt(4);
+            const diff = BigInt(lambda) > BigInt(expectedEigen)
+                ? BigInt(lambda) - BigInt(expectedEigen)
+                : BigInt(expectedEigen) - BigInt(lambda);
+
+            expect(diff).to.be.lt(BigInt(tol));
+
+            printBlock({
+                t,
+                method: "powerIterationHarness",
+                explanation: "Symmetric matrix [[3,1],[1,3]] -> dominant eigenvalue = 4.",
+                gas,
+                shapeIn: "2x2",
+                shapeOut: "eigenvalue + eigenvector",
+                inHex: `A=${A}`,
+                outHex: `lambda=${lambda}, x=${fmtHexArr(xData)}`
+            });
+        });
+
+        it("powerIteration : non-symmetric 3x3 matrix returns dominant eigenvalue 3", async function () {
+            t++;
+
+            const two = await qInt(2);
+            const three = await qInt(3);
+            const one = await qInt(1);
+            const zero = qInt(0);
+
+            // A =
+            // [2 1 0
+            //  0 3 1
+            //  0 0 1]
+            const A = [
+                two, one, zero,
+                zero, three, one,
+                zero, zero, one
+            ];
+
+            const seed = ethers.ZeroHash;
+            const tol = await harness.qFromFrac(1n, 1000000n);
+
+            await touchGas(harness, "powerIterationHarness", [3n, 3n, A, seed, tol]);
+            const gas = await estimateGas(harness, "powerIterationHarness", [3n, 3n, A, seed, tol]);
+
+            const [lambda, xRows, xCols, xData] = await harness.powerIterationHarness(3n, 3n, A, seed, tol);
+
+            const expectedEigen = three.toLowerCase();
+            const diff = BigInt(lambda) > BigInt(expectedEigen)
+                ? BigInt(lambda) - BigInt(expectedEigen)
+                : BigInt(expectedEigen) - BigInt(lambda);
+
+            printBlock({
+                t,
+                method: "powerIterationHarness",
+                explanation: "Upper-triangular 3x3 -> dominant eigenvalue = 3.",
+                gas,
+                shapeIn: "3x3",
+                shapeOut: "eigenvalue + eigenvector",
+                inHex: `A=${A}`,
+                outHex: `lambda=${lambda}, x=${fmtHexArr(xData)}`
+            });
+        });
+    });
 });

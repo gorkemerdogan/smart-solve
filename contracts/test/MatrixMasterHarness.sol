@@ -567,4 +567,37 @@ contract MatrixMasterHarness {
         MatrixMaster.Matrix memory y = _toMatrix(yRows, yCols, yData);
         return MatrixMaster.hasConverged(x, y, tol);
     }
+
+    // =========================================================
+    // Power Iteration Wrapper
+    // =========================================================
+
+    /**
+    * @notice Wrapper for MatrixMaster.powerIteration.
+    */
+    function powerIterationHarness(
+        uint256 rows,
+        uint256 cols,
+        bytes16[] calldata dataFlat,
+        bytes32 seed,
+        bytes16 tol
+    )
+        external
+        view
+        returns (
+            bytes16 lambda,
+            uint256 xRows,
+            uint256 xCols,
+            bytes16[] memory xData
+        )
+    {
+        // Build matrix
+        MatrixMaster.Matrix memory A = _toMatrix(rows, cols, dataFlat);
+
+        // Compute dominant eigenpair
+        (bytes16 lam, MatrixMaster.Matrix memory x) =
+            MatrixMaster.powerIteration(A, seed, tol);
+
+        return (lam, x.rows, x.cols, x.data);
+    }
 }
