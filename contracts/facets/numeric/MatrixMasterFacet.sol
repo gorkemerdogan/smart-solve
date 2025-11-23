@@ -427,4 +427,36 @@ contract MatrixFacet {
         MatrixMaster.Matrix memory vOld = _buildMatrix(yRows, yCols, yData);
         return MatrixMaster.hasConverged(vNew, vOld, tol);
     }
+
+    /*───────────────────────────────────────────────*/
+    /* Eigenvalues                                    */
+    /*───────────────────────────────────────────────*/
+
+    /**
+     * @notice Calculate dominant eigenvalue/vector via Power Iteration.
+     */
+    function powerIteration(
+        uint256 rows,
+        uint256 cols,
+        bytes16[] calldata data,
+        bytes32 seed,
+        bytes16 tol
+    )
+        external
+        view
+        returns (
+            bytes16 lambda,
+            uint256 vecRows,
+            uint256 vecCols,
+            bytes16[] memory vecData
+        )
+    {
+        MatrixMaster.Matrix memory A = _buildMatrix(rows, cols, data);
+        
+        // Call library
+        (bytes16 l, MatrixMaster.Matrix memory v) = MatrixMaster.powerIteration(A, seed, tol);
+
+        // Flatten results manually since return type is mixed (bytes16, Matrix)
+        return (l, v.rows, v.cols, v.data);
+    }
 }
