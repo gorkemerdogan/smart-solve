@@ -529,22 +529,22 @@ library MatrixMaster {
      * @param tol  Convergence tolerance (positive scalar)
      * @return ok True if ||vNew - vOld|| < tol
      */
-    function hasConverged(Matrix memory vNew, Matrix memory vOld, bytes16 tol)
-        internal
-        pure
-        checkSameShape(vNew, vOld)
-        returns (bool ok)
-    {
+    function hasConverged(Matrix memory vNew, Matrix memory vOld, bytes16 tol) internal pure checkSameShape(vNew, vOld) returns (bool ok) {
         require(vNew.cols == 1, "MatrixMaster: converged requires vectors");
 
-        // diff = vNew - vOld
-        Matrix memory diff = sub(vNew, vOld);
+        // Check Positive Direction
+        Matrix memory diffPos = sub(vNew, vOld);
+        if (MathLib.cmp(norm(diffPos), tol) < 0) {
+            return true;
+        }
 
-        // ||diff||
-        bytes16 d = norm(diff);
+        // Check Negative Direction (for negative eigenvalues)
+        Matrix memory diffNeg = add(vNew, vOld);
+        if (MathLib.cmp(norm(diffNeg), tol) < 0) {
+            return true;
+        }
 
-        // d < tol ?
-        ok = (MathLib.cmp(d, tol) < 0);
+        return false;
     }
 
     // ──────────────────────────────────────────────────────────
@@ -722,18 +722,16 @@ library MatrixMaster {
     /**
      * @notice Approximate the dominant eigenvalue/eigenvector of a square matrix A using power iteration.
      *
-     * @dev
-     *  Steps:
-     *    1. Initialize x₀ using randomVector(n, seed).
-     *    2. Repeat:
-     *         y = A * x
-     *         x_new = normalize(y)
-     *         stop if hasConverged(x_new, x, tol)
-     *    3. lambda ≈ x^T (A x)
-     *
-     *  - A must be (n×n)
-     *  - Uses cfg().maxIter from LibNumericConfig
-     *  - tol must be > 0
+     * @dev Steps:
+     *       1. Initialize x₀ using randomVector(n, seed).
+     *       2. Repeat:
+     *            y = A * x
+     *            x_new = normalize(y)
+     *            stop if hasConverged(x_new, x, tol)
+     *       3. lambda ≈ x^T (A x)
+     *     - A must be (n×n)
+     *     - Uses cfg().maxIter from LibNumericConfig
+     *     - tol must be > 0
      *
      * @param A     Input square matrix
      * @param seed  Seed for deterministic initial vector
@@ -742,35 +740,23 @@ library MatrixMaster {
      * @return lambda    Dominant eigenvalue approximation
      * @return x         Dominant eigenvector (n×1 unit vector)
      */
-    function powerIteration(
-        Matrix memory A,
-        bytes32 seed,
-        bytes16 tol
-    )
-        internal
-        view
-        isSquare(A)
-        returns (bytes16 lambda, Matrix memory x)
-    {
+    function powerIteration(Matrix memory A, bytes32 seed, bytes16 tol) internal view isSquare(A) returns (bytes16 lambda, Matrix memory x) {
         uint256 n = A.rows;
-
         require(MathLib.cmp(tol, QZERO) > 0, "MatrixMaster: tol must be > 0");
-
-        // Load from LibNumericConfig
+        
         uint256 maxIter = LibNumericConfig.getMaxIter();
 
-        // Initial vector x₀ (n×1)
         x = randomVector(n, seed);
         x = normalize(x);
 
         for (uint256 iter = 0; iter < maxIter; ++iter) {
-            // y = A * x
             Matrix memory y = mulMatrixVector(A, x);
+            
+            // Avoid division by zero if matrix is singular
+            if (MathLib.cmp(norm(y), QZERO) == 0) { break; }
 
-            // x_new = normalize(y)
             Matrix memory xNew = normalize(y);
 
-            // Check convergence: ||x_new - x|| < tol
             if (hasConverged(xNew, x, tol)) {
                 x = xNew;
                 break;
@@ -778,8 +764,7 @@ library MatrixMaster {
 
             x = xNew;
         }
-
-        // Rayleigh quotient: lambda = x^T (A x)
+        
         Matrix memory Ax = mulMatrixVector(A, x);
         lambda = dot(x, Ax);
     }
