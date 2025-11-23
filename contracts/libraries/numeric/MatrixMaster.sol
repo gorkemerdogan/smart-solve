@@ -744,6 +744,17 @@ library MatrixMaster {
         uint256 n = A.rows;
         require(MathLib.cmp(tol, QZERO) > 0, "MatrixMaster: tol must be > 0");
         
+        // If user passed 0, use Global Default
+        if (MathLib.cmp(tol, QZERO) == 0) {
+            tol = LibNumericConfig.getTol();
+        }
+
+        // Apply Safety Guardrail to ensure not goint below minTol (which would be too expensive)
+        bytes16 minTol = LibNumericConfig.getMinTol();
+        if (MathLib.cmp(tol, minTol) < 0) {
+            tol = minTol;
+        }
+
         uint256 maxIter = LibNumericConfig.getMaxIter();
 
         x = randomVector(n, seed);
