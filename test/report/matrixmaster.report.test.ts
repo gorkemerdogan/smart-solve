@@ -12,6 +12,7 @@ type MatrixMasterHarness = Contract & {
     // quad helpers
     qFromInt(n: bigint): Promise<string>;
     qFromUInt(n: bigint): Promise<string>;
+    qFromFrac(n: bigint, m: bigint): Promise<string>;
 
     // matrix comparison helpers
     matricesExactEqual(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<boolean>;
@@ -2164,13 +2165,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 await qInt(40),
             ];
 
-            // Build a small scalar s = 1 / 1000 using divScalar on a 1x1 matrix [1]
-            const big = await qInt(1000);
-            const one = await qInt(1);
-            const tinyMat = asMatrix(
-                await harness.divScalarHarness(1n, 1n, [one], big),
-            );
-            const tiny = tinyMat.data[0];
+            // tiny = 1 / 1000
+            const tiny = await harness.qFromFrac(1n, 1000n);
 
             await touchGas(harness, "mulScalarHarness", [rows, cols, a, tiny]);
             const gas = await estimateGas(harness, "mulScalarHarness", [rows, cols, a, tiny]);
@@ -2313,13 +2309,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 await qInt(4),
             ];
 
-            // tiny = 1 / 1000 again
-            const big = await qInt(1000);
-            const one = await qInt(1);
-            const tinyMat = asMatrix(
-                await harness.divScalarHarness(1n, 1n, [one], big),
-            );
-            const tiny = tinyMat.data[0];
+            // tiny = 1 / 1000
+            const tiny = await harness.qFromFrac(1n, 1000n);
 
             await touchGas(harness, "divScalarHarness", [rows, cols, a, tiny]);
             const gas = await estimateGas(harness, "divScalarHarness", [rows, cols, a, tiny]);
@@ -2868,13 +2859,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const rows = 2n;
             const cols = 2n;
 
-            // Build a tiny scalar s = 1 / 1000 using divScalar on a 1x1 matrix [1]
-            const one = await qInt(1);
-            const big = await qInt(1000);
-            const tinyMat = asMatrix(
-                await harness.divScalarHarness(1n, 1n, [one], big),
-            );
-            const tiny = tinyMat.data[0];
+            // tiny = 1 / 1000
+            const tiny = await harness.qFromFrac(1n, 1000n);
 
             // A and B both 2x2 filled with 'tiny'
             const A = [tiny, tiny, tiny, tiny];
@@ -3406,8 +3392,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             // Construct epsilon = 1 / 1000 in quad
             const one = await qInt(1);
             const big = await qInt(1000);
-            const tinyMat = asMatrix(await harness.divScalarHarness(1n, 1n, [one], big));
-            const eps = tinyMat.data[0];
+            const eps = await harness.qFromFrac(1n, 1000n);
 
             // Build 1 + eps via 1x1 addHarness
             const onePlusEpsMat = asMatrix(await harness.addHarness(1n, 1n, [one], 1n, 1n, [eps]));
@@ -3786,9 +3771,9 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             // expected = [3/5, 0, 4/5]
             const five = await qInt(5);
-            const ex0 = (await harness.divScalarHarness(1n, 1n, [await qInt(3)], five))[2][0];
+            const ex0 = await harness.qFromFrac(3n, 5n);
             const ex1 = await qInt(0);
-            const ex2 = (await harness.divScalarHarness(1n, 1n, [await qInt(4)], five))[2][0];
+            const ex2 = await harness.qFromFrac(4n, 5n);
 
             expect(data[0].toLowerCase()).to.equal(ex0.toLowerCase());
             expect(data[1].toLowerCase()).to.equal(ex1.toLowerCase());

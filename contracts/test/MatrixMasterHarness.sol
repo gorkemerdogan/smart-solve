@@ -76,6 +76,23 @@ contract MatrixMasterHarness {
     }
 
     /**
+     * @notice Construct a quadruple-precision scalar as (num / den).
+     * @dev Uses MathLib.fromUInt and MathLib.div. Reverts if den == 0.
+     *
+     * @param num  Unsigned integer numerator
+     * @param den  Unsigned integer denominator (must be > 0)
+     * @return q   Quadruple-precision num/den
+     */
+    function qFromFrac(uint256 num, uint256 den) external pure returns (bytes16 q) {
+        require(den != 0, "MatrixFacet: qFromFrac division by zero");
+
+        bytes16 a = MathLib.fromUInt(num);
+        bytes16 b = MathLib.fromUInt(den);
+
+        q = a.div(b);
+    }
+
+    /**
      * @notice Approximate comparison of two quad values with tolerance.
      * @param a    First value
      * @param b    Second value
