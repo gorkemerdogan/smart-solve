@@ -3126,7 +3126,6 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const a = [await qInt(-2), await qInt(3)];
             const b = [await qInt(5), await qInt(-4)];
 
-            // FIX: Swap dimensions to 2 rows, 1 col
             await touchGas(harness, "dotHarness", [2n, 1n, a, 2n, 1n, b]);
             const gas = await estimateGas(harness, "dotHarness", [2n, 1n, a, 2n, 1n, b]);
             const out = await harness.dotHarness(2n, 1n, a, 2n, 1n, b);
@@ -3135,7 +3134,16 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             expect(out.toLowerCase()).to.equal(expected.toLowerCase());
 
-            // ... printBlock update ...
+            printBlock({
+                t,
+                method: "dotHarness",
+                explanation: "Handles negative entries correctly.",
+                gas,
+                shapeIn: "2x1 · 2x1",
+                shapeOut: "scalar",
+                inHex: `a=${fmtHexArr(a)}, b=${fmtHexArr(b)}`,
+                outHex: out,
+            });
         });
 
         it("dot : length mismatch reverts", async function () {
@@ -3144,8 +3152,6 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const a = [await qInt(1), await qInt(2)];
             const b = [await qInt(3)];
 
-            // FIX: Swap dimensions so cols=1. 
-            // Now it will pass the first require, and fail the second (length) require.
             await touchGas(harness, "dotHarness", [2n, 1n, a, 1n, 1n, b]);
             const gas = await estimateGas(harness, "dotHarness", [2n, 1n, a, 1n, 1n, b]);
 
@@ -3153,7 +3159,16 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 harness.dotHarness(2n, 1n, a, 1n, 1n, b)
             ).to.be.revertedWith("MatrixMaster: dot length mismatch");
 
-            // ... printBlock update ...
+            printBlock({
+                t,
+                method: "dotHarness",
+                explanation: "Rejects mismatched vector lengths for dot product.",
+                gas,
+                shapeIn: "2x1 · 1x1",
+                shapeOut: "revert",
+                inHex: `a=${fmtHexArr(a)}, b=${fmtHexArr(b)}`,
+                outHex: "-",
+            });
         });
     });
 
