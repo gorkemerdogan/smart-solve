@@ -21,7 +21,7 @@ type MatrixMasterHarness = Contract & {
     onesHarness(rows: bigint, cols: bigint): Promise<[bigint, bigint, string[]]>;
     createIdentityMatrixHarness(n: bigint): Promise<[bigint, bigint, string[]]>;
     fromDiagonalHarness(diag: string[]): Promise<[bigint, bigint, string[]]>;
-    randomUniformHarness(rows: bigint, cols: bigint, seed: string): Promise<[bigint, bigint, string[]]>;
+    randomMatrixHarness(rows: bigint, cols: bigint, seed: string): Promise<[bigint, bigint, string[]]>;
 
     // element access
     getHarness(rows: bigint, cols: bigint, dataFlat: string[], row: bigint, col: bigint): Promise<string>;
@@ -440,16 +440,16 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomUniform : shape and determinism (same seed yields same matrix)", async function () {
+        it("randomMatrix : shape and determinism (same seed yields same matrix)", async function () {
             t++;
             const seed = ethers.keccak256(ethers.toUtf8Bytes("seed-123"));
             const rows = 3n;
             const cols = 4n;
-            await touchGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed]);
+            await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+            const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
 
-            const m1 = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
-            const m2 = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
+            const m1 = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
+            const m2 = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
 
             expect(m1.rows).to.equal(rows);
             expect(m1.cols).to.equal(cols);
@@ -465,7 +465,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "randomUniformHarness",
+                method: "randomMatrixHarness",
                 explanation:
                     "Generates pseudo-random quad entries in [0,1) and verifies deterministic seeding.",
                 gas,
@@ -476,17 +476,17 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomUniform : different seeds give different data (with high probability)", async function () {
+        it("randomMatrix : different seeds give different data (with high probability)", async function () {
             t++;
             const seed1 = ethers.keccak256(ethers.toUtf8Bytes("seed-A"));
             const seed2 = ethers.keccak256(ethers.toUtf8Bytes("seed-B"));
             const rows = 2n;
             const cols = 3n;
-            await touchGas(harness, "randomUniformHarness", [rows, cols, seed1]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed1]);
+            await touchGas(harness, "randomMatrixHarness", [rows, cols, seed1]);
+            const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed1]);
 
-            const m1 = asMatrix(await harness.randomUniformHarness(rows, cols, seed1));
-            const m2 = asMatrix(await harness.randomUniformHarness(rows, cols, seed2));
+            const m1 = asMatrix(await harness.randomMatrixHarness(rows, cols, seed1));
+            const m2 = asMatrix(await harness.randomMatrixHarness(rows, cols, seed2));
 
             expect(m1.data.length).to.equal(6);
             expect(m2.data.length).to.equal(6);
@@ -496,7 +496,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "randomUniformHarness",
+                method: "randomMatrixHarness",
                 explanation:
                     "Uses two different seeds and checks that generated patterns diverge as expected.",
                 gas,
@@ -507,16 +507,16 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomUniform : all values lie in [0,1) range", async function () {
+        it("randomMatrix : all values lie in [0,1) range", async function () {
             t++;
             const rows = 3n;
             const cols = 3n;
             const seed = ethers.keccak256(ethers.toUtf8Bytes("range-check"));
 
-            await touchGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed]);
+            await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+            const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
 
-            const m = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
+            const m = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
             const zeroQ = await qInt(0);
             const oneQ = await qInt(1);
             const zeroBI = BigInt(zeroQ);
@@ -530,7 +530,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "randomUniformHarness",
+                method: "randomMatrixHarness",
                 explanation:
                     "Samples a small 3x3 random matrix and enforces every encoded quad lies in [0,1).",
                 gas,
@@ -541,15 +541,15 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomUniform : vector shapes 1xN are supported", async function () {
+        it("randomMatrix : vector shapes 1xN are supported", async function () {
             t++;
             const rows = 1n;
             const cols = 5n;
             const seed = ethers.keccak256(ethers.toUtf8Bytes("ru-1xN"));
 
-            await touchGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const m = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
+            await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+            const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+            const m = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
 
             expect(m.rows).to.equal(rows);
             expect(m.cols).to.equal(cols);
@@ -557,7 +557,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "randomUniformHarness",
+                method: "randomMatrixHarness",
                 explanation:
                     "Generates a 1xN random row vector for use as simple quad noise or weights.",
                 gas,
@@ -568,15 +568,15 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomUniform : vector shapes Nx1 are supported", async function () {
+        it("randomMatrix : vector shapes Nx1 are supported", async function () {
             t++;
             const rows = 5n;
             const cols = 1n;
             const seed = ethers.keccak256(ethers.toUtf8Bytes("ru-Nx1"));
 
-            await touchGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const m = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
+            await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+            const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+            const m = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
 
             expect(m.rows).to.equal(rows);
             expect(m.cols).to.equal(cols);
@@ -584,7 +584,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "randomUniformHarness",
+                method: "randomMatrixHarness",
                 explanation:
                     "Generates an Nx1 random column vector suitable for stochastic gradient toy examples.",
                 gas,
@@ -595,15 +595,15 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomUniform : structure / diversity: non-trivial variety across entries", async function () {
+        it("randomMatrix : structure / diversity: non-trivial variety across entries", async function () {
             t++;
             const rows = 4n;
             const cols = 4n;
             const seed = ethers.keccak256(ethers.toUtf8Bytes("ru-diversity"));
 
-            await touchGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomUniformHarness", [rows, cols, seed]);
-            const m = asMatrix(await harness.randomUniformHarness(rows, cols, seed));
+            await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+            const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+            const m = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
             const zeroQ = await qInt(0);
 
             const distinct = new Set(m.data);
@@ -615,7 +615,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             printBlock({
                 t,
-                method: "randomUniformHarness",
+                method: "randomMatrixHarness",
                 explanation:
                     "Samples a 4x4 random matrix and verifies it exhibits non-trivial value diversity.",
                 gas,
@@ -1676,7 +1676,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const n = 10n;
             const seed = ethers.keccak256(ethers.toUtf8Bytes("transpose-10x10"));
 
-            const A = asMatrix(await harness.randomUniformHarness(n, n, seed));
+            const A = asMatrix(await harness.randomMatrixHarness(n, n, seed));
 
             await touchGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
             const gas = await estimateGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
@@ -1715,7 +1715,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const n = 40n;
             const seed = ethers.keccak256(ethers.toUtf8Bytes("transpose-40x40"));
 
-            const A = asMatrix(await harness.randomUniformHarness(n, n, seed));
+            const A = asMatrix(await harness.randomMatrixHarness(n, n, seed));
 
             await touchGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
             const gas = await estimateGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
@@ -1753,7 +1753,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const rows = 100n;
             const cols = 100n;
 
-            // Start with a big 100x100 zero matrix (cheap compared to randomUniform).
+            // Start with a big 100x100 zero matrix (cheap compared to randomMatrix).
             const zeroMat = asMatrix(await harness.zerosHarness(rows, cols));
 
             const one = await qInt(1);
@@ -3099,7 +3099,6 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const a = [await qInt(1), await qInt(2), await qInt(3)];
             const b = [await qInt(4), await qInt(5), await qInt(6)];
 
-            // FIX: Swap dimensions to 3 rows, 1 col
             await touchGas(harness, "dotHarness", [3n, 1n, a, 3n, 1n, b]);
             const gas = await estimateGas(harness, "dotHarness", [3n, 1n, a, 3n, 1n, b]);
             const out = await harness.dotHarness(3n, 1n, a, 3n, 1n, b);
@@ -3709,13 +3708,13 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
     // Norm & Normalize
     // =========================================================
     describe("Norm & Normalize", function () {
-        
+
         // --- Norm ---
         it("norm : computes Euclidean norm of 3-4-5 triangle", async function () {
             t++;
             // Vector [3, 4]^T -> Norm should be 5
-            const v = [await qInt(3), await qInt(4)]; 
-            
+            const v = [await qInt(3), await qInt(4)];
+
             await touchGas(harness, "normHarness", [2n, 1n, v]);
             const gas = await estimateGas(harness, "normHarness", [2n, 1n, v]);
             const out = await harness.normHarness(2n, 1n, v);
@@ -3957,6 +3956,4 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             ).to.be.revertedWith("MatrixMaster: converged requires vectors");
         });
     });
-
-
 });

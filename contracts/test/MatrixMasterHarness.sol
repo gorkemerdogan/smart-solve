@@ -208,14 +208,14 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.randomUniform.
+     * @notice Wrapper for MatrixMaster.randomMatrix.
      */
-    function randomUniformHarness(
+    function randomMatrixHarness(
         uint256 rows,
         uint256 cols,
         bytes32 seed
     ) external pure returns (uint256, uint256, bytes16[] memory) {
-        MatrixMaster.Matrix memory m = MatrixMaster.randomUniform(
+        MatrixMaster.Matrix memory m = MatrixMaster.randomMatrix(
             rows,
             cols,
             seed

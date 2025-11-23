@@ -175,7 +175,7 @@ library MatrixMaster {
      * @param seed Arbitrary seed for deterministic generation
      * @return m New matrix with pseudo-random contents
      */
-    function randomUniform(uint256 rows, uint256 cols, bytes32 seed) internal pure validDims(rows, cols) returns (Matrix memory m) {
+    function randomMatrix(uint256 rows, uint256 cols, bytes32 seed) internal pure validDims(rows, cols) returns (Matrix memory m) {
         uint256 len = rows * cols;
         bytes16[] memory data = new bytes16[](len);
         bytes16 denom = MathLib.fromUInt(2**64);
