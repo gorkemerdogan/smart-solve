@@ -3905,29 +3905,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             const tolPass = await qInt(2);
             const tolFail = await qInt(1);
 
-            await touchGas(harness, "hasConvergedHarness", [
-                2n, 1n, vNew,
-                2n, 1n, vOld,
-                tolPass,
-            ]);
-
-            const gas = await estimateGas(harness, "hasConvergedHarness", [
-                2n, 1n, vNew,
-                2n, 1n, vOld,
-                tolPass,
-            ]);
-
-            const yes = await harness.hasConvergedHarness(
-                2n, 1n, vNew,
-                2n, 1n, vOld,
-                tolPass,
-            );
-
-            const no = await harness.hasConvergedHarness(
-                2n, 1n, vNew,
-                2n, 1n, vOld,
-                tolFail,
-            );
+            await touchGas(harness, "hasConvergedHarness", [2n, 1n, vNew, 2n, 1n, vOld, tolPass]);
+            const gas = await estimateGas(harness, "hasConvergedHarness", [2n, 1n, vNew, 2n, 1n, vOld, tolPass]);
+            const yes = await harness.hasConvergedHarness(2n, 1n, vNew, 2n, 1n, vOld, tolPass);
+            const no = await harness.hasConvergedHarness(2n, 1n, vNew, 2n, 1n, vOld, tolFail);
 
             expect(yes).to.equal(true);
             expect(no).to.equal(false);
