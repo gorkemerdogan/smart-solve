@@ -33,8 +33,10 @@ library LibNumericConfig {
         assembly { c.slot := position }
     }
 
-    /// Setters
-
+    // ------------------------------------------------------------
+    //  Setters
+    // ------------------------------------------------------------
+    
     /**
      * @notice Update tolerance in storage
      * @param tol The new tolerance value as ABDKMathQuad (bytes16)
@@ -59,7 +61,17 @@ library LibNumericConfig {
         cfg().maxIter = m;
     }
 
-    /// Getters
+    /**
+     * @notice Set the step size `h` for numerical differentiation.
+     * @param _h The step size in IEEE-754 binary128 (bytes16).
+     */
+    function setDiffStep(bytes16 _h) internal {
+        layout().diffStep = _h;
+    }
+
+    // ------------------------------------------------------------
+    //  Getters
+    // ------------------------------------------------------------
 
     function getTol() internal view returns (bytes16) {
     return cfg().tol;
@@ -71,5 +83,13 @@ library LibNumericConfig {
 
     function getMaxIter() internal view returns (uint256) {
         return cfg().maxIter;
+    }
+
+    /**
+     * @notice Get the differentiation step size.
+     * @dev Returns 0 (QZERO) if uninitialized. 
+     */
+    function getDiffStep() internal view returns (bytes16) {
+        return layout().diffStep;
     }
 }
