@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import { MathLib } from "../libraries/MathLib.sol";
+
 /**
  * @title LibNumericConfig
  * @notice Stores global numeric configuration in diamond storage.
@@ -13,6 +15,9 @@ pragma solidity ^0.8.20;
  *      Default Differentiation Step: 1e-8
  */
 library LibNumericConfig {
+
+    uint256 private constant DEFAULT_MAX_ITER = 100;
+
     // Fixed storage slot for numeric config (unique hash key)
     bytes32 internal constant SLOT = keccak256("smart-solve.numeric.config.v1");
 
@@ -87,7 +92,7 @@ library LibNumericConfig {
     function getTol() internal view returns (bytes16) {
         bytes16 t = cfg().tol;
         if (MathLib.cmp(t, MathLib.fromInt(0)) == 0) {
-             return MathLib.fromInt(1).div(MathLib.fromInt(1000000000000000000));
+             return MathLib.div(MathLib.fromInt(1), MathLib.fromInt(1000000000000000000));
         }
         return t;
     }
@@ -99,7 +104,7 @@ library LibNumericConfig {
     function getMinTol() internal view returns (bytes16) {
         bytes16 t = cfg().minTol;
         if (MathLib.cmp(t, MathLib.fromInt(0)) == 0) {
-            return MathLib.fromInt(1).div(MathLib.fromUInt(10**32));
+            return MathLib.div(MathLib.fromInt(1), MathLib.fromUInt(10**32));
         }
         return t;
     }
@@ -120,7 +125,7 @@ library LibNumericConfig {
     function getDiffStep() internal view returns (bytes16) {
         bytes16 h = cfg().diffStep;
         if (MathLib.cmp(h, MathLib.fromInt(0)) == 0) {
-            return MathLib.fromInt(1).div(MathLib.fromInt(100000000));
+            return MathLib.div(MathLib.fromInt(1), MathLib.fromInt(100000000));
         }
         return h;
     }
