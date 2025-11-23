@@ -6,6 +6,11 @@ pragma solidity ^0.8.20;
  * @notice Stores global numeric configuration in diamond storage.
  * @dev Contains tolerance values (tol, minTol) encoded as bytes16 (ABDKMathQuad)
  *      and maxIter as the global iteration cap for numerical routines.
+ *      Default Max Iterations: 100
+ *          uint256 private constant DEFAULT_MAX_ITER = 100;
+ *      Default Tolerance: 1e-18 (Standard high precision)
+ *          0x3fc56d5cfaacc19b601e1b7b51944da0 (approx 1e-18 in Quad)
+ *      Default Differentiation Step: 1e-8
  */
 library LibNumericConfig {
     // Fixed storage slot for numeric config (unique hash key)
@@ -16,7 +21,7 @@ library LibNumericConfig {
     * @param tol Numerical tolerance encoded as bytes16
     * @param minTol Minimum allowable tolerance encoded as bytes16
     * @param maxIter Maximum iteration count for numeric loops
-    * @param maxIter Differentiation step
+    * @param maxIter Step size 'h' for differentiation.
     */
     struct NumericConfig {
         bytes16 tol;
@@ -75,23 +80,48 @@ library LibNumericConfig {
     //  Getters
     // ------------------------------------------------------------
 
+    /**
+     * @notice Get the global default tolerance.
+     * @dev Returns 1e-18 if uninitialized.
+     */
     function getTol() internal view returns (bytes16) {
-    return cfg().tol;
+        bytes16 t = cfg().tol;
+        if (MathLib.cmp(t, MathLib.fromInt(0)) == 0) {
+             return MathLib.fromInt(1).div(MathLib.fromInt(1000000000000000000));
+        }
+        return t;
     }
 
+    /**
+     * @notice Get the minimum allowable tolerance (Gas Guardrail).
+     * @dev Returns 1e-32 if uninitialized.
+     */
     function getMinTol() internal view returns (bytes16) {
-        return cfg().minTol;
+        bytes16 t = cfg().minTol;
+        if (MathLib.cmp(t, MathLib.fromInt(0)) == 0) {
+            return MathLib.fromInt(1).div(MathLib.fromUInt(10**32));
+        }
+        return t;
     }
 
+    /**
+     * @notice Get the maximum number of iterations.
+     * @dev Returns 100 if uninitialized.
+     */
     function getMaxIter() internal view returns (uint256) {
-        return cfg().maxIter;
+        uint256 m = cfg().maxIter;
+        return m == 0 ? DEFAULT_MAX_ITER : m;
     }
 
     /**
      * @notice Get the differentiation step size.
-     * @dev Returns 0 (QZERO) if uninitialized. 
+     * @dev Returns 1e-8 if uninitialized.
      */
     function getDiffStep() internal view returns (bytes16) {
-        return cfg().diffStep;
+        bytes16 h = cfg().diffStep;
+        if (MathLib.cmp(h, MathLib.fromInt(0)) == 0) {
+            return MathLib.fromInt(1).div(MathLib.fromInt(100000000));
+        }
+        return h;
     }
 }
