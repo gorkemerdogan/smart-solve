@@ -127,7 +127,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
     // ------------------------------------------------------------
 
     describe("Slice & reshape", function () {
-        it("slice : centered slice", async function () {
+        it("Test 1: slice centered", async function () {
             t++;
             const vals: string[] = [];
             for (let i = 1; i <= 12; ++i) {
@@ -166,7 +166,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
             });
         });
 
-        it("slice : full row slice", async function () {
+        it("Test 2: slice full row", async function () {
             t++;
             const vals: string[] = [];
             for (let i = 1; i <= 12; ++i) {
@@ -200,7 +200,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
             });
         });
 
-        it("slice : invalid or out-of-range bounds revert", async function () {
+        it("Test 3: slice invalid or out-of-range bounds revert", async function () {
             const vals: string[] = [];
             for (let i = 1; i <= 6; ++i) {
                 vals.push(await qInt(i));
@@ -283,7 +283,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
             }
         });
 
-        it("slice : full column slice", async function () {
+        it("Test 4: slice full column", async function () {
             t++;
             // 3x4 matrix [1..12]
             const vals: string[] = [];
@@ -323,73 +323,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
             });
         });
 
-        it("reshape : reshape 2x6 → 3x4 preserves order", async function () {
-            t++;
-            const vals: string[] = [];
-            for (let i = 1; i <= 12; ++i) {
-                vals.push(await qInt(i));
-            }
-
-            const srcRows = 2n;
-            const srcCols = 6n;
-            const dstRows = 3n;
-            const dstCols = 4n;
-
-            await touchGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
-            const gas = await estimateGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
-            const r = asMatrix(await harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols));
-
-            expect(r.rows).to.equal(dstRows);
-            expect(r.cols).to.equal(dstCols);
-            expect(r.data.length).to.equal(12);
-
-            // reshape does not change data order
-            for (let i = 0; i < 12; ++i) {
-                expect(r.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
-            }
-
-            printBlock({
-                t,
-                method: "reshapeHarness",
-                explanation: "Changes matrix shape while reusing the same flat data array and order of entries.",
-                gas,
-                shapeIn: `${srcRows}x${srcCols}`,
-                shapeOut: `${r.rows}x${r.cols}`,
-                inHex: fmtHexArr(vals),
-                outHex: fmtHexArr(r.data),
-            });
-        });
-
-        it("reshape : mismatched area reverts", async function () {
-            t++;
-            const vals: string[] = [];
-            for (let i = 1; i <= 6; ++i) {
-                vals.push(await qInt(i));
-            }
-            const srcRows = 2n;
-            const srcCols = 3n;
-            const dstRows = 4n;
-            const dstCols = 2n;
-
-            await touchGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
-            const gas = await estimateGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
-
-            // 2x3 -> area=6; 4x2 -> area=8 => revert
-            await expect(harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols)).to.be.revertedWith("MatrixMaster: reshape area mismatch");
-
-            printBlock({
-                t,
-                method: "reshapeHarness",
-                explanation: "Prevents reshapes that would change total element count and corrupt matrix data.",
-                gas,
-                shapeIn: `${srcRows}x${srcCols}`,
-                shapeOut: "revert",
-                inHex: fmtHexArr(vals),
-                outHex: "-",
-            });
-        });
-
-        it("slice : full matrix slice returns an identical layout", async function () {
+        it("Test 5: slice full matrix returns identical layout", async function () {
             t++;
             const vals: string[] = [];
             for (let i = 1; i <= 6; ++i) {
@@ -426,7 +360,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
             });
         });
 
-        it("slice : last row boundary slices", async function () {
+        it("Test 6: slice last row boundary", async function () {
             t++;
             const vals: string[] = [];
             for (let i = 1; i <= 9; ++i) {
@@ -464,7 +398,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
             });
         });
 
-        it("slice : last column boundary slices", async function () {
+        it("Test 7: slice last column boundary", async function () {
             t++;
             const vals: string[] = [];
             for (let i = 1; i <= 9; ++i) {
@@ -502,7 +436,73 @@ describe("MatrixMaster — Shape & Reshape", function () {
             });
         });
 
-        it("reshape : MxN to 1x(MN) vector", async function () {
+        it("Test 8: reshape 2x6 → 3x4 preserves order", async function () {
+            t++;
+            const vals: string[] = [];
+            for (let i = 1; i <= 12; ++i) {
+                vals.push(await qInt(i));
+            }
+
+            const srcRows = 2n;
+            const srcCols = 6n;
+            const dstRows = 3n;
+            const dstCols = 4n;
+
+            await touchGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+            const gas = await estimateGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+            const r = asMatrix(await harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols));
+
+            expect(r.rows).to.equal(dstRows);
+            expect(r.cols).to.equal(dstCols);
+            expect(r.data.length).to.equal(12);
+
+            // reshape does not change data order
+            for (let i = 0; i < 12; ++i) {
+                expect(r.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
+            }
+
+            printBlock({
+                t,
+                method: "reshapeHarness",
+                explanation: "Changes matrix shape while reusing the same flat data array and order of entries.",
+                gas,
+                shapeIn: `${srcRows}x${srcCols}`,
+                shapeOut: `${r.rows}x${r.cols}`,
+                inHex: fmtHexArr(vals),
+                outHex: fmtHexArr(r.data),
+            });
+        });
+
+        it("Test 9: reshape mismatched area reverts", async function () {
+            t++;
+            const vals: string[] = [];
+            for (let i = 1; i <= 6; ++i) {
+                vals.push(await qInt(i));
+            }
+            const srcRows = 2n;
+            const srcCols = 3n;
+            const dstRows = 4n;
+            const dstCols = 2n;
+
+            await touchGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+            const gas = await estimateGas(harness, "reshapeHarness", [srcRows, srcCols, vals, dstRows, dstCols]);
+
+            // 2x3 -> area=6; 4x2 -> area=8 => revert
+            await expect(harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols)).to.be.revertedWith("MatrixMaster: reshape area mismatch");
+
+            printBlock({
+                t,
+                method: "reshapeHarness",
+                explanation: "Prevents reshapes that would change total element count and corrupt matrix data.",
+                gas,
+                shapeIn: `${srcRows}x${srcCols}`,
+                shapeOut: "revert",
+                inHex: fmtHexArr(vals),
+                outHex: "-",
+            });
+        });
+
+        it("Test 10: reshape MxN to 1x(MN) vector", async function () {
             t++;
             const vals: string[] = [];
             for (let i = 1; i <= 6; ++i) {
@@ -536,7 +536,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
             });
         });
 
-        it("reshape : 1x(MN) vector back to MxN", async function () {
+        it("Test 11: reshape 1x(MN) vector back to MxN", async function () {
             t++;
             const vals: string[] = [];
             for (let i = 1; i <= 6; ++i) {
@@ -570,7 +570,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
             });
         });
 
-        it("reshape : double reshape returns to the original shape", async function () {
+        it("Test 12: double reshape returns to original shape", async function () {
             t++;
             const vals: string[] = [];
             for (let i = 1; i <= 6; ++i) {
