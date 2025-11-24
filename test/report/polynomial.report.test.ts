@@ -86,10 +86,9 @@ async function estimateGas(harness: PolynomialHarness, method: string, args: any
   return gas.toString();
 }
 
-function printBlock({ t, method, explanation, gas, inHex, outHex, outDec }: any) {
+function printBlock({ t, method, explanation, gas, inHex, expectedHex, outHex, expectedDec, outDec }: any) {
   const sep = "-".repeat(60);
-  const decLine = outDec ? `Output: ${outDec}` : ""; // Conditional output string based on whether outDec is provided
-
+  const decLine = outDec ? `Output: ${outDec}` : "";
 
   console.log(`
         ${sep}
@@ -98,7 +97,9 @@ function printBlock({ t, method, explanation, gas, inHex, outHex, outDec }: any)
         Explanation: ${explanation}
         Gas Usage: ${gas}
         Input: ${inHex}
+        Expected Output (hex): ${expectedHex}
         Output (hex): ${outHex}
+        Expected Output (dec): ${expectedDec}
         ${decLine}
 `.trim()); // trim to clean up leading/trailing newline from template literal
 }
@@ -144,7 +145,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
       const out = await harness.evaluateHorners(coeffs, x);
 
-      printBlock({ t, method: "evaluateHorners", explanation: "O(n) Eval", gas, inHex: "f=[5,2,3], x=5", outHex: out, outDec: expectedDec });
+      printBlock({
+        t,
+        method: "evaluateHorners",
+        explanation: "Horner evaluation of 3x^2 + 2x + 5 at x=5. Verifies basic polynomial pipeline against JS numeric mirror.",
+        inHex: "f=[5,2,3], x=5",
+        expectedHex: "N/A (analytic double result)",
+        outHex: out,
+        expectedDec: expectedDec,
+        outDec: expectedDec,
+        gas,
+      });
     });
 
     it("Test 2: Eval + Derivative (3x^2 + 2x + 5 at x=1.2)", async function () {
@@ -157,7 +168,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateWithDerivative", [coeffs, x]);
       const { px, dpx } = await harness.evaluateWithDerivative(coeffs, x);
 
-      printBlock({ t, method: "evaluateWithDerivative", explanation: "One-pass eval", gas, inHex: "x=1.2", outHex: `p=${px}, p'=${dpx}`, outDec: `p=${pDec}, p'=${dpDec}` });
+      printBlock({
+        t,
+        method: "evaluateWithDerivative",
+        explanation: "One-pass Horner evaluation and derivative for 3x^2 + 2x + 5 at x=1.2. Checks coupled (p, p') output.",
+        inHex: "x=1.2",
+        expectedHex: "N/A (p, p' in quad form)",
+        outHex: `p=${px}, p'=${dpx}`,
+        expectedDec: `p=${pDec}, p'=${dpDec}`,
+        outDec: `p=${pDec}, p'=${dpDec}`,
+        gas,
+      });
     });
 
     it("Test 3: Horner Monic (x^3 + 4x^2 + 0.5x + 2 at x=5)", async function () {
@@ -170,7 +191,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evalHornerMonic", [lower, x]);
       const out = await harness.evalHornerMonic(lower, x);
 
-      printBlock({ t, method: "evalHornerMonic", explanation: "Implicit leading 1", gas, inHex: "lower=[2, 0.5, 4], x=5", outHex: out, outDec: expectedDec });
+      printBlock({
+        t,
+        method: "evalHornerMonic",
+        explanation: "Horner evaluation with implicit leading coefficient 1 (monic) using lower=[2,0.5,4] at x=5.",
+        inHex: "lower=[2, 0.5, 4], x=5",
+        expectedHex: "N/A (monic analytic result)",
+        outHex: out,
+        expectedDec: expectedDec,
+        outDec: expectedDec,
+        gas,
+      });
     });
   });
 
@@ -190,7 +221,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "add", [p1, p2]);
       const out = await harness.add(p1, p2);
 
-      printBlock({ t, method: "add", explanation: "Coeff-wise add", gas, inHex: "[2,1] + [4,3]", outHex: fmtHexArr(out), outDec: expected });
+      printBlock({
+        t,
+        method: "add",
+        explanation: "Coefficient-wise polynomial addition: (x+2)+(3x+4) → (4x+6) in coefficient form.",
+        inHex: "[2,1] + [4,3]",
+        expectedHex: "N/A (computed via JS mirror)",
+        outHex: fmtHexArr(out),
+        expectedDec: expected,
+        outDec: expected,
+        gas,
+      });
     });
 
     it("Test 5: Subtraction ((x+2) - (3x+4))", async function () {
@@ -203,7 +244,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "sub", [p1, p2]);
       const out = await harness.sub(p1, p2);
 
-      printBlock({ t, method: "sub", explanation: "Coeff-wise sub", gas, inHex: "[2,1] - [4,3]", outHex: fmtHexArr(out), outDec: expected });
+      printBlock({
+        t,
+        method: "sub",
+        explanation: "Coefficient-wise subtraction: (x+2)-(3x+4) → (-2x-2) with proper length handling.",
+        inHex: "[2,1] - [4,3]",
+        expectedHex: "N/A (computed via JS mirror)",
+        outHex: fmtHexArr(out),
+        expectedDec: expected,
+        outDec: expected,
+        gas,
+      });
     });
 
     it("Test 6: Scalar Multiplication (2 * (4x^2 + 3x + 1))", async function () {
@@ -216,7 +267,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mulScalar", [p, k]);
       const out = await harness.mulScalar(p, k);
 
-      printBlock({ t, method: "mulScalar", explanation: "Scale coeffs", gas, inHex: "2 * [1,3,4]", outHex: fmtHexArr(out), outDec: expected });
+      printBlock({
+        t,
+        method: "mulScalar",
+        explanation: "Scalar multiplication of coefficient vector by 2, checking each entry is doubled.",
+        inHex: "2 * [1,3,4]",
+        expectedHex: "N/A (coeffs doubled in quad)",
+        outHex: fmtHexArr(out),
+        expectedDec: expected,
+        outDec: expected,
+        gas,
+      });
     });
 
     it("Test 7: Multiplication (Convolution) ((x+1)*(x+1))", async function () {
@@ -229,7 +290,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mul", [p1, p2]);
       const out = await harness.mul(p1, p2);
 
-      printBlock({ t, method: "mul", explanation: "Poly Convolution", gas, inHex: "(x+1)^2", outHex: fmtHexArr(out), outDec: expected });
+      printBlock({
+        t,
+        method: "mul",
+        explanation: "Polynomial convolution for (x+1)^2; ensures classic [1,2,1] coefficient pattern.",
+        inHex: "(x+1)^2",
+        expectedHex: "N/A (convolution via JS mirror)",
+        outHex: fmtHexArr(out),
+        expectedDec: expected,
+        outDec: expected,
+        gas,
+      });
     });
   });
 
@@ -248,7 +319,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "derivative", [coeffs]);
       const out = await harness.derivative(coeffs);
 
-      printBlock({ t, method: "derivative", explanation: "Power rule", gas, inHex: "[5,2,3]", outHex: fmtHexArr(out), outDec: expected });
+      printBlock({
+        t,
+        method: "derivative",
+        explanation: "Coefficient-wise derivative using power rule on 3x^2+2x+5 → 6x+2.",
+        inHex: "[5,2,3]",
+        expectedHex: "N/A (derived in JS mirror)",
+        outHex: fmtHexArr(out),
+        expectedDec: expected,
+        outDec: expected,
+        gas,
+      });
     });
 
     it("Test 9: Integral (of 6x + 12, C=5)", async function () {
@@ -261,7 +342,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "integral", [p, C]);
       const out = await harness.integral(p, C);
 
-      printBlock({ t, method: "integral", explanation: "Indefinite Integral", gas, inHex: "6x+12, C=5", outHex: fmtHexArr(out), outDec: expected });
+      printBlock({
+        t,
+        method: "integral",
+        explanation: "Indefinite integral of 6x+12 with constant C=5 to verify term-by-term integration.",
+        inHex: "6x+12, C=5",
+        expectedHex: "N/A (integrated form in quad)",
+        outHex: fmtHexArr(out),
+        expectedDec: expected,
+        outDec: expected,
+        gas,
+      });
     });
 
     it("Test 10: Synthetic Division (P / (x - 1.5))", async function () {
@@ -274,7 +365,18 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "syntheticDivide", [coeffs, root]);
       const [qHex, rHex] = await harness.syntheticDivide(coeffs, root);
 
-      printBlock({ t, method: "syntheticDivide", explanation: "Ruffini's Rule", gas, inHex: "P=[5,2,3], r=1.5", outHex: `Q=${fmtHexArr(qHex)}, R=${rHex}`, outDec: `Q=${fmtDecArr(rQ)}, R=${rR}` });
+      const expectedDec = `Q=${fmtDecArr(rQ)}, R=${rR}`;
+      printBlock({
+        t,
+        method: "syntheticDivide",
+        explanation: "Ruffini-style synthetic division of P=[5,2,3] by (x-1.5). Checks quotient and remainder pair.",
+        inHex: "P=[5,2,3], r=1.5",
+        expectedHex: "N/A (Q,R in quad form)",
+        outHex: `Q=${fmtHexArr(qHex)}, R=${rHex}`,
+        expectedDec,
+        outDec: expectedDec,
+        gas,
+      });
     });
 
     it("Test 11: Degree Check", async function () {
@@ -286,7 +388,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "degree", [p]);
       const out = await harness.degree(p);
 
-      printBlock({ t, method: "degree", explanation: "Highest non-zero", gas, inHex: "[5,2,0,0]", outHex: out.toString(), outDec: expected });
+      printBlock({
+        t,
+        method: "degree",
+        explanation: "Degree computation: highest non-zero index of [5,2,0,0] should be 1.",
+        inHex: "[5,2,0,0]",
+        expectedHex: "N/A (scalar degree)",
+        outHex: out.toString(),
+        expectedDec: expected,
+        outDec: expected,
+        gas,
+      });
     });
 
     it("Test 12: Trim Trailing Zeros", async function () {
@@ -298,7 +410,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "trimTrailingZeros", [p]);
       const out = await harness.trimTrailingZeros(p);
 
-      printBlock({ t, method: "trimTrailingZeros", explanation: "Canonicalize", gas, inHex: "[5,2,0,0]", outHex: fmtHexArr(out), outDec: expected });
+      printBlock({
+        t,
+        method: "trimTrailingZeros",
+        explanation: "Trims superfluous high-degree zeros to canonicalize polynomial representation.",
+        inHex: "[5,2,0,0]",
+        expectedHex: "N/A (canonical form in quad)",
+        outHex: fmtHexArr(out),
+        expectedDec: expected,
+        outDec: expected,
+        gas,
+      });
     });
   });
 
@@ -317,7 +439,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
       const out = await harness.evaluateHorners(coeffs, x);
 
-      printBlock({ t, method: "evaluateHorners", explanation: "Empty is 0", gas, inHex: "[], x=7", outHex: out, outDec: "0" });
+      printBlock({
+        t,
+        method: "evaluateHorners",
+        explanation: "Evaluating an empty coefficient array should behave like polynomial 0 and return 0.",
+        inHex: "[], x=7",
+        expectedHex: QZERO,
+        outHex: out,
+        expectedDec: "0",
+        outDec: "0",
+        gas,
+      });
     });
 
     it("Test 14: Constant Polynomial (Eval -> C)", async function () {
@@ -329,7 +461,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
       const out = await harness.evaluateHorners(coeffs, x);
 
-      printBlock({ t, method: "evaluateHorners", explanation: "Constant return", gas, inHex: "[7]", outHex: out, outDec: "7" });
+      printBlock({
+        t,
+        method: "evaluateHorners",
+        explanation: "Evaluating constant polynomial [7] at any x must return the same constant value.",
+        inHex: "[7]",
+        expectedHex: coeffs[0],
+        outHex: out,
+        expectedDec: "7",
+        outDec: "7",
+        gas,
+      });
     });
 
     it("Test 15: Constant Derivative (p' -> 0)", async function () {
@@ -341,7 +483,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateWithDerivative", [coeffs, x]);
       const { dpx } = await harness.evaluateWithDerivative(coeffs, x);
 
-      printBlock({ t, method: "evaluateWithDerivative", explanation: "Deriv of const is 0", gas, inHex: "[5]", outHex: `p'=${dpx}`, outDec: "p'=0" });
+      printBlock({
+        t,
+        method: "evaluateWithDerivative",
+        explanation: "Derivative of a constant polynomial is identically 0; checks dpx output only.",
+        inHex: "[5]",
+        expectedHex: QZERO,
+        outHex: `p'=${dpx}`,
+        expectedDec: "p'=0",
+        outDec: "p'=0",
+        gas,
+      });
     });
 
     it("Test 16: Zero Scalar Mul", async function () {
@@ -353,7 +505,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mulScalar", [p, k]);
       const out = await harness.mulScalar(p, k);
 
-      printBlock({ t, method: "mulScalar", explanation: "Scale by 0", gas, inHex: "k=0", outHex: fmtHexArr(out), outDec: "[0]" });
+      printBlock({
+        t,
+        method: "mulScalar",
+        explanation: "Scaling any polynomial by 0 should yield the all-zero polynomial.",
+        inHex: "k=0",
+        expectedHex: "N/A (all coeffs zero in quad)",
+        outHex: fmtHexArr(out),
+        expectedDec: "[0]",
+        outDec: "[0]",
+        gas,
+      });
     });
 
     it("Test 17: Mul by Empty", async function () {
@@ -365,7 +527,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mul", [a, b]);
       const out = await harness.mul(a, b);
 
-      printBlock({ t, method: "mul", explanation: "Empty multiplicand", gas, inHex: "[] * [1,2]", outHex: fmtHexArr(out), outDec: "[0]" });
+      printBlock({
+        t,
+        method: "mul",
+        explanation: "Multiplication where one operand is empty should behave as multiplying by 0.",
+        inHex: "[] * [1,2]",
+        expectedHex: "N/A (zero polynomial)",
+        outHex: fmtHexArr(out),
+        expectedDec: "[0]",
+        outDec: "[0]",
+        gas,
+      });
     });
 
     it("Test 18: Integral of Empty", async function () {
@@ -377,7 +549,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "integral", [a, C]);
       const out = await harness.integral(a, C);
 
-      printBlock({ t, method: "integral", explanation: "Returns C", gas, inHex: "[] + C=9", outHex: fmtHexArr(out), outDec: "[9]" });
+      printBlock({
+        t,
+        method: "integral",
+        explanation: "Integrating an empty polynomial should yield pure constant C in the result.",
+        inHex: "[] + C=9",
+        expectedHex: "N/A (constant-only polynomial)",
+        outHex: fmtHexArr(out),
+        expectedDec: "[9]",
+        outDec: "[9]",
+        gas,
+      });
     });
   });
 
@@ -411,11 +593,13 @@ describe("Polynomial Library - Operations & Calculus", function () {
         printBlock({
           t,
           method: `evaluateHorners (n=${n})`,
-          explanation: "Linear scaling check",
-          gas,
+          explanation: "Horner evaluation on growing degree n, used to observe linear scaling and gas trends.",
           inHex: `a=[1..${n}], x=1.25`,
+          expectedHex: "N/A (large-n analytic double)",
           outHex: out,
-          outDec: expected
+          expectedDec: expected,
+          outDec: expected,
+          gas,
         });
       }
     });
@@ -437,11 +621,13 @@ describe("Polynomial Library - Operations & Calculus", function () {
         printBlock({
           t,
           method: `add (n=${n})`,
-          explanation: "Linear scaling check",
-          gas,
+          explanation: "Wide-vector addition for length-n polynomials; tests linear complexity in coefficient count.",
           inHex: `a=[1..${n}], b=[1..${n}]`,
+          expectedHex: "N/A (large coeff array)",
           outHex: headTail(out),
-          outDec: headTail(expected)
+          expectedDec: headTail(expected),
+          outDec: headTail(expected),
+          gas,
         });
       }
     });
@@ -463,11 +649,13 @@ describe("Polynomial Library - Operations & Calculus", function () {
         printBlock({
           t,
           method: `mul (n=${n})`,
-          explanation: "O(n^2) scaling check",
-          gas,
+          explanation: "Stress test for O(n^2) polynomial multiplication with increasing degrees.",
           inHex: `a=[1..${n}], b=[1..${n}]`,
+          expectedHex: "N/A (large convolution result)",
           outHex: headTail(out),
-          outDec: headTail(expected)
+          expectedDec: headTail(expected),
+          outDec: headTail(expected),
+          gas,
         });
       }
     });
