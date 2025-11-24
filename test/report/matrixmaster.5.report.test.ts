@@ -5,41 +5,37 @@ import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 
 /**
- * MatrixMaster (bytes16 / ABDK quad) : Creation, Access, Algebra, det, inverse
+ * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
+ * @notice Provides comprehensive utilities for matrix operations using the ABDK bytes16/quad fixed-point math type.
+ *         Tests cover core linear algebra multiplication operations: matrix multiplication,
+ *         matrix–vector multiplication, and dot product.
  */
+
+// ------------------------------------------------------------
+//  Types & Constants
+// ------------------------------------------------------------
 
 type MatrixMasterHarness = Contract & {
     // quad helpers
     qFromInt(n: bigint): Promise<string>;
-    qFromUInt(n: bigint): Promise<string>;
     qFromFrac(n: bigint, m: bigint): Promise<string>;
 
     // matrix comparison helpers
-    matricesExactEqual(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<boolean>;
+    matricesExactEqual(
+        aRows: bigint,
+        aCols: bigint,
+        aData: string[],
+        bRows: bigint,
+        bCols: bigint,
+        bData: string[],
+    ): Promise<boolean>;
 
-    // creation
+    // creation (helper)
     zerosHarness(rows: bigint, cols: bigint): Promise<[bigint, bigint, string[]]>;
-    onesHarness(rows: bigint, cols: bigint): Promise<[bigint, bigint, string[]]>;
     createIdentityMatrixHarness(n: bigint): Promise<[bigint, bigint, string[]]>;
-    fromDiagonalHarness(diag: string[]): Promise<[bigint, bigint, string[]]>;
-    randomMatrixHarness(rows: bigint, cols: bigint, seed: string): Promise<[bigint, bigint, string[]]>;
 
-    // element access
-    getHarness(rows: bigint, cols: bigint, dataFlat: string[], row: bigint, col: bigint): Promise<string>;
-    setHarness(rows: bigint, cols: bigint, dataFlat: string[], row: bigint, col: bigint, val: string): Promise<[bigint, bigint, string[]]>;
-
-    // slice & reshape
-    sliceHarness(rows: bigint, cols: bigint, dataFlat: string[], rowStart: bigint, rowEnd: bigint, colStart: bigint, colEnd: bigint): Promise<[bigint, bigint, string[]]>;
-    reshapeHarness(rows: bigint, cols: bigint, dataFlat: string[], newRows: bigint, newCols: bigint): Promise<[bigint, bigint, string[]]>;
-
-    // transpose
-    transposeHarness(rows: bigint, cols: bigint, dataFlat: string[]): Promise<[bigint, bigint, string[]]>;
-
-    // elementwise arithmetic
+    // elementwise arithmetic (helper)
     addHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
-    subHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
-    mulScalarHarness(rows: bigint, cols: bigint, dataFlat: string[], k: string): Promise<[bigint, bigint, string[]]>;
-    divScalarHarness(rows: bigint, cols: bigint, dataFlat: string[], k: string): Promise<[bigint, bigint, string[]]>;
 
     // matrix multiplication
     mulMatrixHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
@@ -49,16 +45,6 @@ type MatrixMasterHarness = Contract & {
 
     // dot product
     dotHarness(xRows: bigint, xCols: bigint, xData: string[], yRows: bigint, yCols: bigint, yData: string[]): Promise<string>;
-
-    // determinant & inverse
-    detHarness(rows: bigint, cols: bigint, dataFlat: string[]): Promise<string>;
-    inverseHarness(rows: bigint, cols: bigint, dataFlat: string[]): Promise<[bigint, bigint, string[]]>;
-
-    // normalization
-    normalizeVectorHarness(vRows: bigint, vCols: bigint, vData: string[]): Promise<[bigint, bigint, string[]]>;
-
-    // convergence
-    hasConvergedHarness(xRows: bigint, xCols: bigint, xData: string[], yRows: bigint, yCols: bigint, yData: string[], tol: string): Promise<boolean>;
 };
 
 async function newHarness(): Promise<MatrixMasterHarness> {
@@ -80,56 +66,70 @@ async function newHarness(): Promise<MatrixMasterHarness> {
     return harness as unknown as MatrixMasterHarness;
 }
 
-// Small helpers for working with the harness
+// ------------------------------------------------------------
+//  Helpers
+// ------------------------------------------------------------
+
 function asMatrix(tuple: [bigint, bigint, string[]]) {
     const [rows, cols, data] = tuple;
     return { rows, cols, data: [...data] };
 }
 
-// =========================
-// Gas / report utilities
-// =========================
+function fmtHexArr(arr: string[]) {
+    if (arr.length > 6) {
+        return `[${arr.slice(0, 3).join(", ")}, ..., ${arr
+            .slice(-3)
+            .join(", ")}] (len=${arr.length})`;
+    }
+    return `[${arr.join(", ")}]`;
+}
 
-/** Fire a real transaction (swallowed errors) so gas reporters can pick it up. */
-async function touchGas(
-    h: MatrixMasterHarness,
-    method: string,
-    args: any[],
-) {
+// ------------------------------------------------------------
+//  Gas Estimation
+// ------------------------------------------------------------
+
+async function touchGas(harness: MatrixMasterHarness, method: string, args: any[]) {
     try {
-        const data = h.interface.encodeFunctionData(method, args);
+        const data = harness.interface.encodeFunctionData(method, args);
         const [signer] = await ethers.getSigners();
-        const to = await h.getAddress();
+        const to = await harness.getAddress();
         const tx = await signer.sendTransaction({ to, data });
         await tx.wait();
     } catch {
-        // For revert tests or estimation failures, silently ignore.
+        // Ignored for reverts / estimation failures
     }
 }
 
-/** Estimate gas for any method; on revert returns a descriptive string. */
-async function estimateGas(
-    h: MatrixMasterHarness,
-    method: string,
-    args: any[],
-): Promise<string> {
+async function estimateGas(harness: MatrixMasterHarness, method: string, args: any[]): Promise<string> {
     try {
-        const anyH = h as any;
+        const anyH = harness as any;
         if (anyH[method]?.estimateGas) {
             return (await anyH[method].estimateGas(...args)).toString();
         }
-        const data = h.interface.encodeFunctionData(method, args);
+        const data = harness.interface.encodeFunctionData(method, args);
         const [signer] = await ethers.getSigners();
-        const to = await h.getAddress();
+        const to = await harness.getAddress();
         const gas = await signer.estimateGas({ to, data });
         return gas.toString();
     } catch {
-        return "revert / estimation failed";
+        return "revert";
     }
 }
 
-/** Pretty-print a report block for a single matrix-related test. */
-function printBlock(options: {
+// ------------------------------------------------------------
+//  Print Block
+// ------------------------------------------------------------
+
+function printBlock({
+    t,
+    method,
+    explanation,
+    gas,
+    shapeIn,
+    shapeOut,
+    inHex,
+    outHex,
+}: {
     t: number;
     method: string;
     explanation: string;
@@ -139,33 +139,29 @@ function printBlock(options: {
     inHex?: string;
     outHex?: string;
 }) {
-    const { t, method, explanation, gas, shapeIn, shapeOut, inHex, outHex } =
-        options;
     const sep = "-".repeat(60);
     console.log(
-        `\n${sep}\nTest ${t}\nMethod: ${method}\nExplanation: ${explanation}\nGas Usage: ${gas}\nInput shape: ${shapeIn}\nOutput shape: ${shapeOut}\nInput (hex): ${inHex ?? "-"}\nOutput (hex): ${outHex ?? "-"}`,
+        `
+        ${sep}
+        Test ${t}
+        Method: ${method}
+        Explanation: ${explanation}
+        Gas Usage: ${gas}
+        Shape In: ${shapeIn}
+        Shape Out: ${shapeOut}
+        Input: ${inHex || "-"}
+        Output: ${outHex || "-"}
+`.trim(),
     );
 }
 
-const fmtHexArr = (arr: string[]) => `[${arr.join(", ")}]`;
+// ------------------------------------------------------------
+//  Test Suite
+// ------------------------------------------------------------
 
-// ABDK quad zero can appear as +0 or -0 at the bit level.
-// These two encodings are numerically equivalent.
-const QUAD_POS_ZERO = "0x00000000000000000000000000000000";
-const QUAD_NEG_ZERO = "0x80000000000000000000000000000000";
-
-function isQuadZero(hex: string): boolean {
-    const h = hex.toLowerCase();
-    return h === QUAD_POS_ZERO || h === QUAD_NEG_ZERO;
-}
-
-// =========================
-/** Main test suite */
-// =========================
-
-describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
+describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
     let harness: MatrixMasterHarness;
-    let t = 0; // global test counter for reporting
+    let t = 0;
 
     beforeEach(async () => {
         harness = await newHarness();
@@ -173,107 +169,185 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
     // --- quad constructors ---
 
-    async function qInt(n: number | string | bigint): Promise<string> {
-        return harness.qFromInt(BigInt(n));
-    }
+    const qInt = async (n: number | string | bigint): Promise<string> =>
+        await harness.qFromInt(BigInt(n));
 
-    async function qUInt(n: number | string | bigint): Promise<string> {
-        return harness.qFromUInt(BigInt(n));
-    }
+    // ------------------------------------------------------------
+    //  Section 1: Matrix multiplication
+    // ------------------------------------------------------------
 
-    // =========================================================
-    // Determinant
-    // =========================================================
-
-    describe("determinant (det)", function () {
-        it("det : small known 2x2 determinant", async function () {
+    describe("Section 1: Matrix multiplication", function () {
+        it("Test 1: mulMatrix valid 2x3 · 3x2 multiplication", async function () {
             t++;
-            // A = [[1,2],[3,4]] -> det = -2
+            // A (2x3): [[1,2,3],[4,5,6]]
             const A = [
                 await qInt(1),
                 await qInt(2),
                 await qInt(3),
                 await qInt(4),
+                await qInt(5),
+                await qInt(6),
             ];
-            await touchGas(harness, "detHarness", [2n, 2n, A]);
-            const gas = await estimateGas(harness, "detHarness", [2n, 2n, A]);
-            const det = await harness.detHarness(2n, 2n, A);
-            const expected = await qInt(-2);
+            // B (3x2): [[7,8],[9,10],[11,12]]
+            const B = [
+                await qInt(7),
+                await qInt(8),
+                await qInt(9),
+                await qInt(10),
+                await qInt(11),
+                await qInt(12),
+            ];
 
-            expect(det.toLowerCase()).to.equal(expected.toLowerCase());
+            await touchGas(harness, "mulMatrixHarness", [2n, 3n, A, 3n, 2n, B]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [2n, 3n, A, 3n, 2n, B]);
+
+            const C = asMatrix(await harness.mulMatrixHarness(2n, 3n, A, 3n, 2n, B));
+
+            expect(C.rows).to.equal(2n);
+            expect(C.cols).to.equal(2n);
+
+            const expected = [
+                await qInt(58),
+                await qInt(64),
+                await qInt(139),
+                await qInt(154),
+            ];
+
+            for (let i = 0; i < expected.length; ++i) {
+                expect(C.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
+            }
 
             printBlock({
                 t,
-                method: "detHarness",
-                explanation:
-                    "Runs LU-based determinant on a simple 2x2 matrix with a known closed-form value.",
+                method: "mulMatrixHarness",
+                explanation: "Computes a standard 2x3·3x2 product and validates dense triple-loop multiplication.",
                 gas,
-                shapeIn: "2x2",
-                shapeOut: "scalar",
-                inHex: fmtHexArr(A),
-                outHex: `det=${det}`,
+                shapeIn: "A:2x3, B:3x2",
+                shapeOut: `${C.rows}x${C.cols}`,
+                inHex: `A=${fmtHexArr(A)}, B=${fmtHexArr(B)}`,
+                outHex: fmtHexArr(C.data),
             });
         });
 
-        it("det : singular matrix returns 0", async function () {
+        it("Test 2: mulMatrix shape mismatch reverts", async function () {
             t++;
-            // Rows linearly dependent: [[1,2],[2,4]] -> det = 0
-            const A = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(2),
-                await qInt(4),
-            ];
-            await touchGas(harness, "detHarness", [2n, 2n, A]);
-            const gas = await estimateGas(harness, "detHarness", [2n, 2n, A]);
-            const det = await harness.detHarness(2n, 2n, A);
-            const zero = await qInt(0);
+            const A = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)]; // 2x2
+            const B = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)]; // 2x2
 
-            expect(det.toLowerCase()).to.equal(zero.toLowerCase());
+            await touchGas(harness, "mulMatrixHarness", [1n, 4n, A, 2n, 2n, B]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [1n, 4n, A, 2n, 2n, B]);
+
+            await expect(
+                harness.mulMatrixHarness(1n, 4n, A, 2n, 2n, B),
+            ).to.be.revertedWith("MatrixMaster: mulMatrix dims a.cols != b.rows");
 
             printBlock({
                 t,
-                method: "detHarness",
-                explanation:
-                    "Detects linear dependence in rows and returns an exact zero determinant.",
+                method: "mulMatrixHarness",
+                explanation: "Ensures multiplication enforces a.cols == b.rows and fails on incompatible shapes.",
                 gas,
-                shapeIn: "2x2",
-                shapeOut: "scalar",
-                inHex: fmtHexArr(A),
-                outHex: `det=${det}`,
+                shapeIn: "A:1x4, B:2x2",
+                shapeOut: "revert",
+                inHex: `A=${fmtHexArr(A)}, B=${fmtHexArr(B)}`,
+                outHex: "-",
             });
         });
 
-        it("det : pivoting matrix requiring row swap", async function () {
+        it("Test 3: mulMatrix 10x10 bilinearity (A+B)·C == A·C + B·C", async function () {
             t++;
-            // A = [[0,1],[1,0]] -> det = -1, and requires pivot swap
-            const A = [
-                await qInt(0),
-                await qInt(1),
-                await qInt(1),
-                await qInt(0),
-            ];
-            await touchGas(harness, "detHarness", [2n, 2n, A]);
-            const gas = await estimateGas(harness, "detHarness", [2n, 2n, A]);
-            const det = await harness.detHarness(2n, 2n, A);
-            const expected = await qInt(-1);
+            const n = 10n;
+            const size = Number(n);
 
-            expect(det.toLowerCase()).to.equal(expected.toLowerCase());
+            // Precompute quad ints 0,1,2 for convenience.
+            const q0 = await qInt(0);
+            const q1 = await qInt(1);
+            const q2 = await qInt(2);
+
+            const Adata: string[] = [];
+            const Bdata: string[] = [];
+            const Cdata: string[] = [];
+
+            // Tiny integer patterns in {0,1,2}. All sums/products stay small,
+            // so ABDK quad arithmetic is exact and bilinearity holds bit-for-bit.
+            for (let i = 0; i < size; ++i) {
+                for (let j = 0; j < size; ++j) {
+                    const ai = (i + j) % 3; // 0,1,2
+                    const bi = (i * j + 1) % 3; // 0,1,2
+                    const ci = (i + 2 * j) % 3; // 0,1,2
+
+                    Adata.push(ai === 0 ? q0 : ai === 1 ? q1 : q2);
+                    Bdata.push(bi === 0 ? q0 : bi === 1 ? q1 : q2);
+                    Cdata.push(ci === 0 ? q0 : ci === 1 ? q1 : q2);
+                }
+            }
+
+            // Local JS-side matrices (no asMatrix here – that's only for contract tuples).
+            const A = { rows: n, cols: n, data: Adata };
+            const B = { rows: n, cols: n, data: Bdata };
+            const C = { rows: n, cols: n, data: Cdata };
+
+            // AplusB = A + B
+            const AplusB = asMatrix(await harness.addHarness(A.rows, A.cols, A.data, B.rows, B.cols, B.data));
+
+            await touchGas(harness, "mulMatrixHarness", [AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data]);
+
+            const left = asMatrix(await harness.mulMatrixHarness(AplusB.rows, AplusB.cols, AplusB.data, C.rows, C.cols, C.data));
+            const AC = asMatrix(await harness.mulMatrixHarness(A.rows, A.cols, A.data, C.rows, C.cols, C.data));
+            const BC = asMatrix(await harness.mulMatrixHarness(B.rows, B.cols, B.data, C.rows, C.cols, C.data));
+            const right = asMatrix(await harness.addHarness(AC.rows, AC.cols, AC.data, BC.rows, BC.cols, BC.data));
+
+            expect(await harness.matricesExactEqual(left.rows, left.cols, left.data, right.rows, right.cols, right.data)).to.equal(true);
 
             printBlock({
                 t,
-                method: "detHarness",
-                explanation:
-                    "Forces LU pivoting via row swap and verifies determinant sign tracking.",
+                method: "mulMatrixHarness",
+                explanation: "Verifies full 10x10 bilinearity with small integer entries where quad arithmetic is exact: (A+B)·C = A·C + B·C bit-for-bit.",
                 gas,
-                shapeIn: "2x2",
-                shapeOut: "scalar",
-                inHex: fmtHexArr(A),
-                outHex: `det=${det}`,
+                shapeIn: "A:10x10, B:10x10, C:10x10",
+                shapeOut: `${left.rows}x${left.cols}`,
+                inHex: `A=${fmtHexArr(A.data)}, B=${fmtHexArr(B.data)}, C=${fmtHexArr(C.data)}`,
+                outHex: `left=${fmtHexArr(left.data)}, right=${fmtHexArr(right.data)}`,
             });
         });
 
-        it("det : non-square matrix reverts", async function () {
+        it("Test 4: mulMatrix identity property A·I == A and I·A == A", async function () {
+            t++;
+            // A 2x2
+            const A = [
+                await qInt(2),
+                await qInt(3),
+                await qInt(5),
+                await qInt(7),
+            ];
+            const I = asMatrix(await harness.createIdentityMatrixHarness(2n));
+
+            // A·I
+            await touchGas(harness, "mulMatrixHarness", [2n, 2n, A, I.rows, I.cols, I.data]);
+            const gas1 = await estimateGas(harness, "mulMatrixHarness", [2n, 2n, A, I.rows, I.cols, I.data]);
+            const AI = asMatrix(await harness.mulMatrixHarness(2n, 2n, A, I.rows, I.cols, I.data));
+
+            // I·A
+            await touchGas(harness, "mulMatrixHarness", [I.rows, I.cols, I.data, 2n, 2n, A]);
+            const gas2 = await estimateGas(harness, "mulMatrixHarness", [I.rows, I.cols, I.data, 2n, 2n, A]);
+            const IA = asMatrix(await harness.mulMatrixHarness(I.rows, I.cols, I.data, 2n, 2n, A));
+
+            expect(await harness.matricesExactEqual(2n, 2n, A, AI.rows, AI.cols, AI.data)).to.equal(true);
+            expect(await harness.matricesExactEqual(2n, 2n, A, IA.rows, IA.cols, IA.data)).to.equal(true);
+
+            printBlock({
+                t,
+                method: "mulMatrixHarness",
+                explanation: "Multiplies a 2x2 matrix by the identity on both sides and confirms invariance of A.",
+                gas: `${gas1} / ${gas2}`,
+                shapeIn: "A:2x2, I:2x2",
+                shapeOut: "2x2",
+                inHex: `A=${fmtHexArr(A)}, I=${fmtHexArr(I.data)}`,
+                outHex: `AI=${fmtHexArr(AI.data)}, IA=${fmtHexArr(IA.data)}`,
+            });
+        });
+
+        it("Test 5: mulMatrix A·0 = 0 and 0·A = 0", async function () {
             t++;
             const A = [
                 await qInt(1),
@@ -283,806 +357,498 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 await qInt(5),
                 await qInt(6),
             ]; // 2x3
+            const rowsA = 2n;
+            const colsA = 3n;
 
-            await touchGas(harness, "detHarness", [2n, 3n, A]);
-            const gas = await estimateGas(harness, "detHarness", [2n, 3n, A]);
-            await expect(harness.detHarness(2n, 3n, A)).to.be.revertedWith("MatrixMaster: matrix must be square");
+            const zeroRight = asMatrix(await harness.zerosHarness(colsA, 2n)); // 3x2
+            const zeroLeft = asMatrix(await harness.zerosHarness(rowsA, colsA)); // 2x3
 
-            printBlock({
-                t,
-                method: "detHarness",
-                explanation:
-                    "Confirms determinant is only defined for n×n matrices and rejects rectangular input.",
-                gas,
-                shapeIn: "2x3",
-                shapeOut: "revert",
-                inHex: fmtHexArr(A),
-                outHex: "-",
-            });
-        });
-
-        it("det : 1×1 matrix returns the single entry", async function () {
-            t++;
-            const val = await qInt(7);
-            const A = [val];
-
-            await touchGas(harness, "detHarness", [1n, 1n, A]);
-            const gas = await estimateGas(harness, "detHarness", [1n, 1n, A]);
-            const det = await harness.detHarness(1n, 1n, A);
-
-            expect(det.toLowerCase()).to.equal(val.toLowerCase());
-
-            printBlock({
-                t,
-                method: "detHarness",
-                explanation:
-                    "Checks the degenerate 1x1 case where det([a]) = a exactly.",
-                gas,
-                shapeIn: "1x1",
-                shapeOut: "scalar",
-                inHex: fmtHexArr(A),
-                outHex: `det=${det}`,
-            });
-        });
-
-        it("det : identity matrix has determinant 1", async function () {
-            t++;
-            const n = 3n;
-            const I = asMatrix(await harness.createIdentityMatrixHarness(n));
-
-            await touchGas(harness, "detHarness", [I.rows, I.cols, I.data]);
-            const gas = await estimateGas(harness, "detHarness", [I.rows, I.cols, I.data]);
-            const det = await harness.detHarness(I.rows, I.cols, I.data);
-            const one = await qInt(1);
-
-            expect(det.toLowerCase()).to.equal(one.toLowerCase());
-
-            printBlock({
-                t,
-                method: "detHarness",
-                explanation:
-                    "Computes det(Iₙ) for n=3 and verifies it equals one as expected.",
-                gas,
-                shapeIn: `${I.rows}x${I.cols}`,
-                shapeOut: "scalar",
-                inHex: fmtHexArr(I.data),
-                outHex: `det=${det}`,
-            });
-        });
-
-        it("det : all-zero matrix has determinant 0", async function () {
-            t++;
-            const n = 3n;
-            const Z = asMatrix(await harness.zerosHarness(n, n));
-
-            await touchGas(harness, "detHarness", [Z.rows, Z.cols, Z.data]);
-            const gas = await estimateGas(harness, "detHarness", [Z.rows, Z.cols, Z.data]);
-            const det = await harness.detHarness(Z.rows, Z.cols, Z.data);
             const zero = await qInt(0);
 
-            expect(det.toLowerCase()).to.equal(zero.toLowerCase());
+            // A·0 (2x3 · 3x2 → 2x2)
+            await touchGas(harness, "mulMatrixHarness", [rowsA, colsA, A, zeroRight.rows, zeroRight.cols, zeroRight.data]);
+            const gas1 = await estimateGas(harness, "mulMatrixHarness", [rowsA, colsA, A, zeroRight.rows, zeroRight.cols, zeroRight.data]);
+            const AZ = asMatrix(await harness.mulMatrixHarness(rowsA, colsA, A, zeroRight.rows, zeroRight.cols, zeroRight.data));
+
+            for (const v of AZ.data) {
+                expect(v.toLowerCase()).to.equal(zero.toLowerCase());
+            }
 
             printBlock({
                 t,
-                method: "detHarness",
-                explanation:
-                    "Confirms that a 3x3 zero matrix has a determinant exactly equal to zero.",
-                gas,
-                shapeIn: `${Z.rows}x${Z.cols}`,
-                shapeOut: "scalar",
-                inHex: fmtHexArr(Z.data),
-                outHex: `det=${det}`,
+                method: "mulMatrixHarness",
+                explanation: "Multiplies A by a zero matrix on the right and confirms the result is all zeros.",
+                gas: gas1,
+                shapeIn: "A:2x3, 0:3x2",
+                shapeOut: `${AZ.rows}x${AZ.cols}`,
+                inHex: `A=${fmtHexArr(A)}, 0=${fmtHexArr(zeroRight.data)}`,
+                outHex: fmtHexArr(AZ.data),
             });
-        });
 
-        it("det : upper triangular matrix equals product of diagonal entries", async function () {
-            t++;
-            // A = [[2,1,2],[0,3,4],[0,0,4]]; det = 2*3*4 = 24
-            const A = [
-                await qInt(2),
+            // 0·A (2x3 zero · 3x2 A)
+            const A3x2 = [
                 await qInt(1),
                 await qInt(2),
-                await qInt(0),
                 await qInt(3),
                 await qInt(4),
-                await qInt(0),
-                await qInt(0),
-                await qInt(4),
+                await qInt(5),
+                await qInt(6),
             ];
 
-            await touchGas(harness, "detHarness", [3n, 3n, A]);
-            const gas = await estimateGas(harness, "detHarness", [3n, 3n, A]);
-            const det = await harness.detHarness(3n, 3n, A);
-            const expected = await qInt(24);
+            await touchGas(harness, "mulMatrixHarness", [zeroLeft.rows, zeroLeft.cols, zeroLeft.data, 3n, 2n, A3x2]);
+            const gas2 = await estimateGas(harness, "mulMatrixHarness", [zeroLeft.rows, zeroLeft.cols, zeroLeft.data, 3n, 2n, A3x2]);
+            const ZA = asMatrix(await harness.mulMatrixHarness(zeroLeft.rows, zeroLeft.cols, zeroLeft.data, 3n, 2n, A3x2));
 
-            expect(det.toLowerCase()).to.equal(expected.toLowerCase());
+            for (const v of ZA.data) {
+                expect(v.toLowerCase()).to.equal(zero.toLowerCase());
+            }
 
             printBlock({
                 t,
-                method: "detHarness",
-                explanation:
-                    "Runs determinant on an upper triangular matrix and checks it equals the product of its diagonal.",
-                gas,
-                shapeIn: "3x3 (upper triangular)",
-                shapeOut: "scalar",
-                inHex: fmtHexArr(A),
-                outHex: `det=${det}`,
+                method: "mulMatrixHarness",
+                explanation: "Multiplies a zero matrix on the left by A and ensures the result is still all zeros.",
+                gas: gas2,
+                shapeIn: "0:2x3, A:3x2",
+                shapeOut: `${ZA.rows}x${ZA.cols}`,
+                inHex: `0=${fmtHexArr(zeroLeft.data)}, A=${fmtHexArr(A3x2)}`,
+                outHex: fmtHexArr(ZA.data),
             });
         });
 
-        it("det : near-singular matrix with tiny pivot yields small but non-zero determinant", async function () {
+        it("Test 6: mulMatrix non-square 2x3 · 3x4 multiplication", async function () {
             t++;
-            // Construct epsilon = 1 / 1000 in quad
-            const one = await qInt(1);
-            const big = await qInt(1000);
-            const eps = await harness.qFromFrac(1n, 1000n);
+            // A (2x3): [[1,2,3],[4,5,6]]
+            const A = [
+                await qInt(1),
+                await qInt(2),
+                await qInt(3),
+                await qInt(4),
+                await qInt(5),
+                await qInt(6),
+            ];
+            // B (3x4): [[1,2,3,4],[5,6,7,8],[9,10,11,12]]
+            const B = [
+                await qInt(1),
+                await qInt(2),
+                await qInt(3),
+                await qInt(4),
+                await qInt(5),
+                await qInt(6),
+                await qInt(7),
+                await qInt(8),
+                await qInt(9),
+                await qInt(10),
+                await qInt(11),
+                await qInt(12),
+            ];
 
-            // Build 1 + eps via 1x1 addHarness
-            const onePlusEpsMat = asMatrix(await harness.addHarness(1n, 1n, [one], 1n, 1n, [eps]));
-            const onePlusEps = onePlusEpsMat.data[0];
+            await touchGas(harness, "mulMatrixHarness", [2n, 3n, A, 3n, 4n, B]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [2n, 3n, A, 3n, 4n, B]);
 
-            // A = [[1, 1],
-            //      [1, 1+eps]]
-            const A = [one, one, one, onePlusEps];
+            const C = asMatrix(await harness.mulMatrixHarness(2n, 3n, A, 3n, 4n, B));
 
-            await touchGas(harness, "detHarness", [2n, 2n, A]);
-            const gas = await estimateGas(harness, "detHarness", [2n, 2n, A]);
-            const det = await harness.detHarness(2n, 2n, A);
+            expect(C.rows).to.equal(2n);
+            expect(C.cols).to.equal(4n);
+
+            const expected = [
+                await qInt(38),
+                await qInt(44),
+                await qInt(50),
+                await qInt(56),
+                await qInt(83),
+                await qInt(98),
+                await qInt(113),
+                await qInt(128),
+            ];
+
+            for (let i = 0; i < expected.length; ++i) {
+                expect(C.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
+            }
+
+            printBlock({
+                t,
+                method: "mulMatrixHarness",
+                explanation: "Multiplies a 2x3 matrix by a 3x4 matrix and validates each of the 8 output entries.",
+                gas,
+                shapeIn: "A:2x3, B:3x4",
+                shapeOut: `${C.rows}x${C.cols}`,
+                inHex: `A=${fmtHexArr(A)}, B=${fmtHexArr(B)}`,
+                outHex: fmtHexArr(C.data),
+            });
+        });
+
+        it("Test 7: mulMatrix vector inner product (1xN · Nx1)", async function () {
+            t++;
+            
+            const row = [await qInt(1), await qInt(2), await qInt(3)]; // row: [1,2,3] as 1x3
+            const col = [await qInt(4), await qInt(5), await qInt(6)]; // col: [4,5,6] as 3x1
+
+            await touchGas(harness, "mulMatrixHarness", [1n, 3n, row, 3n, 1n, col]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [1n, 3n, row, 3n, 1n, col]);
+
+            const result = asMatrix(
+                await harness.mulMatrixHarness(1n, 3n, row, 3n, 1n, col),
+            );
+
+            expect(result.rows).to.equal(1n);
+            expect(result.cols).to.equal(1n);
+
+            const expectedDot = await qInt(32); // 1*4 + 2*5 + 3*6 = 32
+            expect(result.data[0].toLowerCase()).to.equal(expectedDot.toLowerCase());
+
+            printBlock({
+                t,
+                method: "mulMatrixHarness",
+                explanation: "Performs a 1x3 · 3x1 inner product and checks the resulting 1x1 scalar equals the dot product.",
+                gas,
+                shapeIn: "1x3 · 3x1",
+                shapeOut: `${result.rows}x${result.cols}`,
+                inHex: `row=${fmtHexArr(row)}, col=${fmtHexArr(col)}`,
+                outHex: fmtHexArr(result.data),
+            });
+        });
+
+        it("Test 8: mulMatrix vector outer product (Nx1 · 1xN)", async function () {
+            t++;
+            
+            const col = [await qInt(1), await qInt(2), await qInt(3)]; // col: [1,2,3] as 3x1
+            const row = [await qInt(4), await qInt(5), await qInt(6)]; // row: [4,5,6] as 1x3
+
+            await touchGas(harness, "mulMatrixHarness", [3n, 1n, col, 1n, 3n, row]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [3n, 1n, col, 1n, 3n, row]);
+
+            const result = asMatrix(
+                await harness.mulMatrixHarness(3n, 1n, col, 1n, 3n, row),
+            );
+
+            expect(result.rows).to.equal(3n);
+            expect(result.cols).to.equal(3n);
+
+            const expected = [
+                await qInt(4),
+                await qInt(5),
+                await qInt(6),
+                await qInt(8),
+                await qInt(10),
+                await qInt(12),
+                await qInt(12),
+                await qInt(15),
+                await qInt(18),
+            ];
+
+            for (let i = 0; i < expected.length; ++i) {
+                expect(result.data[i].toLowerCase()).to.equal(
+                    expected[i].toLowerCase(),
+                );
+            }
+
+            printBlock({
+                t,
+                method: "mulMatrixHarness",
+                explanation: "Computes the outer product of a 3x1 and 1x3 vector and verifies the resulting 3x3 rank-1 matrix.",
+                gas,
+                shapeIn: "3x1 · 1x3",
+                shapeOut: `${result.rows}x${result.cols}`,
+                inHex: `col=${fmtHexArr(col)}, row=${fmtHexArr(row)}`,
+                outHex: fmtHexArr(result.data),
+            });
+        });
+
+        it("Test 9: mulMatrix stability with tiny entries (no underflow, non-zero result)", async function () {
+            t++;
+            const rows = 2n;
+            const cols = 2n;
+
+            const tiny = await harness.qFromFrac(1n, 1000n); // tiny = 1 / 1000
+
+            // A and B both 2x2 filled with 'tiny'
+            const A = [tiny, tiny, tiny, tiny];
+            const B = [tiny, tiny, tiny, tiny];
+
+            await touchGas(harness, "mulMatrixHarness", [rows, cols, A, rows, cols, B]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [rows, cols, A, rows, cols, B]);
+
+            const C = asMatrix(await harness.mulMatrixHarness(rows, cols, A, rows, cols, B));
 
             const zeroQ = await qInt(0);
             const zeroBI = BigInt(zeroQ);
-            const detBI = BigInt(det);
-            const oneBI = BigInt(one);
+            const tinyBI = BigInt(tiny);
 
-            // For this construction, det(A) ≈ eps:
-            //  - strictly positive
-            //  - much smaller than 1
-            expect(detBI).to.be.gt(zeroBI);
-            expect(detBI).to.be.lt(oneBI);
-
-            printBlock({
-                t,
-                method: "detHarness",
-                explanation:
-                    "Uses A=[[1,1],[1,1+ε]] with ε<<1 and checks determinant is small but non-zero, exercising tiny pivot handling.",
-                gas,
-                shapeIn: "2x2 (near-singular)",
-                shapeOut: "scalar",
-                inHex: fmtHexArr(A),
-                outHex: `det=${det}, eps=${eps}`,
-            });
-        });
-    });
-
-    // =========================================================
-    // Inverse
-    // =========================================================
-
-    describe("inverse", function () {
-        it("inverse : 2x2 upper-triangular with det=1, A·A⁻¹ = I", async function () {
-            t++;
-            // A = [[1,1],[0,1]]; inverse = [[1,-1],[0,1]] all integers
-            const A = [
-                await qInt(1),
-                await qInt(1),
-                await qInt(0),
-                await qInt(1),
-            ];
-            await touchGas(harness, "inverseHarness", [2n, 2n, A]);
-            const gas = await estimateGas(harness, "inverseHarness", [2n, 2n, A]);
-            const inv = asMatrix(await harness.inverseHarness(2n, 2n, A));
-
-            // Check A·A⁻¹ == I
-            const prod = asMatrix(await harness.mulMatrixHarness(2n, 2n, A, inv.rows, inv.cols, inv.data));
-            const I = asMatrix(await harness.createIdentityMatrixHarness(2n));
-
-            expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
+            // Each entry should be positive and strictly smaller than 'tiny'
+            // (since C_ij ≈ 2 * tiny^2 and tiny < 1).
+            for (const v of C.data) {
+                const cBI = BigInt(v);
+                expect(cBI).to.be.gt(zeroBI);
+                expect(cBI).to.be.lt(tinyBI);
+            }
 
             printBlock({
                 t,
-                method: "inverseHarness",
-                explanation:
-                    "Inverts an upper-triangular matrix and verifies the product yields the identity.",
+                method: "mulMatrixHarness",
+                explanation: "Multiplies two tiny-valued 2x2 matrices and checks outputs remain small, positive, and non-zero (no underflow).",
                 gas,
-                shapeIn: "2x2",
-                shapeOut: `${inv.rows}x${inv.cols}`,
-                inHex: fmtHexArr(A),
-                outHex: `inv=${fmtHexArr(inv.data)}`,
+                shapeIn: `${rows}x${cols} · ${rows}x${cols}`,
+                shapeOut: `${C.rows}x${C.cols}`,
+                inHex: `A=${fmtHexArr(A)}, B=${fmtHexArr(B)}, tiny=${tiny}`,
+                outHex: fmtHexArr(C.data),
             });
         });
 
-        it("inverse : 3x3 permutation matrix with multiple pivots", async function () {
+        it("Test 10: mulMatrix zero row in A produces zero row in A·B", async function () {
             t++;
-            // A = permutation matrix:
-            // [0 1 0]
-            // [0 0 1]
-            // [1 0 0]
-            // A⁻¹ = Aᵀ, and A·A⁻¹ = I
-            const zero = await qInt(0);
+            const rowsA = 3n;
+            const colsA = 4n;
+            const rowsB = 4n;
+            const colsB = 2n;
+
             const one = await qInt(1);
+            const zero = await qInt(0);
 
+            // A = [[1,1,1,1],
+            //      [1,1,1,1],
+            //      [0,0,0,0]]
             const Adata = [
-                zero, one, zero,
-                zero, zero, one,
-                one, zero, zero,
+                one, one, one, one,
+                one, one, one, one,
+                zero, zero, zero, zero,
             ];
 
-            await touchGas(harness, "inverseHarness", [3n, 3n, Adata]);
-            const gas = await estimateGas(harness, "inverseHarness", [3n, 3n, Adata]);
-            const invA = asMatrix(await harness.inverseHarness(3n, 3n, Adata));
-
-            // Check A·A⁻¹ = I₃
-            const prod = asMatrix(await harness.mulMatrixHarness(3n, 3n, Adata, invA.rows, invA.cols, invA.data));
-            const I = asMatrix(await harness.createIdentityMatrixHarness(3n));
-
-            expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
-
-            printBlock({
-                t,
-                method: "inverseHarness",
-                explanation:
-                    "Inverts a 3x3 permutation matrix that forces multiple pivot choices and confirms A·A⁻¹ = I₃.",
-                gas,
-                shapeIn: "3x3 (permutation)",
-                shapeOut: `${invA.rows}x${invA.cols}`,
-                inHex: fmtHexArr(Adata),
-                outHex: `invA=${fmtHexArr(invA.data)}, prod=${fmtHexArr(prod.data)}`,
-            });
-        });
-
-        it("inverse : pivoting case (row swap) works", async function () {
-            t++;
-            // A = [[0,1],[1,0]]; A^-1 = A
-            const A = [
-                await qInt(0),
-                await qInt(1),
-                await qInt(1),
-                await qInt(0),
-            ];
-            await touchGas(harness, "inverseHarness", [2n, 2n, A]);
-            const gas = await estimateGas(harness, "inverseHarness", [2n, 2n, A]);
-            const inv = asMatrix(await harness.inverseHarness(2n, 2n, A));
-
-            // inverse should equal A exactly
-            expect(await harness.matricesExactEqual(2n, 2n, A, inv.rows, inv.cols, inv.data)).to.equal(true);
-
-            printBlock({
-                t,
-                method: "inverseHarness",
-                explanation:
-                    "Exercises Gauss–Jordan pivoting on a swap matrix and checks A⁻¹ equals A itself.",
-                gas,
-                shapeIn: "2x2",
-                shapeOut: `${inv.rows}x${inv.cols}`,
-                inHex: fmtHexArr(A),
-                outHex: fmtHexArr(inv.data),
-            });
-        });
-
-        it("inverse : singular matrix reverts", async function () {
-            t++;
-            // [[1,2],[2,4]] singular
-            const A = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(2),
-                await qInt(4),
-            ];
-            await touchGas(harness, "inverseHarness", [2n, 2n, A]);
-            const gas = await estimateGas(harness, "inverseHarness", [2n, 2n, A]);
-            await expect(harness.inverseHarness(2n, 2n, A)).to.be.revertedWith("MatrixMaster: singular matrix");
-
-            printBlock({
-                t,
-                method: "inverseHarness",
-                explanation:
-                    "Attempts to invert a rank-deficient matrix and ensures a singularity revert.",
-                gas,
-                shapeIn: "2x2",
-                shapeOut: "revert",
-                inHex: fmtHexArr(A),
-                outHex: "-",
-            });
-        });
-
-        it("inverse : non-square matrix reverts", async function () {
-            t++;
-            const A = [
+            // B = [[1,2],
+            //      [3,4],
+            //      [5,6],
+            //      [7,8]]
+            const Bdata = [
                 await qInt(1),
                 await qInt(2),
                 await qInt(3),
                 await qInt(4),
                 await qInt(5),
                 await qInt(6),
-            ]; // 2x3
-
-            await touchGas(harness, "inverseHarness", [2n, 3n, A]);
-            const gas = await estimateGas(harness, "inverseHarness", [2n, 3n, A]);
-            await expect(harness.inverseHarness(2n, 3n, A)).to.be.revertedWith("MatrixMaster: matrix must be square");
-
-            printBlock({
-                t,
-                method: "inverseHarness",
-                explanation:
-                    "Verifies inversion is only allowed for square matrices and rejects 2x3 input.",
-                gas,
-                shapeIn: "2x3",
-                shapeOut: "revert",
-                inHex: fmtHexArr(A),
-                outHex: "-",
-            });
-        });
-
-        it("inverse : identity matrix is its own inverse", async function () {
-            t++;
-            const n = 3n;
-            const I = asMatrix(await harness.createIdentityMatrixHarness(n));
-
-            await touchGas(harness, "inverseHarness", [I.rows, I.cols, I.data]);
-            const gas = await estimateGas(harness, "inverseHarness", [I.rows, I.cols, I.data]);
-            const invI = asMatrix(await harness.inverseHarness(I.rows, I.cols, I.data));
-
-            expect(await harness.matricesExactEqual(I.rows, I.cols, I.data, invI.rows, invI.cols, invI.data)).to.equal(true);
-
-            printBlock({
-                t,
-                method: "inverseHarness",
-                explanation:
-                    "Inverts a 3x3 identity matrix and ensures the result is bitwise-identical to I.",
-                gas,
-                shapeIn: `${I.rows}x${I.cols}`,
-                shapeOut: `${invI.rows}x${invI.cols}`,
-                inHex: fmtHexArr(I.data),
-                outHex: fmtHexArr(invI.data),
-            });
-        });
-
-        it("inverse : 1×1 matrix inverse behaves as scalar reciprocal", async function () {
-            t++;
-            const a = await qInt(2); // [2]
-            const A = [a];
-
-            await touchGas(harness, "inverseHarness", [1n, 1n, A]);
-            const gas = await estimateGas(harness, "inverseHarness", [1n, 1n, A]);
-            const inv = asMatrix(await harness.inverseHarness(1n, 1n, A));
-
-            // Check A·A⁻¹ = [1]
-            const prod = asMatrix(await harness.mulMatrixHarness(1n, 1n, A, inv.rows, inv.cols, inv.data));
-            const one = await qInt(1);
-
-            expect(prod.rows).to.equal(1n);
-            expect(prod.cols).to.equal(1n);
-            expect(prod.data[0].toLowerCase()).to.equal(one.toLowerCase());
-
-            printBlock({
-                t,
-                method: "inverseHarness",
-                explanation:
-                    "Inverts a 1x1 matrix [a] and checks [a]·[a]⁻¹ = [1], matching scalar reciprocal semantics.",
-                gas,
-                shapeIn: "1x1",
-                shapeOut: `${inv.rows}x${inv.cols}`,
-                inHex: fmtHexArr(A),
-                outHex: `inv=${fmtHexArr(inv.data)}, prod=${fmtHexArr(prod.data)}`,
-            });
-        });
-
-        it("inverse : diagonal matrix inverse yields reciprocal diagonal (via product check)", async function () {
-            t++;
-            // diag = [2,4] so inverse diag should be [1/2,1/4]
-            const d0 = await qInt(2);
-            const d1 = await qInt(4);
-            const diag = [d0, d1];
-
-            const D = asMatrix(await harness.fromDiagonalHarness(diag));
-
-            await touchGas(harness, "inverseHarness", [D.rows, D.cols, D.data]);
-            const gas = await estimateGas(harness, "inverseHarness", [D.rows, D.cols, D.data]);
-            const invD = asMatrix(await harness.inverseHarness(D.rows, D.cols, D.data));
-            const prod = asMatrix(await harness.mulMatrixHarness(D.rows, D.cols, D.data, invD.rows, invD.cols, invD.data));
-            const I = asMatrix(await harness.createIdentityMatrixHarness(2n));
-
-            expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
-
-            printBlock({
-                t,
-                method: "inverseHarness",
-                explanation:
-                    "Inverts a 2x2 diagonal matrix and verifies via D·D⁻¹ = I that diagonal entries act as reciprocals.",
-                gas,
-                shapeIn: `${D.rows}x${D.cols}`,
-                shapeOut: `${invD.rows}x${invD.cols}`,
-                inHex: fmtHexArr(D.data),
-                outHex: `invD=${fmtHexArr(invD.data)}, prod=${fmtHexArr(prod.data)}`,
-            });
-        });
-
-        it("inverse : inverse(inverse(A)) == A for simple integer 2x2 matrix", async function () {
-            t++;
-            // A = [[1,1],[0,1]] with integer inverse [[1,-1],[0,1]]
-            const A = [
-                await qInt(1),
-                await qInt(1),
-                await qInt(0),
-                await qInt(1),
+                await qInt(7),
+                await qInt(8),
             ];
 
-            await touchGas(harness, "inverseHarness", [2n, 2n, A]);
-            const gas = await estimateGas(harness, "inverseHarness", [2n, 2n, A]);
-            const invA = asMatrix(await harness.inverseHarness(2n, 2n, A));
-            const invInvA = asMatrix(await harness.inverseHarness(invA.rows, invA.cols, invA.data));
+            await touchGas(harness, "mulMatrixHarness", [rowsA, colsA, Adata, rowsB, colsB, Bdata]);
+            const gas = await estimateGas(harness, "mulMatrixHarness", [rowsA, colsA, Adata, rowsB, colsB, Bdata]);
 
-            expect(await harness.matricesExactEqual(2n, 2n, A, invInvA.rows, invInvA.cols, invInvA.data)).to.equal(true);
+            const C = asMatrix(await harness.mulMatrixHarness(rowsA, colsA, Adata, rowsB, colsB, Bdata));
+
+            expect(C.rows).to.equal(rowsA);
+            expect(C.cols).to.equal(colsB);
+
+            // Last row of C must be all zeros because last row of A is all zeros.
+            const colsOut = Number(colsB);
+            const lastRowStart = (Number(rowsA) - 1) * colsOut;
+
+            for (let j = 0; j < colsOut; ++j) {
+                const v = C.data[lastRowStart + j];
+                expect(v.toLowerCase()).to.equal(zero.toLowerCase());
+            }
 
             printBlock({
                 t,
-                method: "inverseHarness",
-                explanation:
-                    "Applies the inverse operator twice to A and verifies inverse(inverse(A)) restores A exactly.",
+                method: "mulMatrixHarness",
+                explanation: "Uses a 3x4 matrix with a fully zero last row and checks the corresponding row of A·B remains exactly zero.",
                 gas,
-                shapeIn: "2x2",
-                shapeOut: `${invInvA.rows}x${invInvA.cols}`,
-                inHex: fmtHexArr(A),
-                outHex: fmtHexArr(invInvA.data),
+                shapeIn: "A:3x4, B:4x2",
+                shapeOut: `${C.rows}x${C.cols}`,
+                inHex: `A=${fmtHexArr(Adata)}, B=${fmtHexArr(Bdata)}`,
+                outHex: fmtHexArr(C.data),
             });
         });
     });
 
-    // =========================================================
-    // Norm & Normalize
-    // =========================================================
-    describe("Norm & Normalize", function () {
+    // ------------------------------------------------------------
+    //  Section 2: Matrix-Vector multiplication
+    // ------------------------------------------------------------
 
-        // --- Norm ---
-        it("norm : computes Euclidean norm of 3-4-5 triangle", async function () {
+    describe("Section 2: Matrix–vector multiplication", function () {
+        it("Test 11: mulMatrixVector 3x3 · 3x1 produces correct 3x1", async function () {
             t++;
-            // Vector [3, 4]^T -> Norm should be 5
-            const v = [await qInt(3), await qInt(4)];
 
-            await touchGas(harness, "normHarness", [2n, 1n, v]);
-            const gas = await estimateGas(harness, "normHarness", [2n, 1n, v]);
-            const out = await harness.normHarness(2n, 1n, v);
+            const A = [
+                await qInt(1), await qInt(2), await qInt(3),
+                await qInt(4), await qInt(5), await qInt(6),
+                await qInt(7), await qInt(8), await qInt(9),
+            ]; // 3×3
 
-            const expected = await qInt(5);
+            const x = [
+                await qInt(1),
+                await qInt(0),
+                await qInt(1),
+            ]; // 3×1
+
+            await touchGas(harness, "mulMatrixVectorHarness", [3n, 3n, A, 3n, 1n, x]);
+            const gas = await estimateGas(harness, "mulMatrixVectorHarness", [3n, 3n, A, 3n, 1n, x]);
+
+            const out = asMatrix(await harness.mulMatrixVectorHarness(3n, 3n, A, 3n, 1n, x));
+
+            const e0 = await qInt(4);
+            const e1 = await qInt(10);
+            const e2 = await qInt(16);
+
+            expect(out.rows).to.equal(3n);
+            expect(out.cols).to.equal(1n);
+            expect(out.data[0]).to.equal(e0);
+            expect(out.data[1]).to.equal(e1);
+            expect(out.data[2]).to.equal(e2);
+
+            printBlock({
+                t,
+                method: "mulMatrixVectorHarness",
+                explanation: "Multiplies a 3x3 dense quad matrix with a 3x1 column vector and validates row-wise dot-products.",
+                gas,
+                shapeIn: "A:3x3, x:3x1",
+                shapeOut: `${out.rows}x${out.cols}`,
+                inHex: `A=${fmtHexArr(A)}, x=${fmtHexArr(x)}`,
+                outHex: fmtHexArr(out.data),
+            });
+        });
+
+        it("Test 12: mulMatrixVector shape mismatch reverts", async function () {
+            t++;
+
+            const A = [
+                await qInt(1), await qInt(2), await qInt(3),
+                await qInt(4), await qInt(5), await qInt(6),
+                await qInt(7), await qInt(8), await qInt(9),
+            ]; // 3×3
+
+            const xBad = [await qInt(1), await qInt(2)]; // 2×1
+
+            await touchGas(harness, "mulMatrixVectorHarness", [3n, 3n, A, 2n, 1n, xBad]);
+            const gas = await estimateGas(harness, "mulMatrixVectorHarness", [3n, 3n, A, 2n, 1n, xBad]);
+
+            await expect(
+                harness.mulMatrixVectorHarness(3n, 3n, A, 2n, 1n, xBad),
+            ).to.be.revertedWith("MatrixMaster: mulMatrix dims a.cols != b.rows");
+
+            printBlock({
+                t,
+                method: "mulMatrixVectorHarness",
+                explanation: "Ensures A.cols == x.rows is required for matrix–vector multiplication; mismatched dims revert.",
+                gas,
+                shapeIn: "A:3x3, x:2x1",
+                shapeOut: "revert",
+                inHex: `A=${fmtHexArr(A)}, x=${fmtHexArr(xBad)}`,
+                outHex: "-",
+            });
+        });
+
+        it("Test 13: mulMatrixVector multiplying by zero vector yields zero output", async function () {
+            t++;
+
+            const A = [
+                await qInt(1), await qInt(2), await qInt(3), await qInt(4),
+                await qInt(5), await qInt(6), await qInt(7), await qInt(8),
+                await qInt(9), await qInt(10), await qInt(11), await qInt(12),
+                await qInt(13), await qInt(14), await qInt(15), await qInt(16),
+            ]; // 4×4
+
+            const zero = await qInt(0);
+            const xZero = [zero, zero, zero, zero]; // 4×1
+
+            await touchGas(harness, "mulMatrixVectorHarness", [4n, 4n, A, 4n, 1n, xZero]);
+            const gas = await estimateGas(harness, "mulMatrixVectorHarness", [4n, 4n, A, 4n, 1n, xZero]);
+
+            const out = asMatrix(await harness.mulMatrixVectorHarness(4n, 4n, A, 4n, 1n, xZero));
+
+            expect(out.rows).to.equal(4n);
+            expect(out.cols).to.equal(1n);
+            expect(out.data.every((v) => v.toLowerCase() === zero.toLowerCase())).to.equal(true);
+
+            printBlock({
+                t,
+                method: "mulMatrixVectorHarness",
+                explanation: "Verifies that A·0 = 0 holds for quad-precision matrices: multiplying any 4x4 matrix by a zero vector returns a zero column vector.",
+                gas,
+                shapeIn: "A:4x4, x:4x1",
+                shapeOut: `${out.rows}x${out.cols}`,
+                inHex: `A=${fmtHexArr(A)}, x=${fmtHexArr(xZero)}`,
+                outHex: fmtHexArr(out.data),
+            });
+        });
+    });
+
+    // ------------------------------------------------------------
+    //  Section 3: Dot product
+    // ------------------------------------------------------------
+
+    describe("Section 3: Dot product", function () {
+        it("Test 14: dot basic 3-element vectors", async function () {
+            t++;
+
+            const a = [await qInt(1), await qInt(2), await qInt(3)];
+            const b = [await qInt(4), await qInt(5), await qInt(6)];
+
+            await touchGas(harness, "dotHarness", [3n, 1n, a, 3n, 1n, b]);
+            const gas = await estimateGas(harness, "dotHarness", [3n, 1n, a, 3n, 1n, b]);
+
+            const out = await harness.dotHarness(3n, 1n, a, 3n, 1n, b);
+            const expected = await qInt(32);
 
             expect(out.toLowerCase()).to.equal(expected.toLowerCase());
 
             printBlock({
                 t,
-                method: "normHarness",
-                explanation: "Computes ||v|| for vector [3, 4].",
+                method: "dotHarness",
+                explanation: "Computes the dot product of two 3x1 vectors and confirms the scalar result matches Sum(aᵢbᵢ).",
                 gas,
-                shapeIn: "2x1",
+                shapeIn: "3x1 · 3x1",
                 shapeOut: "scalar",
-                inHex: `v=${fmtHexArr(v)}`,
+                inHex: `a=${fmtHexArr(a)}, b=${fmtHexArr(b)}`,
                 outHex: out,
             });
         });
 
-        it("norm : reverts on row vector", async function () {
+        it("Test 15: dot handles negative entries", async function () {
             t++;
-            // Pass as Row Vector (1 row, 2 cols) -> Should revert
-            const v = [await qInt(1), await qInt(1)];
 
-            await touchGas(harness, "normHarness", [1n, 2n, v]);
-            const gas = await estimateGas(harness, "normHarness", [1n, 2n, v]);
+            const a = [await qInt(-2), await qInt(3)];
+            const b = [await qInt(5), await qInt(-4)];
 
-            await expect(harness.normHarness(1n, 2n, v)).to.be.revertedWith("MatrixMaster: norm requires column vector");
+            await touchGas(harness, "dotHarness", [2n, 1n, a, 2n, 1n, b]);
+            const gas = await estimateGas(harness, "dotHarness", [2n, 1n, a, 2n, 1n, b]);
+
+            const out = await harness.dotHarness(2n, 1n, a, 2n, 1n, b);
+            const expected = await qInt(-22);
+
+            expect(out.toLowerCase()).to.equal(expected.toLowerCase());
 
             printBlock({
                 t,
-                method: "normHarness",
-                explanation: "norm : reverts on row vector.",
+                method: "dotHarness",
+                explanation: "Uses 2x1 vectors with mixed signs and checks the dot product correctly accumulates signed contributions.",
                 gas,
-                shapeIn: "1x1",
+                shapeIn: "2x1 · 2x1",
                 shapeOut: "scalar",
-                inHex: `v=${fmtHexArr(v)}`,
-                outHex: "-",
+                inHex: `a=${fmtHexArr(a)}, b=${fmtHexArr(b)}`,
+                outHex: out,
             });
         });
 
-        // --- Normalize ---
-        it("normalize : scales vector to unit length", async function () {
-            t++;
-            const v = [await qInt(3), await qInt(0), await qInt(4)];
-
-            await touchGas(harness, "normalizeHarness", [3n, 1n, v]);
-            const gas = await estimateGas(harness, "normalizeHarness", [3n, 1n, v]);
-            const result = await harness.normalizeHarness(3n, 1n, v);
-
-            const data = result.data || result[2];
-
-            // expected = [3/5, 0, 4/5]
-            const five = await qInt(5);
-            const ex0 = await harness.qFromFrac(3n, 5n);
-            const ex1 = await qInt(0);
-            const ex2 = await harness.qFromFrac(4n, 5n);
-
-            expect(data[0].toLowerCase()).to.equal(ex0.toLowerCase());
-            expect(data[1].toLowerCase()).to.equal(ex1.toLowerCase());
-            expect(data[2].toLowerCase()).to.equal(ex2.toLowerCase());
-
-            printBlock({
-                t,
-                method: "normalizeHarness",
-                explanation: "Normalizes [3,0,4] into unit vector (3/5, 0, 4/5) using quad math.",
-                gas,
-                shapeIn: "3x1",
-                shapeOut: "3x1",
-                inHex: `v=${fmtHexArr(v)}`,
-                outHex: fmtHexArr(data),
-            });
-        });
-
-        it("normalize : reverts on zero vector", async function () {
-            t++;
-            // Norm is 0, cannot divide by zero -> revert
-            const v = [await qInt(0), await qInt(0)];
-
-            await touchGas(harness, "normalizeHarness", [2n, 1n, v]);
-            const gas = await estimateGas(harness, "normalizeHarness", [2n, 1n, v]);
-
-            await expect(harness.normalizeHarness(2n, 1n, v)).to.be.revertedWith("MatrixMaster: cannot normalize zero vector");
-
-            printBlock({
-                t,
-                method: "normHarness",
-                explanation: "norm : reverts on row vector.",
-                gas,
-                shapeIn: "1x1",
-                shapeOut: "scalar",
-                inHex: `v=${fmtHexArr(v)}`,
-                outHex: "-",
-            });
-        });
-    });
-
-    // =========================================================
-    // Utilities: Random & Converged
-    // =========================================================
-    describe("Utils: Random & Converged", function () {
-
-        // =========================================================
-        // Random Vector
-        // =========================================================
-
-        it("randomVector : generates deterministic n x 1 vector", async function () {
-            t++;
-            const n = 5n;
-            const seed = ethers.ZeroHash;
-
-            await touchGas(harness, "randomVectorHarness", [n, seed]);
-            const gas = await estimateGas(harness, "randomVectorHarness", [n, seed]);
-
-            const res1 = await harness.randomVectorHarness(n, seed);
-            const res2 = await harness.randomVectorHarness(n, seed);
-
-            const [rows1, cols1, data1] = res1;
-            const [rows2, cols2, data2] = res2;
-
-            expect(rows1).to.equal(n);
-            expect(cols1).to.equal(1n);
-            expect(rows2).to.equal(n);
-            expect(cols2).to.equal(1n);
-            expect(data1).to.deep.equal(data2); // deterministic for fixed seed
-
-            printBlock({
-                t,
-                method: "randomVectorHarness",
-                explanation: "Deterministic generation with fixed seed, returns a stable 5x1 vector.",
-                gas,
-                shapeIn: `n=${n}`,
-                shapeOut: "5x1",
-                inHex: `seed=${seed}`,
-                outHex: fmtHexArr(data1),
-            });
-        });
-
-        it("randomVector : different seeds produce different vectors", async function () {
-            t++;
-            const n = 5n;
-            const seedA = ethers.ZeroHash;
-            const seedB = ethers.keccak256(ethers.toUtf8Bytes("another"));
-
-            await touchGas(harness, "randomVectorHarness", [n, seedA]);
-            await touchGas(harness, "randomVectorHarness", [n, seedB]);
-
-            const gasA = await estimateGas(harness, "randomVectorHarness", [n, seedA]);
-            const gasB = await estimateGas(harness, "randomVectorHarness", [n, seedB]);
-            const gas = gasA + gasB;
-
-            const resA = await harness.randomVectorHarness(n, seedA);
-            const resB = await harness.randomVectorHarness(n, seedB);
-
-            const [, , dataA] = resA;
-            const [, , dataB] = resB;
-
-            expect(dataA).to.not.deep.equal(dataB); // different seed -> different vector
-
-            printBlock({
-                t,
-                method: "randomVectorHarness",
-                explanation: "Different seeds must yield different pseudo-random vectors.",
-                gas,
-                shapeIn: `n=${n}`,
-                shapeOut: "5x1",
-                inHex: `seedA=${seedA}, seedB=${seedB}`,
-                outHex: "vectors differ",
-            });
-        });
-
-        // =========================================================
-        // Converged
-        // =========================================================
-
-        it("hasConverged : detects convergence within tolerance", async function () {
+        it("Test 16: dot length mismatch reverts", async function () {
             t++;
 
-            // vOld = [0, 0], vNew = [1, 0]
-            // ||vNew - vOld||₂ = 1
-            const vOld = [await qInt(0), await qInt(0)];
-            const vNew = [await qInt(1), await qInt(0)];
+            const a = [await qInt(1), await qInt(2)];
+            const b = [await qInt(3)];
 
-            // tolPass = 2  → 1 < 2  => true
-            // tolFail = 1  → 1 < 1  => false (strict inequality)
-            const tolPass = await qInt(2);
-            const tolFail = await qInt(1);
-
-            await touchGas(harness, "hasConvergedHarness", [2n, 1n, vNew, 2n, 1n, vOld, tolPass]);
-            const gas = await estimateGas(harness, "hasConvergedHarness", [2n, 1n, vNew, 2n, 1n, vOld, tolPass]);
-            const yes = await harness.hasConvergedHarness(2n, 1n, vNew, 2n, 1n, vOld, tolPass);
-            const no = await harness.hasConvergedHarness(2n, 1n, vNew, 2n, 1n, vOld, tolFail);
-
-            expect(yes).to.equal(true);
-            expect(no).to.equal(false);
-
-            printBlock({
-                t,
-                method: "hasConvergedHarness",
-                explanation: "Checks whether ||vNew - vOld||₂ < tol (here 1 < 2 is true, 1 < 1 is false).",
-                gas,
-                shapeIn: "2x1, 2x1",
-                shapeOut: "bool",
-                inHex: `tolPass=${tolPass}, tolFail=${tolFail}`,
-                outHex: yes ? "true" : "false",
-            });
-        });
-
-        it("hasConverged : reverts on row vectors", async function () {
-            const vRow = [await qInt(1), await qInt(2)];
-            const tol = await qInt(1);
+            await touchGas(harness, "dotHarness", [2n, 1n, a, 1n, 1n, b]);
+            const gas = await estimateGas(harness, "dotHarness", [2n, 1n, a, 1n, 1n, b]);
 
             await expect(
-                harness.hasConvergedHarness(
-                    1n, 2n, vRow,
-                    1n, 2n, vRow,
-                    tol,
-                ),
-            ).to.be.revertedWith("MatrixMaster: converged requires vectors");
-        });
-    });
-
-    // =========================================================
-    // Power Iteration
-    // =========================================================
-    describe("PowerIteration", function () {
-        it("powerIteration : diagonal 2x2 matrix returns dominant eigenvalue 5", async function () {
-            t++;
-
-            const five = await qInt(5);
-            const two = await qInt(2);
-
-            // A = [ [5,0],
-            //       [0,2] ]
-            const A = [five, qInt(0), qInt(0), two];
-
-            const seed = ethers.ZeroHash;
-            const tol = await harness.qFromFrac(1n, 1000000n); // 1e-6
-
-            await touchGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
-            const gas = await estimateGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
-
-            const [lambda, xRows, xCols, xData] = await harness.powerIterationHarness(
-                2n, 2n, A, seed, tol
-            );
-
-            const expected = five
-            const diff = BigInt(lambda) > BigInt(expected)
-                ? BigInt(lambda) - BigInt(expected)
-                : BigInt(expected) - BigInt(lambda);
-
-            expect(diff).to.be.lt(BigInt(tol));
+                harness.dotHarness(2n, 1n, a, 1n, 1n, b),
+            ).to.be.revertedWith("MatrixMaster: dot length mismatch");
 
             printBlock({
                 t,
-                method: "powerIterationHarness",
-                explanation: "Diagonal matrix diag(5,2) -> eigenvalue = 5.",
+                method: "dotHarness",
+                explanation: "Rejects mismatched vector lengths for the dot product and reverts with an explicit error.",
                 gas,
-                shapeIn: "2x2",
-                shapeOut: "eigenvalue + eigenvector",
-                inHex: `A=${A}`,
-                outHex: `lambda=${lambda}, x=${fmtHexArr(xData)}`
-            });
-        });
-
-        it("powerIteration : symmetric 2x2 matrix returns dominant eigenvalue 4", async function () {
-            t++;
-
-            const three = await qInt(3);
-            const one = await qInt(1);
-
-            // A = [3,1; 1,3]
-            const A = [three, one, one, three];
-
-            const seed = ethers.ZeroHash;
-            const tol = await harness.qFromFrac(1n, 1000000n);
-
-            await touchGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
-            const gas = await estimateGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
-
-            const [lambda, xRows, xCols, xData] = await harness.powerIterationHarness(
-                2n, 2n, A, seed, tol
-            );
-
-            const expectedEigen = await qInt(4);
-            const diff = BigInt(lambda) > BigInt(expectedEigen)
-                ? BigInt(lambda) - BigInt(expectedEigen)
-                : BigInt(expectedEigen) - BigInt(lambda);
-
-            expect(diff).to.be.lt(BigInt(tol));
-
-            printBlock({
-                t,
-                method: "powerIterationHarness",
-                explanation: "Symmetric matrix [[3,1],[1,3]] -> dominant eigenvalue = 4.",
-                gas,
-                shapeIn: "2x2",
-                shapeOut: "eigenvalue + eigenvector",
-                inHex: `A=${A}`,
-                outHex: `lambda=${lambda}, x=${fmtHexArr(xData)}`
-            });
-        });
-
-        it("powerIteration : non-symmetric 3x3 matrix returns dominant eigenvalue 3", async function () {
-            t++;
-
-            const two = await qInt(2);
-            const three = await qInt(3);
-            const one = await qInt(1);
-            const zero = qInt(0);
-
-            // A =
-            // [2 1 0
-            //  0 3 1
-            //  0 0 1]
-            const A = [
-                two, one, zero,
-                zero, three, one,
-                zero, zero, one
-            ];
-
-            const seed = ethers.ZeroHash;
-            const tol = await harness.qFromFrac(1n, 1000000n);
-
-            await touchGas(harness, "powerIterationHarness", [3n, 3n, A, seed, tol]);
-            const gas = await estimateGas(harness, "powerIterationHarness", [3n, 3n, A, seed, tol]);
-
-            const [lambda, xRows, xCols, xData] = await harness.powerIterationHarness(3n, 3n, A, seed, tol);
-
-            const expectedEigen = three.toLowerCase();
-            const diff = BigInt(lambda) > BigInt(expectedEigen)
-                ? BigInt(lambda) - BigInt(expectedEigen)
-                : BigInt(expectedEigen) - BigInt(lambda);
-
-            printBlock({
-                t,
-                method: "powerIterationHarness",
-                explanation: "Upper-triangular 3x3 -> dominant eigenvalue = 3.",
-                gas,
-                shapeIn: "3x3",
-                shapeOut: "eigenvalue + eigenvector",
-                inHex: `A=${A}`,
-                outHex: `lambda=${lambda}, x=${fmtHexArr(xData)}`
+                shapeIn: "2x1 · 1x1",
+                shapeOut: "revert",
+                inHex: `a=${fmtHexArr(a)}, b=${fmtHexArr(b)}`,
+                outHex: "-",
             });
         });
     });
