@@ -62,8 +62,10 @@ async function estimateGas(harness: DifferentiationHarness, method: string, args
     return gas.toString();
 }
 
-function printBlock({ t, method, explanation, gas, inHex, outHex }: any) {
+function printBlock({ t, method, explanation, gas, inHex, outHex, outDec }: any) {
     const sep = "-".repeat(60);
+    const decLine = outDec ? `Output: ${outDec}` : "";
+    
     console.log(`
         ${sep}
         Test ${t}
@@ -72,7 +74,8 @@ function printBlock({ t, method, explanation, gas, inHex, outHex }: any) {
         Gas Usage: ${gas}
         Input (x): ${inHex}
         Output (hex): ${outHex}
-`);
+        ${decLine}
+`.trim());
 }
 
 // ------------------------------------------------------------
@@ -128,7 +131,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.forwardDiffHarness(target, selSquare, x, QZERO);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({ t, method: "forwardDiff", explanation: "x^2 at x=3", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "forwardDiff", explanation: "x^2 at x=3 -> 6", gas, inHex: x, outHex: out, outDec: "6" });
         });
 
         it("Test 2: Negative Input (x^2 at x=-10)", async function () {
@@ -141,7 +144,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.forwardDiffHarness(target, selSquare, x, QZERO);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({ t, method: "forwardDiff", explanation: "x^2 at x=-10", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "forwardDiff", explanation: "x^2 at x=-10 -> -20", gas, inHex: x, outHex: out, outDec: "-20" });
         });
 
         it("Test 3: Zero Slope/Const (f(x)=5 at x=100)", async function () {
@@ -154,7 +157,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.forwardDiffHarness(target, selConstFive, x, QZERO);
 
             expect(out).to.equal(expected);
-            printBlock({ t, method: "forwardDiff", explanation: "Constant", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "forwardDiff", explanation: "Constant -> 0", gas, inHex: x, outHex: out, outDec: "0" });
         });
 
         it("Test 4: Explicit Step Size Logic", async function () {
@@ -167,8 +170,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "forwardDiffHarness", [target, selSquare, x, stepOne]);
             const out = await harness.forwardDiffHarness(target, selSquare, x, stepOne);
 
-            expectClose(out, expectedDistorted, TOL_EXACT); // Error is deterministic
-            printBlock({ t, method: "forwardDiff", explanation: "Explicit h=1", gas, inHex: x, outHex: out });
+            expectClose(out, expectedDistorted, TOL_EXACT);
+            printBlock({ t, method: "forwardDiff", explanation: "Explicit h=1, x^2 at 4 -> 9", gas, inHex: x, outHex: out, outDec: "9" });
         });
 
         it("Test 5: Linear Function Exactness", async function () {
@@ -180,15 +183,15 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "forwardDiffHarness", [target, selLinear, x, QZERO]);
             const out = await harness.forwardDiffHarness(target, selLinear, x, QZERO);
 
-            expectClose(out, expected, TOL_EXACT); // Linear is "exact" but has floating point noise
-            printBlock({ t, method: "forwardDiff", explanation: "Linear", gas, inHex: x, outHex: out });
+            expectClose(out, expected, TOL_EXACT);
+            printBlock({ t, method: "forwardDiff", explanation: "Linear slope -> 3", gas, inHex: x, outHex: out, outDec: "3" });
         });
 
         it("Test 6: Revert on Invalid Selector", async function () {
             t++;
             const x = await qInt(1);
             await expect(harness.forwardDiffHarness(target, "0x12345678", x, QZERO)).to.be.reverted;
-            printBlock({ t, method: "forwardDiff", explanation: "Revert", gas: "N/A", inHex: x, outHex: "Reverted" });
+            printBlock({ t, method: "forwardDiff", explanation: "Revert", gas: "N/A", inHex: x, outHex: "Reverted", outDec: "Reverted" });
         });
     });
 
@@ -198,7 +201,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
 
     describe("Method 2: Backward Difference (Approximation)", function () {
 
-        it("Test 1: Standard Positive Input (x^2 at x=4)", async function () {
+        it("Test 7: Standard Positive Input (x^2 at x=4)", async function () {
             t++;
             const x = await qInt(4);
             const expected = await qInt(8);
@@ -208,26 +211,23 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.backwardDiffHarness(target, selSquare, x, QZERO);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({ t, method: "backwardDiff", explanation: "x^2 at x=4", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "backwardDiff", explanation: "x^2 at x=4 -> 8", gas, inHex: x, outHex: out, outDec: "8" });
         });
 
-        it("Test 2: Zero Crossing (x^2 at x=0)", async function () {
+        it("Test 8: Zero Crossing (x^2 at x=0)", async function () {
             t++;
             const x = await qInt(0);
-
-            // Backward Diff for x^2 at 0 is mathematically -harness, not 0.
-            // (f(0) - f(-h))/h = (0 - h^2)/h = -h
             const expected = NEG_H_STEP;
 
             await touchGas(harness, "backwardDiffHarness", [target, selSquare, x, QZERO]);
             const gas = await estimateGas(harness, "backwardDiffHarness", [target, selSquare, x, QZERO]);
             const out = await harness.backwardDiffHarness(target, selSquare, x, QZERO);
 
-            expectClose(out, expected, TOL_APPROX); // bit-wise close because exponents match
-            printBlock({ t, method: "backwardDiff", explanation: "x^2 at x=0 -> -h", gas, inHex: x, outHex: out });
+            expectClose(out, expected, TOL_APPROX);
+            printBlock({ t, method: "backwardDiff", explanation: "x^2 at x=0 -> -h", gas, inHex: x, outHex: out, outDec: "-1e-8" });
         });
 
-        it("Test 3: Cubic Approximation (x^3 at x=-5)", async function () {
+        it("Test 9: Cubic Approximation (x^3 at x=-5)", async function () {
             t++;
             const x = await qInt(-5);
             const expected = await qInt(75);
@@ -237,10 +237,10 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.backwardDiffHarness(target, selCube, x, QZERO);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({ t, method: "backwardDiff", explanation: "x^3 at x=-5", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "backwardDiff", explanation: "x^3 at x=-5 -> 75", gas, inHex: x, outHex: out, outDec: "75" });
         });
 
-        it("Test 4: Discontinuous Derivative (Abs(x) at x=-1)", async function () {
+        it("Test 10: Discontinuous Derivative (Abs(x) at x=-1)", async function () {
             t++;
             const x = await qInt(-1);
             const expected = await qInt(-1);
@@ -250,10 +250,10 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.backwardDiffHarness(target, selAbs, x, QZERO);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({ t, method: "backwardDiff", explanation: "|x| at x=-1", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "backwardDiff", explanation: "|x| at x=-1 -> -1", gas, inHex: x, outHex: out, outDec: "-1" });
         });
 
-        it("Test 5: Explicit Step Size Symmetry", async function () {
+        it("Test 11: Explicit Step Size Symmetry", async function () {
             t++;
             const x = await qInt(4);
             const stepOne = await qInt(1);
@@ -264,14 +264,14 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.backwardDiffHarness(target, selSquare, x, stepOne);
 
             expectClose(out, expectedDistorted, TOL_EXACT);
-            printBlock({ t, method: "backwardDiff", explanation: "Explicit h=1", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "backwardDiff", explanation: "Explicit h=1, x^2 at 4 -> 7", gas, inHex: x, outHex: out, outDec: "7" });
         });
 
-        it("Test 6: Revert on Invalid Target", async function () {
+        it("Test 12: Revert on Invalid Target", async function () {
             t++;
             const x = await qInt(1);
             await expect(harness.backwardDiffHarness(ethers.ZeroAddress, selSquare, x, QZERO)).to.be.reverted;
-            printBlock({ t, method: "backwardDiff", explanation: "Revert on zero address", gas: "N/A", inHex: x, outHex: "Reverted" });
+            printBlock({ t, method: "backwardDiff", explanation: "Revert on zero address", gas: "N/A", inHex: x, outHex: "Reverted", outDec: "Reverted" });
         });
     });
 
@@ -281,7 +281,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
 
     describe("Method 3: Centered Difference", function () {
 
-        it("Test 1: Exact Quadratic (x^2 at x=10)", async function () {
+        it("Test 13: Exact Quadratic (x^2 at x=10)", async function () {
             t++;
             const x = await qInt(10);
             const expected = await qInt(20);
@@ -291,10 +291,10 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.centeredDiffHarness(target, selSquare, x, QZERO);
 
             expectClose(out, expected, TOL_EXACT);
-            printBlock({ t, method: "centeredDiff", explanation: "x^2 at x=10", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "centeredDiff", explanation: "x^2 at x=10 -> 20", gas, inHex: x, outHex: out, outDec: "20" });
         });
 
-        it("Test 2: Negative Input Exactness (x^2 at x=-10)", async function () {
+        it("Test 14: Negative Input Exactness (x^2 at x=-10)", async function () {
             t++;
             const x = await qInt(-10);
             const expected = await qInt(-20);
@@ -304,10 +304,10 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.centeredDiffHarness(target, selSquare, x, QZERO);
 
             expectClose(out, expected, TOL_EXACT);
-            printBlock({ t, method: "centeredDiff", explanation: "x^2 at x=-10", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "centeredDiff", explanation: "x^2 at x=-10 -> -20", gas, inHex: x, outHex: out, outDec: "-20" });
         });
 
-        it("Test 3: Singularity Handling (Abs(x) at x=0)", async function () {
+        it("Test 15: Singularity Handling (Abs(x) at x=0)", async function () {
             t++;
             const x = await qInt(0);
             const expected = await qInt(0);
@@ -317,10 +317,10 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.centeredDiffHarness(target, selAbs, x, QZERO);
 
             expect(out).to.equal(expected);
-            printBlock({ t, method: "centeredDiff", explanation: "|x| at x=0", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "centeredDiff", explanation: "|x| at x=0 -> 0", gas, inHex: x, outHex: out, outDec: "0" });
         });
 
-        it("Test 4: Cubic Approximation (x^3 at x=2)", async function () {
+        it("Test 16: Cubic Approximation (x^3 at x=2)", async function () {
             t++;
             const x = await qInt(2);
             const expected = await qInt(12);
@@ -329,11 +329,11 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "centeredDiffHarness", [target, selCube, x, QZERO]);
             const out = await harness.centeredDiffHarness(target, selCube, x, QZERO);
 
-            expectClose(out, expected, TOL_APPROX); // Cubic is not exact even for centered diff, use APPROX tolerance
-            printBlock({ t, method: "centeredDiff", explanation: "x^3 at x=2", gas, inHex: x, outHex: out });
+            expectClose(out, expected, TOL_APPROX);
+            printBlock({ t, method: "centeredDiff", explanation: "x^3 at x=2 -> 12", gas, inHex: x, outHex: out, outDec: "12" });
         });
 
-        it("Test 5: Explicit Step Size (Robustness)", async function () {
+        it("Test 17: Explicit Step Size (Robustness)", async function () {
             t++;
             const x = await qInt(123);
             const stepOne = await qInt(1);
@@ -344,14 +344,14 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const out = await harness.centeredDiffHarness(target, selSquare, x, stepOne);
 
             expectClose(out, expected, TOL_EXACT);
-            printBlock({ t, method: "centeredDiff", explanation: "Explicit h=1", gas, inHex: x, outHex: out });
+            printBlock({ t, method: "centeredDiff", explanation: "Explicit h=1, x^2 at 123 -> 246", gas, inHex: x, outHex: out, outDec: "246" });
         });
 
-        it("Test 6: Revert on staticcall failure", async function () {
+        it("Test 18: Revert on staticcall failure", async function () {
             t++;
             const x = await qInt(5);
             await expect(harness.centeredDiffHarness(target, "0xdeadbeef", x, QZERO)).to.be.reverted;
-            printBlock({ t, method: "centeredDiff", explanation: "Revert check", gas: "N/A", inHex: x, outHex: "Reverted" });
+            printBlock({ t, method: "centeredDiff", explanation: "Revert check", gas: "N/A", inHex: x, outHex: "Reverted", outDec: "Reverted" });
         });
     });
 });

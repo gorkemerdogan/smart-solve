@@ -3,18 +3,19 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 
-/**
- * Integration Tests for Integration library via IntegrationHarness.
- *
- * Uses trapezoidal, simpson13, simpson38.
- * All values are IEEE-754 quad (bytes16).
- */
+// ------------------------------------------------------------
+//  Types & Constants
+// ------------------------------------------------------------
 
-// Harness interface
 type IntegrationHarness = Contract & {
   qFromInt(n: bigint | number): Promise<string>;
   qFromFrac(n: bigint | number, d: bigint | number): Promise<string>;
   PI(): Promise<string>;
+
+  trapezoidal(target: string, selector: string, a: string, b: string, n: number): Promise<string>;
+  simpson13(target: string, selector: string, a: string, b: string, n: number): Promise<string>;
+  simpson38(target: string, selector: string, a: string, b: string, n: number): Promise<string>;
+
   f_linear(x: string): Promise<string>;
   f_square(x: string): Promise<string>;
   f_cube(x: string): Promise<string>;
@@ -26,393 +27,360 @@ type IntegrationHarness = Contract & {
   f_piecewise(x: string): Promise<string>;
 };
 
-// Integration selectors
-const SEL = {
-  linear: ethers.id("f_linear(bytes16)").slice(0, 10),
-  square: ethers.id("f_square(bytes16)").slice(0, 10),
-  cube: ethers.id("f_cube(bytes16)").slice(0, 10),
-  const5: ethers.id("f_const5(bytes16)").slice(0, 10),
-  sin: ethers.id("f_sin(bytes16)").slice(0, 10),
-  inv: ethers.id("f_inv(bytes16)").slice(0, 10),
-  tiny: ethers.id("f_tiny(bytes16)").slice(0, 10),
-  large: ethers.id("f_large(bytes16)").slice(0, 10),
-  piecewise: ethers.id("f_piecewise(bytes16)").slice(0, 10),
-};
+const QZERO = "0x00000000000000000000000000000000";
 
-// ------------------- Gas Helpers -------------------
+// ------------------------------------------------------------
+//  Helpers
+// ------------------------------------------------------------
 
-/** Send a real transaction so Hardhat gas-reporter records a gas row. */
-async function touchGas(h: IntegrationHarness, method: string, args: any[]) {
-  const data = h.interface.encodeFunctionData(method, args);
+async function touchGas(harness: IntegrationHarness, method: string, args: any[]) {
+  const data = harness.interface.encodeFunctionData(method, args);
   const [signer] = await ethers.getSigners();
-  const to = await h.getAddress();
+  const to = await harness.getAddress();
   const tx = await signer.sendTransaction({ to, data });
   await tx.wait();
 }
 
-/** Estimate gas for any method (pure/view included). */
-async function estimateGas(h: IntegrationHarness, method: string, args: any[]) {
-  const anyH = h as any;
+async function estimateGas(harness: IntegrationHarness, method: string, args: any[]) {
+  const anyH = harness as any;
   if (anyH[method]?.estimateGas) {
     return (await anyH[method].estimateGas(...args)).toString();
   }
-  const data = h.interface.encodeFunctionData(method, args);
+  const data = harness.interface.encodeFunctionData(method, args);
   const [signer] = await ethers.getSigners();
-  const to = await h.getAddress();
+  const to = await harness.getAddress();
   const gas = await signer.estimateGas({ to, data });
   return gas.toString();
 }
 
-// Reporter function (from your performance project)
-function printBlock(
-  n: number,
-  method: string,
-  explanation: string,
-  gas: string,
-  input: string,
-  outHex: string,
-  outDec: string
-) {
+function printBlock({ t, method, explanation, gas, inHex, outHex, outDec }: any) {
   const sep = "-".repeat(60);
-  console.log(
-    `\n${sep}
-    Test ${n}
-    Method: ${method}
-    Explanation: ${explanation}
-    Gas Usage (estimate): ${gas}
-    Input: ${input}
-    Output (hex): y=${outHex}
-    Output: y=${outDec}`
-  );
+  const decLine = outDec ? `Output: ${outDec}` : "";
+
+  console.log(`
+        ${sep}
+        Test ${t}
+        Method: ${method}
+        Explanation: ${explanation}
+        Gas Usage: ${gas}
+        Input: ${inHex}
+        Output (hex): ${outHex}
+        ${decLine}
+`.trim()); // trim to clean up leading/trailing newline from template literal
 }
 
-describe("Integration Library via IntegrationHarness", function () {
-  let h: IntegrationHarness;
+// ------------------------------------------------------------
+//  Test Suite
+// ------------------------------------------------------------
+
+describe("Integration Library - Numerical Methods", function () {
+  let harness: IntegrationHarness;
   let target: string;
   let t = 0;
 
-  let q0: string;
-  let q1: string;
-  let q2: string;
-  let qPI: string;
+  // Constants
+  let q0: string, q1: string, q2: string, qPI: string;
+
+  // Selectors
+  let selLinear: string, selSquare: string, selCube: string, selConst5: string;
+  let selSin: string, selInv: string, selTiny: string, selLarge: string, selPiecewise: string;
+
+  // Helper Wrappers
+  const qInt = async (n: number | bigint) => await harness.qFromInt(n);
 
   before(async () => {
-    // Deploy MathLib (library)
     const MathLibFactory = await ethers.getContractFactory("MathLib");
     const mathlib = await MathLibFactory.deploy();
     await mathlib.waitForDeployment();
 
-    // Deploy IntegrationHarness with library linking
     const HF = await ethers.getContractFactory("IntegrationHarness", {
-      libraries: {
-        MathLib: await mathlib.getAddress(),
-      },
+      libraries: { MathLib: await mathlib.getAddress() },
     });
 
-    h = (await HF.deploy()) as unknown as IntegrationHarness;
-    await h.waitForDeployment();
-    target = await h.getAddress();
+    harness = (await HF.deploy()) as unknown as IntegrationHarness;
+    await harness.waitForDeployment();
+    target = await harness.getAddress();
 
-    q0 = await h.qFromInt(0);
-    q1 = await h.qFromInt(1);
-    q2 = await h.qFromInt(2);
-    qPI = await h.PI();
+    // Init Constants
+    q0 = await harness.qFromInt(0);
+    q1 = await harness.qFromInt(1);
+    q2 = await harness.qFromInt(2);
+    qPI = await harness.PI();
+
+    // Init Selectors
+    selLinear = harness.interface.getFunction("f_linear")!.selector;
+    selSquare = harness.interface.getFunction("f_square")!.selector;
+    selCube = harness.interface.getFunction("f_cube")!.selector;
+    selConst5 = harness.interface.getFunction("f_const5")!.selector;
+    selSin = harness.interface.getFunction("f_sin")!.selector;
+    selInv = harness.interface.getFunction("f_inv")!.selector;
+    selTiny = harness.interface.getFunction("f_tiny")!.selector;
+    selLarge = harness.interface.getFunction("f_large")!.selector;
+    selPiecewise = harness.interface.getFunction("f_piecewise")!.selector;
   });
 
-  // Helper to compare expected decimal ranges
-  async function cmpInRange(root: string, lowDec: number, highDec: number) {
-    const low = await h.qFromFrac(lowDec * 10000, 10000n);
-    const high = await h.qFromFrac(highDec * 10000, 10000n);
-    const cmpLow = await h.f_square(low); // WRONG — FIX LATER IF NEEDED
-  }
+  // ------------------------------------------------------------
+  //  Trapezoidal Rule
+  // ------------------------------------------------------------
 
-  // ================================================================
-  //  Trapezoidal Tests
-  // ================================================================
-  describe("Trapezoidal Rule", function () {
-    it("1. f(x)=x on [0,1], n=10 → ≈ 0.5", async () => {
+  describe("Method 1: Trapezoidal Rule", function () {
+
+    it("Test 1: Linear Exactness (f(x)=x on [0,1], n=10)", async function () {
       t++;
+      const expectedDec = "≈0.5";
 
-      const val = await h.trapezoidal(target, SEL.linear, q0, q1, 10);
-      await touchGas(h, "trapezoidal", [target, SEL.linear, q0, q1, 10]);
-      const gas = await estimateGas(h, "trapezoidal", [target, SEL.linear, q0, q1, 10]);
-      printBlock(
-        t,
-        "trapezoidal",
-        "Linear function (exact)",
-        gas,
-        "f=x, [0,1]",
-        val,
-        "≈0.5"
-      );
+      await touchGas(harness, "trapezoidal", [target, selLinear, q0, q1, 10]);
+      const gas = await estimateGas(harness, "trapezoidal", [target, selLinear, q0, q1, 10]);
+      const out = await harness.trapezoidal(target, selLinear, q0, q1, 10);
 
-      const approxHalf = await h.qFromFrac(1, 2);
-      const cmp = await h.f_square(approxHalf); // NOT A REAL CMP (placeholder)
-      expect(typeof val).to.equal("string");
+      expect(typeof out).to.equal("string");
+      printBlock({ t, method: "trapezoidal", explanation: "Linear function (exact)", gas, inHex: "f=x, [0,1]", outHex: out, outDec: expectedDec });
     });
 
-    it("2. f(x)=x^2 [0,1], n=300 → ≈ 1/3", async () => {
+    it("Test 2: Smooth Quadratic (f(x)=x^2 on [0,1], n=300)", async function () {
       t++;
+      const expectedDec = "≈0.3333";
 
-      const val = await h.trapezoidal(target, SEL.square, q0, q1, 300);
-      await touchGas(h, "trapezoidal", [target, SEL.square, q0, q1, 300]);
-      const gas = await estimateGas(h, "trapezoidal", [target, SEL.square, q0, q1, 300]);
-      printBlock(
-        t,
-        "trapezoidal",
-        "Smooth quadratic",
-        gas,
-        "f=x^2, [0,1]",
-        val,
-        "≈0.3333"
-      );
-      expect(val).to.be.a("string");
+      await touchGas(harness, "trapezoidal", [target, selSquare, q0, q1, 300]);
+      const gas = await estimateGas(harness, "trapezoidal", [target, selSquare, q0, q1, 300]);
+      const out = await harness.trapezoidal(target, selSquare, q0, q1, 300);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "trapezoidal", explanation: "Smooth quadratic", gas, inHex: "f=x^2, [0,1]", outHex: out, outDec: expectedDec });
     });
 
-    it("3. f=5 constant [0,10], n=50 → 50", async () => {
+    it("Test 3: Constant Exactness (f=5 on [0,10], n=50)", async function () {
       t++;
+      const b = await qInt(10);
+      const expectedDec = "50";
 
-      const val = await h.trapezoidal(target, SEL.const5, q0, await h.qFromInt(10), 50);
-      await touchGas(h, "trapezoidal", [target, SEL.const5, q0, await h.qFromInt(10), 50]);
-      const gas = await estimateGas(h, "trapezoidal", [target, SEL.const5, q0, await h.qFromInt(10), 50]);
-      printBlock(
-        t,
-        "trapezoidal",
-        "Constant function exact",
-        gas,
-        "f=5,[0,10]",
-        val, "50"
-      );
-      expect(val).to.be.a("string");
+      await touchGas(harness, "trapezoidal", [target, selConst5, q0, b, 50]);
+      const gas = await estimateGas(harness, "trapezoidal", [target, selConst5, q0, b, 50]);
+      const out = await harness.trapezoidal(target, selConst5, q0, b, 50);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "trapezoidal", explanation: "Constant function exact", gas, inHex: "f=5, [0,10]", outHex: out, outDec: expectedDec });
     });
 
-    it("4. f=sin(x) [0,π], n=200 → ≈2", async () => {
+    it("Test 4: Trig Function (sin(x) on [0,π], n=200)", async function () {
       t++;
+      const expectedDec = "≈2";
 
-      const val = await h.trapezoidal(target, SEL.sin, q0, qPI, 200);
-      await touchGas(h, "trapezoidal", [target, SEL.sin, q0, qPI, 200]);
-      const gas = await estimateGas(h, "trapezoidal", [target, SEL.sin, q0, qPI, 200]);
-      printBlock(
-        t,
-        "trapezoidal",
-        "sin(x) integrates to 2",
-        gas,
-        "f=sin, [0,π]",
-        val,
-        "≈2"
-      );
-      expect(val).to.be.a("string");
+      await touchGas(harness, "trapezoidal", [target, selSin, q0, qPI, 200]);
+      const gas = await estimateGas(harness, "trapezoidal", [target, selSin, q0, qPI, 200]);
+      const out = await harness.trapezoidal(target, selSin, q0, qPI, 200);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "trapezoidal", explanation: "sin(x) integrates to 2", gas, inHex: "f=sin, [0,π]", outHex: out, outDec: expectedDec });
     });
 
-    it("5. degenerate [0,0], n=100 → 0", async () => {
+    it("Test 5: Degenerate Interval ([0,0], n=100)", async function () {
       t++;
-      const args = [target, SEL.square, q0, q0, 100];
-      await touchGas(h, "trapezoidal", args);
-      const gas = await estimateGas(h, "trapezoidal", args);
-      const val = await h.trapezoidal(...args);
-      printBlock(t, "trapezoidal", "Zero interval", gas, "[0,0]", val, "0");
-      expect(val).to.equal(q0);
+      const expectedDec = "0";
+
+      await touchGas(harness, "trapezoidal", [target, selSquare, q0, q0, 100]);
+      const gas = await estimateGas(harness, "trapezoidal", [target, selSquare, q0, q0, 100]);
+      const out = await harness.trapezoidal(target, selSquare, q0, q0, 100);
+
+      expect(out).to.equal(q0);
+      printBlock({ t, method: "trapezoidal", explanation: "Zero interval", gas, inHex: "[0,0]", outHex: out, outDec: expectedDec });
     });
 
-    it("6. f=x^2 max-iter comparison (synthetic)", async () => {
+    it("Test 6: Max Iteration Comparison (f=x^2)", async function () {
       t++;
-      const args = [target, SEL.square, q0, q1, 50];
-      await touchGas(h, "trapezoidal", args);
-      const gas = await estimateGas(h, "trapezoidal", args);
-      const val = await h.trapezoidal(...args);
-      printBlock(t, "trapezoidal", "Reference for Java comparison", gas, "[0,1]", val, "~");
-      expect(val).to.be.a("string");
+      const expectedDec = "~";
+
+      await touchGas(harness, "trapezoidal", [target, selSquare, q0, q1, 50]);
+      const gas = await estimateGas(harness, "trapezoidal", [target, selSquare, q0, q1, 50]);
+      const out = await harness.trapezoidal(target, selSquare, q0, q1, 50);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "trapezoidal", explanation: "Java Ref Comp", gas, inHex: "[0,1]", outHex: out, outDec: expectedDec });
     });
   });
 
-  // ================================================================
-  // Simpson 1/3 Tests
-  // ================================================================
-  describe("Simpson 1/3 Rule", function () {
-    it("7. f=x^2 [0,1], n=10 → ≈ 1/3", async () => {
+  // ------------------------------------------------------------
+  //  Simpson 1/3 Rule
+  // ------------------------------------------------------------
+
+  describe("Method 2: Simpson 1/3 Rule", function () {
+
+    it("Test 7: Quadratic Exactness-ish (f=x^2 on [0,1], n=10)", async function () {
       t++;
-      const args = [target, SEL.square, q0, q1, 10];
-      await touchGas(h, "simpson13", args);
-      const gas = await estimateGas(h, "simpson13", args);
-      const val = await h.simpson13(...args);
-      printBlock(t, "simpson13", "x^2 exact-ish", gas, "[0,1],n=10", val, "≈0.3333");
-      expect(val).to.be.a("string");
+      const expectedDec = "≈0.3333";
+
+      await touchGas(harness, "simpson13", [target, selSquare, q0, q1, 10]);
+      const gas = await estimateGas(harness, "simpson13", [target, selSquare, q0, q1, 10]);
+      const out = await harness.simpson13(target, selSquare, q0, q1, 10);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "simpson13", explanation: "x^2 exact-ish", gas, inHex: "[0,1], n=10", outHex: out, outDec: expectedDec });
     });
 
-    it("8. f=x^3 [0,1], n=12 → 0.25", async () => {
+    it("Test 8: Cubic Exactness (f=x^3 on [0,1], n=12)", async function () {
       t++;
-      const args = [target, SEL.cube, q0, q1, 12];
-      await touchGas(h, "simpson13", args);
-      const gas = await estimateGas(h, "simpson13", args);
-      const val = await h.simpson13(...args);
-      printBlock(t, "simpson13", "x^3 exact", gas, "[0,1],n=12", val, "0.25");
-      expect(val).to.be.a("string");
+      const expectedDec = "0.25";
+
+      await touchGas(harness, "simpson13", [target, selCube, q0, q1, 12]);
+      const gas = await estimateGas(harness, "simpson13", [target, selCube, q0, q1, 12]);
+      const out = await harness.simpson13(target, selCube, q0, q1, 12);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "simpson13", explanation: "x^3 exact", gas, inHex: "[0,1], n=12", outHex: out, outDec: expectedDec });
     });
 
-    it("9. f=exp(x) approx [0,1], n=20 → ≈1.718", async () => {
+    it("Test 9: Exp Approx (Linear proxy on [0,1], n=20)", async function () {
       t++;
-      const args = [target, SEL.linear, q0, q1, 20];
-      await touchGas(h, "simpson13", args);
-      const gas = await estimateGas(h, "simpson13", args);
-      const val = await h.simpson13(...args);
-      printBlock(t, "simpson13", "exp approx placeholder", gas, "[0,1],n=20", val, "~");
-      expect(val).to.be.a("string");
+      const expectedDec = "~";
+
+      await touchGas(harness, "simpson13", [target, selLinear, q0, q1, 20]);
+      const gas = await estimateGas(harness, "simpson13", [target, selLinear, q0, q1, 20]);
+      const out = await harness.simpson13(target, selLinear, q0, q1, 20);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "simpson13", explanation: "exp approx placeholder", gas, inHex: "[0,1], n=20", outHex: out, outDec: expectedDec });
     });
 
-    it("10. f=1/x [1,2], n=40 → ~0.693", async () => {
+    it("Test 10: Inverse Function (1/x on [1,2], n=40)", async function () {
       t++;
-      const a = await h.qFromInt(1);
-      const b = await h.qFromInt(2);
-      const args = [target, SEL.inv, a, b, 40];
-      await touchGas(h, "simpson13", args);
-      const gas = await estimateGas(h, "simpson13", args);
-      const val = await h.simpson13(...args);
-      printBlock(t, "simpson13", "log(2)", gas, "[1,2],n=40", val, "≈0.693");
-      expect(val).to.be.a("string");
+      const expectedDec = "≈0.693";
+
+      await touchGas(harness, "simpson13", [target, selInv, q1, q2, 40]);
+      const gas = await estimateGas(harness, "simpson13", [target, selInv, q1, q2, 40]);
+      const out = await harness.simpson13(target, selInv, q1, q2, 40);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "simpson13", explanation: "log(2)", gas, inHex: "[1,2], n=40", outHex: out, outDec: expectedDec });
     });
 
-    it("11. invalid n (odd) should revert", async () => {
+    it("Test 11: Revert on Invalid N (Odd)", async function () {
       t++;
-      await expect(
-        h.simpson13(target, SEL.square, q0, q1, 7)
-      ).to.be.revertedWith("Integration: Simpson 1/3 requires even n");
-      printBlock(
-        t,
-        "invalid n (odd) should revert",
-        "Integration: Simpson 1/3 requires even n",
-        "x^2",
-        "N/A",
-        "revert",
-        "revert"
-      );
+      await expect(harness.simpson13(target, selSquare, q0, q1, 7)).to.be.revertedWith("Integration: Simpson 1/3 requires even n");
+      printBlock({ t, method: "simpson13", explanation: "Revert (odd n)", gas: "N/A", inHex: "x^2, n=7", outHex: "Revert", outDec: "Revert" });
     });
   });
 
-  // ================================================================
-  // Simpson 3/8 Tests
-  // ================================================================
-  describe("Simpson 3/8 Rule", function () {
-    it("12. f=x^2 [0,1], n=9 → ≈1/3", async () => {
+  // ------------------------------------------------------------
+  //  Simpson 3/8 Rule
+  // ------------------------------------------------------------
+
+  describe("Method 3: Simpson 3/8 Rule", function () {
+
+    it("Test 12: Quadratic Exactness (f=x^2 on [0,1], n=9)", async function () {
       t++;
-      const args = [target, SEL.square, q0, q1, 9];
-      await touchGas(h, "simpson38", args);
-      const gas = await estimateGas(h, "simpson38", args);
-      const val = await h.simpson38(...args);
-      printBlock(t, "simpson38", "x^2", gas, "[0,1],n=9", val, "≈0.3333");
-      expect(val).to.be.a("string");
+      const expectedDec = "≈0.3333";
+
+      await touchGas(harness, "simpson38", [target, selSquare, q0, q1, 9]);
+      const gas = await estimateGas(harness, "simpson38", [target, selSquare, q0, q1, 9]);
+      const out = await harness.simpson38(target, selSquare, q0, q1, 9);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "simpson38", explanation: "x^2", gas, inHex: "[0,1], n=9", outHex: out, outDec: expectedDec });
     });
 
-    it("13. f=x^3 [0,1], n=12 → 0.25", async () => {
+    it("Test 13: Cubic Exactness (f=x^3 on [0,1], n=12)", async function () {
       t++;
-      const args = [target, SEL.cube, q0, q1, 12];
-      await touchGas(h, "simpson38", args);
-      const gas = await estimateGas(h, "simpson38", args);
-      const val = await h.simpson38(...args);
-      printBlock(t, "simpson38", "x^3 exact", gas, "[0,1],n=12", val, "0.25");
-      expect(val).to.be.a("string");
+      const expectedDec = "0.25";
+
+      await touchGas(harness, "simpson38", [target, selCube, q0, q1, 12]);
+      const gas = await estimateGas(harness, "simpson38", [target, selCube, q0, q1, 12]);
+      const out = await harness.simpson38(target, selCube, q0, q1, 12);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "simpson38", explanation: "x^3 exact", gas, inHex: "[0,1], n=12", outHex: out, outDec: expectedDec });
     });
 
-    it("14. f=1/x [1,2], n=12 → ~0.693", async () => {
+    it("Test 14: Inverse Function (1/x on [1,2], n=12)", async function () {
       t++;
-      const a = await h.qFromInt(1);
-      const b = await h.qFromInt(2);
-      const args = [target, SEL.inv, a, b, 12];
-      await touchGas(h, "simpson38", args);
-      const gas = await estimateGas(h, "simpson38", args);
-      const val = await h.simpson38(...args);
-      printBlock(t, "simpson38", "log2", gas, "[1,2],n=12", val, "≈0.693");
-      expect(val).to.be.a("string");
+      const expectedDec = "≈0.693";
+
+      await touchGas(harness, "simpson38", [target, selInv, q1, q2, 12]);
+      const gas = await estimateGas(harness, "simpson38", [target, selInv, q1, q2, 12]);
+      const out = await harness.simpson38(target, selInv, q1, q2, 12);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "simpson38", explanation: "log2", gas, inHex: "[1,2], n=12", outHex: out, outDec: expectedDec });
     });
 
-    it("15. degenerate [5,5] → 0", async () => {
+    it("Test 15: Degenerate Interval ([5,5], n=3)", async function () {
       t++;
-      const five = await h.qFromInt(5);
-      const args = [target, SEL.square, five, five, 3];
-      await touchGas(h, "simpson38", args);
-      const gas = await estimateGas(h, "simpson38", args);
-      const val = await h.simpson38(...args);
-      printBlock(t, "simpson38", "zero interval", gas, "[5,5]", val, "0");
-      expect(val).to.equal(q0);
+      const five = await qInt(5);
+      const expectedDec = "0";
+
+      await touchGas(harness, "simpson38", [target, selSquare, five, five, 3]);
+      const gas = await estimateGas(harness, "simpson38", [target, selSquare, five, five, 3]);
+      const out = await harness.simpson38(target, selSquare, five, five, 3);
+
+      expect(out).to.equal(q0);
+      printBlock({ t, method: "simpson38", explanation: "Zero interval", gas, inHex: "[5,5]", outHex: out, outDec: expectedDec });
     });
 
-    it("16. invalid n (not multiple of 3) -> revert", async () => {
+    it("Test 16: Revert on Invalid N (Not Multiple of 3)", async function () {
       t++;
-      const args = [target, SEL.square, q0, q1, 10];
-      await expect(
-        h.simpson38(...args)
-      ).to.be.revertedWith("Integration: Simpson 3/8 requires n % 3 == 0");
-      printBlock(
-        t,
-        "invalid n (not multiple of 3)",
-        "Integration: Simpson 3/8 requires n % 3 == 0",
-        "x^2",
-        "N/A",
-        "revert",
-        "revert"
-      );
+      await expect(harness.simpson38(target, selSquare, q0, q1, 10)).to.be.revertedWith("Integration: Simpson 3/8 requires n % 3 == 0");
+      printBlock({ t, method: "simpson38", explanation: "Revert (n%3!=0)", gas: "N/A", inHex: "x^2, n=10", outHex: "Revert", outDec: "Revert" });
     });
   });
 
-  // ================================================================
-  // Extra Edge Cases (5)
-  // ================================================================
+  // ------------------------------------------------------------
+  //  Edge Cases
+  // ------------------------------------------------------------
+
   describe("Edge Cases", function () {
-    it("17. tiny magnitudes f=1e-30·x", async () => {
+
+    it("Test 17: Tiny Magnitudes (1e-30·x)", async function () {
       t++;
-      const args = [target, SEL.tiny, q0, q1, 30];
-      await touchGas(h, "trapezoidal", args);
-      const gas = await estimateGas(h, "trapezoidal", args);
-      const val = await h.trapezoidal(...args);
-      printBlock(t, "trapezoidal", "tiny magnitude", gas, "1e-30·x", val, "≈5e-31");
-      expect(val).to.be.a("string");
+      const expectedDec = "≈5e-31";
+
+      await touchGas(harness, "trapezoidal", [target, selTiny, q0, q1, 30]);
+      const gas = await estimateGas(harness, "trapezoidal", [target, selTiny, q0, q1, 30]);
+      const out = await harness.trapezoidal(target, selTiny, q0, q1, 30);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "trapezoidal", explanation: "Tiny magnitude", gas, inHex: "1e-30·x", outHex: out, outDec: expectedDec });
     });
 
-    it("18. large magnitudes f=1e20·x", async () => {
+    it("Test 18: Large Magnitudes (1e20·x)", async function () {
       t++;
-      const args = [target, SEL.large, q0, q1, 30];
-      await touchGas(h, "trapezoidal", args);
-      const gas = await estimateGas(h, "trapezoidal", args);
-      const val = await h.trapezoidal(...args);
-      printBlock(t, "trapezoidal", "large magnitude", gas, "1e20·x", val, "≈5e19");
-      expect(val).to.be.a("string");
+      const expectedDec = "≈5e19";
+
+      await touchGas(harness, "trapezoidal", [target, selLarge, q0, q1, 30]);
+      const gas = await estimateGas(harness, "trapezoidal", [target, selLarge, q0, q1, 30]);
+      const out = await harness.trapezoidal(target, selLarge, q0, q1, 30);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "trapezoidal", explanation: "Large magnitude", gas, inHex: "1e20·x", outHex: out, outDec: expectedDec });
     });
 
-    it("19. piecewise discontinuous", async () => {
+    it("Test 19: Piecewise Discontinuous", async function () {
       t++;
-      const two = await h.qFromInt(2);
-      const args = [target, SEL.piecewise, q0, two, 60];
-      await touchGas(h, "simpson13", args);
-      const gas = await estimateGas(h, "simpson13", args);
-      const val = await h.simpson13(...args);
-      printBlock(t, "simpson13", "piecewise 1→3", gas, "[0,2]", val, "≈4");
-      expect(val).to.be.a("string");
+      const expectedDec = "≈4";
+
+      await touchGas(harness, "simpson13", [target, selPiecewise, q0, q2, 60]);
+      const gas = await estimateGas(harness, "simpson13", [target, selPiecewise, q0, q2, 60]);
+      const out = await harness.simpson13(target, selPiecewise, q0, q2, 60);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "simpson13", explanation: "Piecewise 1->3", gas, inHex: "[0,2]", outHex: out, outDec: expectedDec });
     });
 
-    it("20. narrow interval [0,1e-12], f=x^2", async () => {
+    it("Test 20: Narrow Interval ([0,1e-12])", async function () {
       t++;
-      const tiny = await h.qFromFrac(1, BigInt("1000000000000"));
-      const args = [target, SEL.square, q0, tiny, 9];
-      await touchGas(h, "simpson38", args);
-      const gas = await estimateGas(h, "simpson38", args);
-      const val = await h.simpson38(...args);
-      printBlock(t, "simpson38", "tiny interval", gas, "[0,1e-12]", val, "≈3.33e-37");
-      expect(val).to.be.a("string");
+      const tiny = await harness.qFromFrac(1, BigInt("1000000000000"));
+      const expectedDec = "≈3.33e-37";
+
+      await touchGas(harness, "simpson38", [target, selSquare, q0, tiny, 9]);
+      const gas = await estimateGas(harness, "simpson38", [target, selSquare, q0, tiny, 9]);
+      const out = await harness.simpson38(target, selSquare, q0, tiny, 9);
+
+      expect(out).to.be.a("string");
+      printBlock({ t, method: "simpson38", explanation: "Tiny interval", gas, inHex: "[0,1e-12]", outHex: out, outDec: expectedDec });
     });
 
-    it("21. reversed bounds → revert", async () => {
+    it("Test 21: Revert on Reversed Bounds", async function () {
       t++;
-      await expect(
-        h.trapezoidal(target, SEL.square, q1, q0, 10)
-      ).to.be.revertedWith("Integration: upper bound b must be >= a");
-      printBlock(
-        t,
-        "reversed bounds → revert",
-        "Integration: upper bound b must be >= a",
-        "x^2",
-        "N/A",
-        "revert",
-        "revert"
-      );
+      await expect(harness.trapezoidal(target, selSquare, q1, q0, 10)).to.be.revertedWith("Integration: upper bound b must be >= a");
+      printBlock({ t, method: "trapezoidal", explanation: "Revert (reversed)", gas: "N/A", inHex: "x^2, [1,0]", outHex: "Revert", outDec: "Revert" });
     });
   });
 });
