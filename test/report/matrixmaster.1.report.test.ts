@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: MIT
-
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 
 /**
- * MatrixMaster (bytes16 / ABDK quad) : Creation, Access, Algebra, det, inverse
+ * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
+ * @notice Provides comprehensive utilities for matrix operations using the ABDK bytes16/quad fixed-point math type.
+ *         Tests includes functions for matrix creation (zeros, ones, identity, diagonal, random),
+ *         element access/modification, matrix algebra (addition, multiplication), and advanced operations (determinant, inverse).
  */
+
+// ------------------------------------------------------------
+//  Types & Constants
+// ------------------------------------------------------------
 
 type MatrixMasterHarness = Contract & {
     // quad helpers
     qFromInt(n: bigint): Promise<string>;
-    qFromUInt(n: bigint): Promise<string>;
-    qFromFrac(n: bigint, m: bigint): Promise<string>;
-
-    // matrix comparison helpers
-    matricesExactEqual(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<boolean>;
 
     // creation
     zerosHarness(rows: bigint, cols: bigint): Promise<[bigint, bigint, string[]]>;
@@ -27,169 +28,125 @@ type MatrixMasterHarness = Contract & {
     // element access
     getHarness(rows: bigint, cols: bigint, dataFlat: string[], row: bigint, col: bigint): Promise<string>;
     setHarness(rows: bigint, cols: bigint, dataFlat: string[], row: bigint, col: bigint, val: string): Promise<[bigint, bigint, string[]]>;
-
-    // slice & reshape
-    sliceHarness(rows: bigint, cols: bigint, dataFlat: string[], rowStart: bigint, rowEnd: bigint, colStart: bigint, colEnd: bigint): Promise<[bigint, bigint, string[]]>;
-    reshapeHarness(rows: bigint, cols: bigint, dataFlat: string[], newRows: bigint, newCols: bigint): Promise<[bigint, bigint, string[]]>;
-
-    // transpose
-    transposeHarness(rows: bigint, cols: bigint, dataFlat: string[]): Promise<[bigint, bigint, string[]]>;
-
-    // elementwise arithmetic
-    addHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
-    subHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
-    mulScalarHarness(rows: bigint, cols: bigint, dataFlat: string[], k: string): Promise<[bigint, bigint, string[]]>;
-    divScalarHarness(rows: bigint, cols: bigint, dataFlat: string[], k: string): Promise<[bigint, bigint, string[]]>;
-
-    // matrix multiplication
-    mulMatrixHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
-
-    // matrix-vector multiplication
-    mulMatrixVectorHarness(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<[bigint, bigint, string[]]>;
-
-    // dot product
-    dotHarness(xRows: bigint, xCols: bigint, xData: string[], yRows: bigint, yCols: bigint, yData: string[]): Promise<string>;
-
-    // determinant & inverse
-    detHarness(rows: bigint, cols: bigint, dataFlat: string[]): Promise<string>;
-    inverseHarness(rows: bigint, cols: bigint, dataFlat: string[]): Promise<[bigint, bigint, string[]]>;
-
-    // normalization
-    normalizeVectorHarness(vRows: bigint, vCols: bigint, vData: string[]): Promise<[bigint, bigint, string[]]>;
-
-    // convergence
-    hasConvergedHarness(xRows: bigint, xCols: bigint, xData: string[], yRows: bigint, yCols: bigint, yData: string[], tol: string): Promise<boolean>;
 };
 
-async function newHarness(): Promise<MatrixMasterHarness> {
-    // Deploy MathLib (library)
-    const MathLibFactory = await ethers.getContractFactory("MathLib");
-    const math = await MathLibFactory.deploy();
-    await math.waitForDeployment();
-    const mathAddr = await math.getAddress();
+// ------------------------------------------------------------
+//  Helpers
+// ------------------------------------------------------------
 
-    // Deploy MatrixMasterHarness with linked MathLib
-    const Factory = await ethers.getContractFactory("MatrixMasterHarness", {
-        libraries: {
-            "contracts/libraries/MathLib.sol:MathLib": mathAddr,
-        },
-    });
-
-    const harness = await Factory.deploy();
-    await harness.waitForDeployment();
-    return harness as unknown as MatrixMasterHarness;
-}
-
-// Small helpers for working with the harness
 function asMatrix(tuple: [bigint, bigint, string[]]) {
     const [rows, cols, data] = tuple;
     return { rows, cols, data: [...data] };
 }
 
-// =========================
-// Gas / report utilities
-// =========================
+function fmtHexArr(arr: string[]) {
+    if (arr.length > 6) {
+        return `[${arr.slice(0, 3).join(", ")}, ..., ${arr
+            .slice(-3)
+            .join(", ")}] (len=${arr.length})`;
+    }
+    return `[${arr.join(", ")}]`;
+}
 
-/** Fire a real transaction (swallowed errors) so gas reporters can pick it up. */
-async function touchGas(
-    h: MatrixMasterHarness,
-    method: string,
-    args: any[],
-) {
+// ------------------------------------------------------------
+//  Gas Estimation
+// ------------------------------------------------------------
+
+async function touchGas(harness: MatrixMasterHarness, method: string, args: any[]) {
     try {
-        const data = h.interface.encodeFunctionData(method, args);
+        const data = harness.interface.encodeFunctionData(method, args);
         const [signer] = await ethers.getSigners();
-        const to = await h.getAddress();
+        const to = await harness.getAddress();
         const tx = await signer.sendTransaction({ to, data });
         await tx.wait();
     } catch {
-        // For revert tests or estimation failures, silently ignore.
+        // Ignored for reverts (we only care about side-effectful gas touching)
     }
 }
 
-/** Estimate gas for any method; on revert returns a descriptive string. */
-async function estimateGas(
-    h: MatrixMasterHarness,
-    method: string,
-    args: any[],
-): Promise<string> {
+async function estimateGas(harness: MatrixMasterHarness, method: string, args: any[]) {
     try {
-        const anyH = h as any;
+        const anyH = harness as any;
         if (anyH[method]?.estimateGas) {
             return (await anyH[method].estimateGas(...args)).toString();
         }
-        const data = h.interface.encodeFunctionData(method, args);
+        const data = harness.interface.encodeFunctionData(method, args);
         const [signer] = await ethers.getSigners();
-        const to = await h.getAddress();
+        const to = await harness.getAddress();
         const gas = await signer.estimateGas({ to, data });
         return gas.toString();
     } catch {
-        return "revert / estimation failed";
+        return "revert";
     }
 }
 
-/** Pretty-print a report block for a single matrix-related test. */
-function printBlock(options: {
-    t: number;
-    method: string;
-    explanation: string;
-    gas: string;
-    shapeIn: string;
-    shapeOut: string;
-    inHex?: string;
-    outHex?: string;
-}) {
-    const { t, method, explanation, gas, shapeIn, shapeOut, inHex, outHex } =
-        options;
+// ------------------------------------------------------------
+//  Print Block
+// ------------------------------------------------------------
+
+function printBlock({
+    t,
+    method,
+    explanation,
+    gas,
+    shapeIn,
+    shapeOut,
+    inHex,
+    outHex,
+}: any) {
     const sep = "-".repeat(60);
     console.log(
-        `\n${sep}\nTest ${t}\nMethod: ${method}\nExplanation: ${explanation}\nGas Usage: ${gas}\nInput shape: ${shapeIn}\nOutput shape: ${shapeOut}\nInput (hex): ${inHex ?? "-"}\nOutput (hex): ${outHex ?? "-"}`,
+        `
+        ${sep}
+        Test ${t}
+        Method: ${method}
+        Explanation: ${explanation}
+        Gas Usage: ${gas}
+        Shape In: ${shapeIn}
+        Shape Out: ${shapeOut}
+        Input: ${inHex || "-"}
+        Output: ${outHex || "-"}
+`.trim(),
     );
 }
 
-const fmtHexArr = (arr: string[]) => `[${arr.join(", ")}]`;
+// ------------------------------------------------------------
+//  Test Suite
+// ------------------------------------------------------------
 
-// ABDK quad zero can appear as +0 or -0 at the bit level.
-// These two encodings are numerically equivalent.
-const QUAD_POS_ZERO = "0x00000000000000000000000000000000";
-const QUAD_NEG_ZERO = "0x80000000000000000000000000000000";
-
-function isQuadZero(hex: string): boolean {
-    const h = hex.toLowerCase();
-    return h === QUAD_POS_ZERO || h === QUAD_NEG_ZERO;
-}
-
-// =========================
-/** Main test suite */
-// =========================
-
-describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
+describe("MatrixMaster — Creation & Element Access", function () {
     let harness: MatrixMasterHarness;
-    let t = 0; // global test counter for reporting
+    let t = 0;
 
-    beforeEach(async () => {
-        harness = await newHarness();
+    // --------------------------------------------------------
+    //  Quad helper wrappers
+    // --------------------------------------------------------
+
+    const qInt = async (n: number | bigint) => await harness.qFromInt(BigInt(n));
+
+    before(async () => {
+        const MathLibFactory = await ethers.getContractFactory("MathLib");
+        const math = await MathLibFactory.deploy();
+        await math.waitForDeployment();
+
+        const Factory = await ethers.getContractFactory("MatrixMasterHarness", {
+            libraries: { "contracts/libraries/MathLib.sol:MathLib": await math.getAddress() },
+        });
+
+        harness = (await Factory.deploy()) as unknown as MatrixMasterHarness;
+        await harness.waitForDeployment();
     });
 
-    // --- quad constructors ---
+    // ------------------------------------------------------------
+    //  Section 1: Creation
+    // ------------------------------------------------------------
 
-    async function qInt(n: number | string | bigint): Promise<string> {
-        return harness.qFromInt(BigInt(n));
-    }
-
-    async function qUInt(n: number | string | bigint): Promise<string> {
-        return harness.qFromUInt(BigInt(n));
-    }
-
-    // =========================================================
-    // Creation
-    // =========================================================
-
-    describe("Creation", function () {
-        it("zeros : returns correct all-zero matrix", async function () {
+    describe("Section 1: Creation", function () {
+        it("Test 1: Zeros (2x3)", async function () {
             t++;
             const rows = 2n;
             const cols = 3n;
+
             await touchGas(harness, "zerosHarness", [rows, cols]);
             const gas = await estimateGas(harness, "zerosHarness", [rows, cols]);
 
@@ -206,8 +163,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "zerosHarness",
-                explanation:
-                    "Creates a dense rows×cols matrix fully initialized with quad-precision zeros.",
+                explanation: "Creates a 2×3 dense matrix fully initialized with quad-precision zeros.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m.rows}x${m.cols}`,
@@ -216,7 +172,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("zeros : very large 100x100 dense matrix", async function () {
+        it("Test 2: Zeros (100x100)", async function () {
             t++;
             const rows = 100n;
             const cols = 100n;
@@ -237,8 +193,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "zerosHarness",
-                explanation:
-                    "Stress-allocates a 100x100 dense matrix and verifies every entry is an exact quad zero.",
+                explanation: "Stress-allocates a 100×100 dense matrix and verifies every entry is an exact quad zero.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m.rows}x${m.cols}`,
@@ -247,10 +202,11 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("ones : returns correct all-one matrix", async function () {
+        it("Test 3: Ones (2x2)", async function () {
             t++;
             const rows = 2n;
             const cols = 2n;
+
             await touchGas(harness, "onesHarness", [rows, cols]);
             const gas = await estimateGas(harness, "onesHarness", [rows, cols]);
 
@@ -267,8 +223,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "onesHarness",
-                explanation:
-                    "Allocates a rows×cols matrix filled with quad-precision ones for baseline checks.",
+                explanation: "Allocates a 2×2 matrix filled with quad-precision ones for baseline sanity checks.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m.rows}x${m.cols}`,
@@ -277,9 +232,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("Identity Matrix : produces valid identity", async function () {
+        it("Test 4: Identity (3x3)", async function () {
             t++;
             const n = 3n;
+
             await touchGas(harness, "createIdentityMatrixHarness", [n]);
             const gas = await estimateGas(harness, "createIdentityMatrixHarness", [n]);
 
@@ -305,8 +261,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "createIdentityMatrixHarness",
-                explanation:
-                    "Builds a square identity matrix with ones on the diagonal and strict zeros elsewhere.",
+                explanation: "Builds a 3×3 identity matrix with ones on the diagonal and strict zeros elsewhere.",
                 gas,
                 shapeIn: `n=${n.toString()}`,
                 shapeOut: `${m.rows}x${m.cols}`,
@@ -315,9 +270,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("Identity Matrix : n = 0 reverts", async function () {
+        it("Test 5: Identity (n=0 revert)", async function () {
             t++;
             const n = 0n;
+
             await touchGas(harness, "createIdentityMatrixHarness", [n]);
             const gas = await estimateGas(harness, "createIdentityMatrixHarness", [n]);
 
@@ -328,8 +284,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "createIdentityMatrixHarness",
-                explanation:
-                    "Ensures identity construction rejects zero-sized matrices via dimension guard.",
+                explanation: "Ensures identity construction rejects zero-sized matrices via dimension guard.",
                 gas,
                 shapeIn: `n=${n.toString()}`,
                 shapeOut: "revert",
@@ -338,7 +293,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("fromDiagonal : diagonal assembled correctly", async function () {
+        it("Test 6: From Diagonal (3 elements)", async function () {
             t++;
             const d0 = await qInt(1);
             const d1 = await qInt(2);
@@ -368,8 +323,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "fromDiagonalHarness",
-                explanation:
-                    "Lifts a 1D quad array into a square diagonal matrix with zeros off the diagonal.",
+                explanation: "Lifts a 3-element quad vector into a 3×3 diagonal matrix with zeros off the diagonal.",
                 gas,
                 shapeIn: `diag length=${diag.length}`,
                 shapeOut: `${m.rows}x${m.cols}`,
@@ -378,9 +332,10 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("fromDiagonal : empty diag reverts", async function () {
+        it("Test 7: From Diagonal (empty revert)", async function () {
             t++;
             const diag: string[] = [];
+
             await touchGas(harness, "fromDiagonalHarness", [diag]);
             const gas = await estimateGas(harness, "fromDiagonalHarness", [diag]);
 
@@ -391,8 +346,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "fromDiagonalHarness",
-                explanation:
-                    "Checks that constructing a diagonal matrix from an empty vector is rejected.",
+                explanation: "Checks that constructing a diagonal matrix from an empty vector is rejected.",
                 gas,
                 shapeIn: "diag length=0",
                 shapeOut: "revert",
@@ -401,7 +355,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("fromDiagonal : supports negative and large-magnitude diagonal entries", async function () {
+        it("Test 8: From Diagonal (mixed entries)", async function () {
             t++;
             const d0 = await qInt(-5);
             const d1 = await qInt(0);
@@ -419,6 +373,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             const rows = Number(m.rows);
             const cols = Number(m.cols);
+
             for (let i = 0; i < rows; ++i) {
                 for (let j = 0; j < cols; ++j) {
                     const idx = i * cols + j;
@@ -431,8 +386,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "fromDiagonalHarness",
-                explanation:
-                    "Builds a diagonal matrix with mixed negative, zero, and large-magnitude quad entries.",
+                explanation: "Builds a 4×4 diagonal matrix with mixed negative, zero, and large-magnitude quad entries.",
                 gas,
                 shapeIn: `diag length=${diag.length}`,
                 shapeOut: `${m.rows}x${m.cols}`,
@@ -441,11 +395,12 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomMatrix : shape and determinism (same seed yields same matrix)", async function () {
+        it("Test 9: Random Matrix (Determinism)", async function () {
             t++;
             const seed = ethers.keccak256(ethers.toUtf8Bytes("seed-123"));
             const rows = 3n;
             const cols = 4n;
+
             await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
             const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
 
@@ -457,9 +412,8 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             expect(m1.data.length).to.equal(12);
             expect(m2.rows).to.equal(rows);
             expect(m2.cols).to.equal(cols);
-
-            // same seed => identical data
             expect(m1.data.length).to.equal(m2.data.length);
+
             for (let i = 0; i < m1.data.length; ++i) {
                 expect(m1.data[i]).to.equal(m2.data[i]);
             }
@@ -467,8 +421,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "randomMatrixHarness",
-                explanation:
-                    "Generates pseudo-random quad entries in [0,1) and verifies deterministic seeding.",
+                explanation: "Generates pseudo-random quad entries in [0,1) and verifies deterministic seeding.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m1.rows}x${m1.cols}`,
@@ -477,12 +430,13 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomMatrix : different seeds give different data (with high probability)", async function () {
+        it("Test 10: Random Matrix (Different seeds)", async function () {
             t++;
             const seed1 = ethers.keccak256(ethers.toUtf8Bytes("seed-A"));
             const seed2 = ethers.keccak256(ethers.toUtf8Bytes("seed-B"));
             const rows = 2n;
             const cols = 3n;
+
             await touchGas(harness, "randomMatrixHarness", [rows, cols, seed1]);
             const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed1]);
 
@@ -498,8 +452,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "randomMatrixHarness",
-                explanation:
-                    "Uses two different seeds and checks that generated patterns diverge as expected.",
+                explanation: "Uses two different seeds and checks that generated patterns diverge as expected.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m1.rows}x${m1.cols}`,
@@ -508,7 +461,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomMatrix : all values lie in [0,1) range", async function () {
+        it("Test 11: Random Matrix (Range [0,1))", async function () {
             t++;
             const rows = 3n;
             const cols = 3n;
@@ -532,8 +485,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "randomMatrixHarness",
-                explanation:
-                    "Samples a small 3x3 random matrix and enforces every encoded quad lies in [0,1).",
+                explanation: "Samples a 3×3 random matrix and enforces every encoded quad lies in [0,1).",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m.rows}x${m.cols}`,
@@ -542,7 +494,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomMatrix : vector shapes 1xN are supported", async function () {
+        it("Test 12: Random Matrix (1xN row vector)", async function () {
             t++;
             const rows = 1n;
             const cols = 5n;
@@ -550,6 +502,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
             const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+
             const m = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
 
             expect(m.rows).to.equal(rows);
@@ -559,8 +512,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "randomMatrixHarness",
-                explanation:
-                    "Generates a 1xN random row vector for use as simple quad noise or weights.",
+                explanation: "Generates a 1×N random row vector for use as simple quad noise or weights.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m.rows}x${m.cols}`,
@@ -569,7 +521,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomMatrix : vector shapes Nx1 are supported", async function () {
+        it("Test 13: Random Matrix (Nx1 column vector)", async function () {
             t++;
             const rows = 5n;
             const cols = 1n;
@@ -577,6 +529,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
             const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+
             const m = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
 
             expect(m.rows).to.equal(rows);
@@ -586,8 +539,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             printBlock({
                 t,
                 method: "randomMatrixHarness",
-                explanation:
-                    "Generates an Nx1 random column vector suitable for stochastic gradient toy examples.",
+                explanation: "Generates an N×1 random column vector suitable for stochastic gradient toy examples.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m.rows}x${m.cols}`,
@@ -596,7 +548,7 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
             });
         });
 
-        it("randomMatrix : structure / diversity: non-trivial variety across entries", async function () {
+        it("Test 14: Random Matrix (Diversity)", async function () {
             t++;
             const rows = 4n;
             const cols = 4n;
@@ -604,21 +556,22 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
 
             await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
             const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+
             const m = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
             const zeroQ = await qInt(0);
 
             const distinct = new Set(m.data);
-            const hasNonZero = m.data.some((v) => v.toLowerCase() !== zeroQ.toLowerCase());
+            const hasNonZero = m.data.some(
+                (v) => v.toLowerCase() !== zeroQ.toLowerCase(),
+            );
 
-            // Not a strict proof, just a sanity check that the generator is not degenerate.
             expect(distinct.size).to.be.greaterThan(1);
             expect(hasNonZero).to.equal(true);
 
             printBlock({
                 t,
                 method: "randomMatrixHarness",
-                explanation:
-                    "Samples a 4x4 random matrix and verifies it exhibits non-trivial value diversity.",
+                explanation: "Samples a 4×4 random matrix and verifies it exhibits non-trivial value diversity.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m.rows}x${m.cols}`,
@@ -626,214 +579,295 @@ describe("MatrixMaster (library) : dense matrices over ABDK quad", function () {
                 outHex: fmtHexArr(m.data),
             });
         });
+    });
 
-        it("zeros : large 50x50 dense matrix", async function () {
+    // ------------------------------------------------------------
+    //  Section 2: Element Access (get / set)
+    // ------------------------------------------------------------
+
+    describe("Section 2: Element Access (get / set)", function () {
+        it("Test 15: get reads correct element", async function () {
             t++;
-            const rows = 50n;
-            const cols = 50n;
+            // 2x3: [[1,2,3],[4,5,6]]
+            const vals = [
+                await qInt(1),
+                await qInt(2),
+                await qInt(3),
+                await qInt(4),
+                await qInt(5),
+                await qInt(6),
+            ];
+            const rows = 2n;
+            const cols = 3n;
+            const row = 1n;
+            const col = 2n;
 
-            await touchGas(harness, "zerosHarness", [rows, cols]);
-            const gas = await estimateGas(harness, "zerosHarness", [rows, cols]);
+            await touchGas(harness, "getHarness", [rows, cols, vals, row, col]);
+            const gas = await estimateGas(harness, "getHarness", [rows, cols, vals, row, col]);
 
-            const m = asMatrix(await harness.zerosHarness(rows, cols));
-            expect(m.rows).to.equal(rows);
-            expect(m.cols).to.equal(cols);
-            expect(m.data.length).to.equal(Number(rows * cols));
+            const v = await harness.getHarness(rows, cols, vals, row, col); // row=1,col=2 -> 6
+            expect(v.toLowerCase()).to.equal(vals[5].toLowerCase());
 
+            printBlock({
+                t,
+                method: "getHarness",
+                explanation: "Fetches a single quad entry by row/col indices from a flat row-major matrix.",
+                gas,
+                shapeIn: `${rows}x${cols}`,
+                shapeOut: "scalar",
+                inHex: fmtHexArr(vals),
+                outHex: v,
+            });
+        });
+
+        it("Test 16: get out-of-bounds access reverts", async function () {
+            t++;
+            const vals = [
+                await qInt(1),
+                await qInt(2),
+                await qInt(3),
+                await qInt(4),
+            ];
+            const rows = 2n;
+            const cols = 2n;
+
+            // row=2 out of range
+            await touchGas(harness, "getHarness", [rows, cols, vals, 2n, 0n]);
+            const gas1 = await estimateGas(harness, "getHarness", [rows, cols, vals, 2n, 0n]);
+
+            await expect(
+                harness.getHarness(rows, cols, vals, 2n, 0n),
+            ).to.be.revertedWith("MatrixMaster: index out of bounds");
+
+            printBlock({
+                t,
+                method: "getHarness",
+                explanation: "Checks that reading with an out-of-range row index triggers bounds protection.",
+                gas: gas1,
+                shapeIn: `${rows}x${cols}`,
+                shapeOut: "revert",
+                inHex: fmtHexArr(vals),
+                outHex: "-",
+            });
+
+            // col=2 out of range
+            await touchGas(harness, "getHarness", [rows, cols, vals, 0n, 2n]);
+            const gas2 = await estimateGas(harness, "getHarness", [rows, cols, vals, 0n, 2n]);
+
+            await expect(
+                harness.getHarness(rows, cols, vals, 0n, 2n),
+            ).to.be.revertedWith("MatrixMaster: index out of bounds");
+
+            printBlock({
+                t,
+                method: "getHarness",
+                explanation: "Checks that reading with an out-of-range column index reverts via bounds check.",
+                gas: gas2,
+                shapeIn: `${rows}x${cols}`,
+                shapeOut: "revert",
+                inHex: fmtHexArr(vals),
+                outHex: "-",
+            });
+        });
+
+        it("Test 17: get retrieves corner elements", async function () {
+            t++;
+            const rows = 3n;
+            const cols = 3n;
+            const vals: string[] = [];
+
+            for (let i = 1; i <= 9; ++i) {
+                vals.push(await qInt(i));
+            }
+
+            // (0,0)
+            await touchGas(harness, "getHarness", [rows, cols, vals, 0n, 0n]);
+            const gas1 = await estimateGas(harness, "getHarness", [rows, cols, vals, 0n, 0n]);
+            const topLeft = await harness.getHarness(rows, cols, vals, 0n, 0n);
+            expect(topLeft.toLowerCase()).to.equal(vals[0].toLowerCase());
+
+            printBlock({
+                t,
+                method: "getHarness",
+                explanation: "Accesses the top-left corner element (0,0) in a 3×3 matrix and checks correct decoding.",
+                gas: gas1,
+                shapeIn: `${rows}x${cols}`,
+                shapeOut: "scalar",
+                inHex: fmtHexArr(vals),
+                outHex: topLeft,
+            });
+
+            // (rows-1, cols-1)
+            const lastRow = rows - 1n;
+            const lastCol = cols - 1n;
+
+            await touchGas(harness, "getHarness", [rows, cols, vals, lastRow, lastCol]);
+            const gas2 = await estimateGas(harness, "getHarness", [rows, cols, vals, lastRow, lastCol]);
+            const bottomRight = await harness.getHarness(rows, cols, vals, lastRow, lastCol);
+            const expectedIdx = Number(lastRow * cols + lastCol);
+
+            expect(bottomRight.toLowerCase()).to.equal(
+                vals[expectedIdx].toLowerCase(),
+            );
+
+            printBlock({
+                t,
+                method: "getHarness",
+                explanation: "Accesses the bottom-right corner element (rows-1, cols-1) and verifies flat-index mapping.",
+                gas: gas2,
+                shapeIn: `${rows}x${cols}`,
+                shapeOut: "scalar",
+                inHex: fmtHexArr(vals),
+                outHex: bottomRight,
+            });
+        });
+
+        it("Test 18: get random interior element inside 10x10", async function () {
+            t++;
+            const rows = 10n;
+            const cols = 10n;
+            const vals: string[] = [];
+
+            for (let i = 1; i <= 100; ++i) {
+                vals.push(await qInt(i));
+            }
+
+            const row = 7n;
+            const col = 3n; // deterministic but random-looking interior cell
+            const expectedIdx = Number(row * cols + col);
+            const expectedVal = vals[expectedIdx];
+
+            await touchGas(harness, "getHarness", [rows, cols, vals, row, col]);
+            const gas = await estimateGas(harness, "getHarness", [rows, cols, vals, row, col]);
+            const v = await harness.getHarness(rows, cols, vals, row, col);
+
+            expect(v.toLowerCase()).to.equal(expectedVal.toLowerCase());
+
+            printBlock({
+                t,
+                method: "getHarness",
+                explanation: "Indexes an interior element of a 10×10 matrix and validates large-grid index arithmetic.",
+                gas,
+                shapeIn: `${rows}x${cols}`,
+                shapeOut: "scalar",
+                inHex: fmtHexArr(vals),
+                outHex: v,
+            });
+        });
+
+        it("Test 19: set writes correct element", async function () {
+            t++;
+            // 2x2 all zeros
             const zero = await qInt(0);
-            for (const v of m.data) {
-                expect(v.toLowerCase()).to.equal(zero.toLowerCase());
-            }
+            const one = await qInt(1);
+            const init = [zero, zero, zero, zero];
+
+            const rows = 2n;
+            const cols = 2n;
+            const row = 1n;
+            const col = 0n;
+
+            await touchGas(harness, "setHarness", [rows, cols, init, row, col, one]);
+            const gas = await estimateGas(harness, "setHarness", [rows, cols, init, row, col, one]);
+
+            const out = asMatrix(await harness.setHarness(rows, cols, init, row, col, one));
+
+            expect(out.rows).to.equal(rows);
+            expect(out.cols).to.equal(cols);
+
+            // Expect only (1,0) to be 1
+            expect(out.data[0].toLowerCase()).to.equal(zero.toLowerCase());
+            expect(out.data[1].toLowerCase()).to.equal(zero.toLowerCase());
+            expect(out.data[2].toLowerCase()).to.equal(one.toLowerCase()); // row1,col0
+            expect(out.data[3].toLowerCase()).to.equal(zero.toLowerCase());
 
             printBlock({
                 t,
-                method: "zerosHarness",
-                explanation:
-                    "Allocates a relatively large 50x50 dense matrix and validates all entries are exact zeros.",
+                method: "setHarness",
+                explanation: "Mutates a single matrix cell and verifies only that entry is modified.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
-                shapeOut: `${m.rows}x${m.cols}`,
-                inHex: "-",
-                outHex: fmtHexArr(m.data),
+                shapeOut: `${out.rows}x${out.cols}`,
+                inHex: fmtHexArr(init),
+                outHex: fmtHexArr(out.data),
             });
         });
 
-        it("zeros : vector shapes 1xN return all-zero vectors", async function () {
+        it("Test 20: set out-of-bounds write reverts", async function () {
             t++;
-            const rows = 1n;
-            const cols = 5n;
-
-            await touchGas(harness, "zerosHarness", [rows, cols]);
-            const gas = await estimateGas(harness, "zerosHarness", [rows, cols]);
-
-            const m = asMatrix(await harness.zerosHarness(rows, cols));
-            expect(m.rows).to.equal(rows);
-            expect(m.cols).to.equal(cols);
-            expect(m.data.length).to.equal(Number(rows * cols));
-
             const zero = await qInt(0);
-            for (const v of m.data) {
-                expect(v.toLowerCase()).to.equal(zero.toLowerCase());
-            }
+            const init = [zero, zero, zero, zero];
+            const rows = 2n;
+            const cols = 2n;
+
+            // row=2 out of range
+            await touchGas(harness, "setHarness", [rows, cols, init, 2n, 0n, zero]);
+            const gas1 = await estimateGas(harness, "setHarness", [rows, cols, init, 2n, 0n, zero]);
+
+            await expect(
+                harness.setHarness(rows, cols, init, 2n, 0n, zero),
+            ).to.be.revertedWith("MatrixMaster: index out of bounds");
 
             printBlock({
                 t,
-                method: "zerosHarness",
-                explanation:
-                    "Builds a 1xN row vector of quad zeros and confirms it behaves like a zero row.",
-                gas,
+                method: "setHarness",
+                explanation: "Verifies that assigning outside valid row indices reverts with an explicit error.",
+                gas: gas1,
                 shapeIn: `${rows}x${cols}`,
-                shapeOut: `${m.rows}x${m.cols}`,
-                inHex: "-",
-                outHex: fmtHexArr(m.data),
+                shapeOut: "revert",
+                inHex: fmtHexArr(init),
+                outHex: "-",
+            });
+
+            // col=2 out of range
+            await touchGas(harness, "setHarness", [rows, cols, init, 0n, 2n, zero]);
+            const gas2 = await estimateGas(harness, "setHarness", [rows, cols, init, 0n, 2n, zero]);
+
+            await expect(
+                harness.setHarness(rows, cols, init, 0n, 2n, zero),
+            ).to.be.revertedWith("MatrixMaster: index out of bounds");
+
+            printBlock({
+                t,
+                method: "setHarness",
+                explanation: "Verifies that assigning outside valid column indices also reverts safely.",
+                gas: gas2,
+                shapeIn: `${rows}x${cols}`,
+                shapeOut: "revert",
+                inHex: fmtHexArr(init),
+                outHex: "-",
             });
         });
 
-        it("zeros : vector shapes  Nx1 return all-zero vectors", async function () {
+        it("Test 21: set + get reflect mutation", async function () {
             t++;
-            const rows = 5n;
-            const cols = 1n;
-
-            await touchGas(harness, "zerosHarness", [rows, cols]);
-            const gas = await estimateGas(harness, "zerosHarness", [rows, cols]);
-
-            const m = asMatrix(await harness.zerosHarness(rows, cols));
-            expect(m.rows).to.equal(rows);
-            expect(m.cols).to.equal(cols);
-            expect(m.data.length).to.equal(Number(rows * cols));
-
             const zero = await qInt(0);
-            for (const v of m.data) {
-                expect(v.toLowerCase()).to.equal(zero.toLowerCase());
-            }
-
-            printBlock({
-                t,
-                method: "zerosHarness",
-                explanation:
-                    "Allocates an Nx1 column vector of zeros and checks every entry is exactly zero.",
-                gas,
-                shapeIn: `${rows}x${cols}`,
-                shapeOut: `${m.rows}x${m.cols}`,
-                inHex: "-",
-                outHex: fmtHexArr(m.data),
-            });
-        });
-
-        it("ones : large 40x40 dense matrix", async function () {
-            t++;
-            const rows = 40n;
-            const cols = 40n;
-
-            await touchGas(harness, "onesHarness", [rows, cols]);
-            const gas = await estimateGas(harness, "onesHarness", [rows, cols]);
-
-            const m = asMatrix(await harness.onesHarness(rows, cols));
-            expect(m.rows).to.equal(rows);
-            expect(m.cols).to.equal(cols);
-            expect(m.data.length).to.equal(Number(rows * cols));
-
             const one = await qInt(1);
-            for (const v of m.data) {
-                expect(v.toLowerCase()).to.equal(one.toLowerCase());
-            }
+
+            const rows = 3n;
+            const cols = 3n;
+            const init = Array.from({ length: 9 }, () => zero);
+
+            const row = 2n;
+            const col = 1n;
+
+            await touchGas(harness, "setHarness", [rows, cols, init, row, col, one]);
+            const gas = await estimateGas(harness, "setHarness", [rows, cols, init, row, col, one]);
+
+            const out = asMatrix(await harness.setHarness(rows, cols, init, row, col, one));
+
+            const readBack = await harness.getHarness(out.rows, out.cols, out.data, row, col);
+            expect(readBack.toLowerCase()).to.equal(one.toLowerCase());
 
             printBlock({
                 t,
-                method: "onesHarness",
-                explanation:
-                    "Constructs a larger 40x40 matrix of quad ones to exercise allocation and fill loops.",
+                method: "setHarness",
+                explanation: "Writes a single cell using set() and immediately reads it back via get() to confirm persistence.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
-                shapeOut: `${m.rows}x${m.cols}`,
-                inHex: "-",
-                outHex: fmtHexArr(m.data),
-            });
-        });
-
-        it("ones : vector shapes 1xN return all-one vectors", async function () {
-            t++;
-            const rows = 1n;
-            const cols = 4n;
-
-            await touchGas(harness, "onesHarness", [rows, cols]);
-            const gas = await estimateGas(harness, "onesHarness", [rows, cols]);
-
-            const m = asMatrix(await harness.onesHarness(rows, cols));
-            expect(m.rows).to.equal(rows);
-            expect(m.cols).to.equal(cols);
-
-            const one = await qInt(1);
-            for (const v of m.data) {
-                expect(v.toLowerCase()).to.equal(one.toLowerCase());
-            }
-
-            printBlock({
-                t,
-                method: "onesHarness",
-                explanation:
-                    "Creates a 1xN row vector of ones for simple broadcast-style operations.",
-                gas,
-                shapeIn: `${rows}x${cols}`,
-                shapeOut: `${m.rows}x${m.cols}`,
-                inHex: "-",
-                outHex: fmtHexArr(m.data),
-            });
-        });
-
-        it("ones : vector shapes  Nx1 return all-one vectors", async function () {
-            t++;
-            const rows = 4n;
-            const cols = 1n;
-
-            await touchGas(harness, "onesHarness", [rows, cols]);
-            const gas = await estimateGas(harness, "onesHarness", [rows, cols]);
-
-            const m = asMatrix(await harness.onesHarness(rows, cols));
-            expect(m.rows).to.equal(rows);
-            expect(m.cols).to.equal(cols);
-
-            const one = await qInt(1);
-            for (const v of m.data) {
-                expect(v.toLowerCase()).to.equal(one.toLowerCase());
-            }
-
-            printBlock({
-                t,
-                method: "onesHarness",
-                explanation:
-                    "Creates an Nx1 column vector of ones to mimic simple column-bias terms.",
-                gas,
-                shapeIn: `${rows}x${cols}`,
-                shapeOut: `${m.rows}x${m.cols}`,
-                inHex: "-",
-                outHex: fmtHexArr(m.data),
-            });
-        });
-
-        it("Identity Matrix : transpose(identity) = identity", async function () {
-            t++;
-            const n = 3n;
-
-            const I = asMatrix(await harness.createIdentityMatrixHarness(n));
-
-            await touchGas(harness, "transposeHarness", [I.rows, I.cols, I.data]);
-            const gas = await estimateGas(harness, "transposeHarness", [I.rows, I.cols, I.data]);
-            const IT = asMatrix(await harness.transposeHarness(I.rows, I.cols, I.data));
-
-            // I^T should be bitwise identical to I
-            expect(await harness.matricesExactEqual(I.rows, I.cols, I.data, IT.rows, IT.cols, IT.data)).to.equal(true);
-
-            printBlock({
-                t,
-                method: "transposeHarness",
-                explanation:
-                    "Confirms that transposing an identity matrix leaves it unchanged (Iᵀ = I).",
-                gas,
-                shapeIn: `${I.rows}x${I.cols}`,
-                shapeOut: `${IT.rows}x${IT.cols}`,
-                inHex: fmtHexArr(I.data),
-                outHex: fmtHexArr(IT.data),
+                shapeOut: `${out.rows}x${out.cols}`,
+                inHex: fmtHexArr(init),
+                outHex: fmtHexArr(out.data),
             });
         });
     });
