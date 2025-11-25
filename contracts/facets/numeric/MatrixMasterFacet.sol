@@ -376,7 +376,7 @@ contract MatrixFacet {
     /**
      * @notice Compute Euclidean 2-norm ||v||₂ of a column vector (n×1).
      */
-    function norm(
+    function euclideanNorm(
         uint256 rows,
         uint256 cols,
         bytes16[] calldata data
@@ -386,7 +386,7 @@ contract MatrixFacet {
         returns (bytes16)
     {
         MatrixMaster.Matrix memory v = _buildMatrix(rows, cols, data);
-        return MatrixMaster.norm(v);
+        return MatrixMaster.euclideanNorm(v);
     }
 
     /**

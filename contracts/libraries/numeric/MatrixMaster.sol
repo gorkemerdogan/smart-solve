@@ -473,8 +473,8 @@ library MatrixMaster {
      * @param v Input vector (n×1)
      * @return nrm Vector norm = sqrt(dot(v, v))
      */
-    function norm(Matrix memory v) internal pure returns (bytes16 nrm) {
-        require(v.cols == 1, "MatrixMaster: norm requires column vector");
+    function euclideanNorm(Matrix memory v) internal pure returns (bytes16 nrm) {
+        require(v.cols == 1, "MatrixMaster: euclideanNorm requires column vector");
 
         bytes16 d = dot(v, v);
         nrm = MathLib.sqrt(d);
@@ -489,7 +489,7 @@ library MatrixMaster {
     function normalize(Matrix memory v) internal pure returns (Matrix memory out) {
         require(v.cols == 1, "MatrixMaster: normalize requires column vector");
 
-        bytes16 nrm = norm(v);
+        bytes16 nrm = euclideanNorm(v);
         require(MathLib.cmp(nrm, QZERO) != 0, "MatrixMaster: cannot normalize zero vector");
 
         out = divScalar(v, nrm); // v / ||v||
@@ -534,13 +534,13 @@ library MatrixMaster {
 
         // Check Positive Direction
         Matrix memory diffPos = sub(vNew, vOld);
-        if (MathLib.cmp(norm(diffPos), tol) < 0) {
+        if (MathLib.cmp(euclideanNorm(diffPos), tol) < 0) {
             return true;
         }
 
         // Check Negative Direction (for negative eigenvalues)
         Matrix memory diffNeg = add(vNew, vOld);
-        if (MathLib.cmp(norm(diffNeg), tol) < 0) {
+        if (MathLib.cmp(euclideanNorm(diffNeg), tol) < 0) {
             return true;
         }
 
@@ -764,7 +764,7 @@ library MatrixMaster {
             Matrix memory y = mulMatrixVector(A, x);
             
             // Avoid division by zero if matrix is singular
-            if (MathLib.cmp(norm(y), QZERO) == 0) { break; }
+            if (MathLib.cmp(euclideanNorm(y), QZERO) == 0) { break; }
 
             Matrix memory xNew = normalize(y);
 

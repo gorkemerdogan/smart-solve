@@ -20,7 +20,7 @@ type MatrixMasterHarness = Contract & {
     qFromFrac(n: bigint, m: bigint): Promise<string>;
 
     // normalization
-    normHarness(vRows: bigint, vCols: bigint, vData: string[]): Promise<string>;
+    euclideanNormHarness(vRows: bigint, vCols: bigint, vData: string[]): Promise<string>;
     normalizeHarness(vRows: bigint, vCols: bigint, vData: string[]): Promise<[bigint, bigint, string[]]>;
 
     // random vector
@@ -157,22 +157,22 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
         // Norm
         // ------------------------------
 
-        it("Test 1: norm of [3,4] is 5", async function () {
+        it("Test 1: euclideanNorm of [3,4] is 5", async function () {
             t++;
             // Vector [3, 4]^T -> ||v||_2 = 5
             const v = [await qInt(3), await qInt(4)];
 
-            await touchGas(harness, "normHarness", [2n, 1n, v]);
-            const gas = await estimateGas(harness, "normHarness", [2n, 1n, v]);
-            const out = await harness.normHarness(2n, 1n, v);
+            await touchGas(harness, "euclideanNormHarness", [2n, 1n, v]);
+            const gas = await estimateGas(harness, "euclideanNormHarness", [2n, 1n, v]);
+            const out = await harness.euclideanNormHarness(2n, 1n, v);
 
             const expected = await qInt(5);
             expect(out.toLowerCase()).to.equal(expected.toLowerCase());
 
             printBlock({
                 t,
-                method: "normHarness",
-                explanation: "Computes Euclidean norm ||[3,4]^T||_2 = 5.",
+                method: "euclideanNormHarness",
+                explanation: "Computes Euclidean euclideanNorm ||[3,4]^T||_2 = 5.",
                 gas,
                 shapeIn: "2x1",
                 shapeOut: "scalar",
@@ -181,21 +181,19 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             });
         });
 
-        it("Test 2: norm reverts on row vector (1x2)", async function () {
+        it("Test 2: euclideanNorm reverts on row vector (1x2)", async function () {
             t++;
             const v = [await qInt(1), await qInt(1)]; // 1x2 row vector
 
-            await touchGas(harness, "normHarness", [1n, 2n, v]);
-            const gas = await estimateGas(harness, "normHarness", [1n, 2n, v]);
+            await touchGas(harness, "euclideanNormHarness", [1n, 2n, v]);
+            const gas = await estimateGas(harness, "euclideanNormHarness", [1n, 2n, v]);
 
-            await expect(
-                harness.normHarness(1n, 2n, v),
-            ).to.be.revertedWith("MatrixMaster: norm requires column vector");
+            await expect( harness.euclideanNormHarness(1n, 2n, v)).to.be.revertedWith("MatrixMaster: euclideanNorm requires column vector");
 
             printBlock({
                 t,
-                method: "normHarness",
-                explanation: "Rejects row vectors. norm requires a column vector (n×1).",
+                method: "euclideanNormHarness",
+                explanation: "Rejects row vectors. euclideanNorm requires a column vector (n×1).",
                 gas,
                 shapeIn: "1x2",
                 shapeOut: "revert",

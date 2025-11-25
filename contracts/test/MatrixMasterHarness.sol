@@ -19,9 +19,9 @@ contract MatrixMasterHarness {
     // Short alias for library struct
     using MatrixMaster for MatrixMaster.Matrix;
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Internal helpers
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Build a MatrixMaster.Matrix from flat calldata.
@@ -57,9 +57,9 @@ contract MatrixMasterHarness {
         return (m.rows, m.cols, m.data);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Quad helpers for tests
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Convert integer to quad using MathLib.
@@ -172,9 +172,9 @@ contract MatrixMasterHarness {
         return true;
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Creation wrappers
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.zeros.
@@ -240,9 +240,9 @@ contract MatrixMasterHarness {
         return _fromMatrix(m);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Element access wrappers
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.get.
@@ -275,9 +275,9 @@ contract MatrixMasterHarness {
         return _fromMatrix(m);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Slice & reshape wrappers
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.slice.
@@ -321,9 +321,9 @@ contract MatrixMasterHarness {
         return _fromMatrix(r);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Transpose wrapper
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.transpose.
@@ -338,9 +338,9 @@ contract MatrixMasterHarness {
         return _fromMatrix(t);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Elementwise arithmetic wrappers
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.add.
@@ -404,9 +404,9 @@ contract MatrixMasterHarness {
         return _fromMatrix(c);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Matrix multiplication wrapper
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.mul.
@@ -425,9 +425,9 @@ contract MatrixMasterHarness {
         return _fromMatrix(c);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Matrix-Vector multiplication wrapper
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.mulMatrixVector.
@@ -446,9 +446,9 @@ contract MatrixMasterHarness {
         return _fromMatrix(c);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Vector dot product wrapper
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.dot.
@@ -466,9 +466,9 @@ contract MatrixMasterHarness {
         return MatrixMaster.dot(a, b);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Determinant wrapper
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.det.
@@ -482,9 +482,9 @@ contract MatrixMasterHarness {
         return MatrixMaster.det(a);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Inverse wrapper
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.inverse.
@@ -499,28 +499,28 @@ contract MatrixMasterHarness {
         return _fromMatrix(invA);
     }
 
-    // =========================================================
-    // Vector norm (l₂) & normalization wrappers
-    // =========================================================
+    // ---------------------------------------------------------
+    // Vector euclideanNorm (l_2) & normalization wrappers
+    // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.norm2.
+     * @notice Wrapper for MatrixMaster.euclideanNorm.
      * @dev Input must be vector-shaped: (n×1) or (1×n).
-     * @return norm  l₂-vector norm ||v||₂
+     * @return norm  l_2-vector norm ||v||_2
      */
-    function normHarness(
+    function euclideanNormHarness(
         uint256 rows,
         uint256 cols,
         bytes16[] calldata dataFlat
     ) external pure returns (bytes16 norm) {
         MatrixMaster.Matrix memory v = _toMatrix(rows, cols, dataFlat);
-        return MatrixMaster.norm(v);
+        return MatrixMaster.euclideanNorm(v);
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.normalize, computing v / ||v||₂.
+     * @notice Wrapper for MatrixMaster.normalize, computing v / ||v||_2.
      * @dev Reverts on zero vector.  
-     * @return (rows, cols, data)  normalized vector with unit l₂ norm
+     * @return (rows, cols, data)  normalized vector with unit l_2 norm
      */
     function normalizeHarness(
         uint256 rows,
@@ -532,9 +532,9 @@ contract MatrixMasterHarness {
         return _fromMatrix(out);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Vector randomization wrapper
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
     * @notice Wrapper for MatrixMaster.randomVector (n × 1).
@@ -547,9 +547,9 @@ contract MatrixMasterHarness {
         return _fromMatrix(v);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Convergence check wrapper
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Wrapper for MatrixMaster.hasConverged.
@@ -568,9 +568,9 @@ contract MatrixMasterHarness {
         return MatrixMaster.hasConverged(x, y, tol);
     }
 
-    // =========================================================
+    // ---------------------------------------------------------
     // Power Iteration Wrapper
-    // =========================================================
+    // ---------------------------------------------------------
 
     /**
     * @notice Wrapper for MatrixMaster.powerIteration.
