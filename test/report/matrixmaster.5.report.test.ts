@@ -21,14 +21,7 @@ type MatrixMasterHarness = Contract & {
     qFromFrac(n: bigint, m: bigint): Promise<string>;
 
     // matrix comparison helpers
-    matricesExactEqual(
-        aRows: bigint,
-        aCols: bigint,
-        aData: string[],
-        bRows: bigint,
-        bCols: bigint,
-        bData: string[],
-    ): Promise<boolean>;
+    matricesExactEqual(aRows: bigint, aCols: bigint, aData: string[], bRows: bigint, bCols: bigint, bData: string[]): Promise<boolean>;
 
     // creation (helper)
     zerosHarness(rows: bigint, cols: bigint): Promise<[bigint, bigint, string[]]>;
