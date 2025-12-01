@@ -18,9 +18,10 @@ import "../libraries/Trigonometry/Trigonometry.sol";
 contract TrigonometryHarness {
     using MathLib for bytes16;
 
-    /*──────────────────────────────────────────────────────────
-        QUAD CONSTANTS
-    ──────────────────────────────────────────────────────────*/
+    // ---------------------------------------------------------
+    // QUAD CONSTANTS
+    // ---------------------------------------------------------
+
     bytes16 public constant QPI        = 0x4000921FB54442D18469898CC51701B8;
     bytes16 public constant QHALF_PI   = 0x3FFF921FB54442D18469898CC51701B8;
     bytes16 public constant QQUARTER_PI= 0x3FFE921FB54442D18469898CC51701B8;
@@ -28,9 +29,9 @@ contract TrigonometryHarness {
 
     bytes16 public constant QNAN       = 0x7fff8000000000000000000000000000;
 
-    /*──────────────────────────────────────────────────────────
-        BASIC QUAD <-> INT CONVERSIONS
-    ──────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    // QUAD <-> INT Conversions
+    // ------------------------------------------------------------
 
     /**
      * @notice Converts a signed integer to quadruple precision.
@@ -60,9 +61,9 @@ contract TrigonometryHarness {
         return MathLib.toInt(x);
     }
 
-    /*──────────────────────────────────────────────────────────
-        QUAD <-> FLOAT (scaled)  (JS testing compatible)
-    ──────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    // QUAD <-> FLOAT (scaled) (JS testing compatible)
+    // ------------------------------------------------------------
 
     /// @notice Scaling factor used for JS-style fixed-decimal conversions.
     uint256 public constant SCALE = 1e12;
@@ -90,9 +91,9 @@ contract TrigonometryHarness {
         return MathLib.toInt(scaled);
     }
 
-    /*──────────────────────────────────────────────────────────
-        UTILITY HELPERS
-    ──────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes |x| in quadruple precision.
@@ -155,9 +156,9 @@ contract TrigonometryHarness {
         return MathLib.mul(a, b);
     }
 
-    /*──────────────────────────────────────────────────────────
-        TRIGONOMETRY EXPOSED FUNCTIONS
-    ──────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    // Trigonometry Functions
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes sin(x) using high-precision trigonometric reduction.
