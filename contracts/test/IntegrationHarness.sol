@@ -20,12 +20,12 @@ contract IntegrationHarness {
     // ------------------------------------------------------------
 
     /**
-     * @notice Converts an int256 into its quad-precision representation.
-     * @param x Signed integer value.
-     * @return q Quad-precision number representing x.
+     * @notice Converts a signed integer to IEEE-754 quadruple precision.
+     * @param  n Signed integer.
+     * @return q Quadruple-precision representation of `n`.
      */
-    function qFromInt(int256 x) external pure returns (bytes16) {
-        return MathLib.fromInt(x);
+    function qFromInt(int256 n) external pure returns (bytes16 q) {
+        q = MathLib.fromInt(n);
     }
 
     /**
@@ -38,15 +38,17 @@ contract IntegrationHarness {
     }
 
     /**
-     * @notice Produces a quad-precision fraction num/den.
+     * @notice Converts a rational number num/den to quadruple precision.
+     * @dev    Reverts if `den` equals zero.
      * @param num Signed numerator.
-     * @param den Signed denominator.
-     * @return q Quad-precision representation of num/den.
+     * @param den Signed denominator (must be non-zero).
+     * @return q  Quadruple-precision value representing num/den.
      */
-    function qFromFrac(int256 num, int256 den) external pure returns (bytes16) {
-        bytes16 n = MathLib.fromInt(num);
-        bytes16 d = MathLib.fromInt(den);
-        return n.div(d);
+    function qFromFrac(int256 num, int256 den) external pure returns (bytes16 q) {
+        require(den != 0, "den=0");
+        bytes16 qNum = MathLib.fromInt(num);
+        bytes16 qDen = MathLib.fromInt(den);
+        q = qNum.div(qDen);
     }
 
     /**
