@@ -13,9 +13,9 @@ import { MathLib } from "../libraries/MathLib.sol";
 contract PolynomialHarness {
     using MathLib for bytes16;
 
-    // ============================================================
-    // Passthroughs to Polynomial library
-    // ============================================================
+    // ---------------------------------------------------------
+    // Polynomial library
+    // ---------------------------------------------------------
 
     /**
      * @notice Evaluates a polynomial using Horner's method.
@@ -100,9 +100,9 @@ contract PolynomialHarness {
         return Polynomial.syntheticDivide(coeffs, root);
     }
 
-    // ============================================================
+    // ---------------------------------------------------------
     // Calculus
-    // ============================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Computes the derivative polynomial coefficients.
@@ -123,9 +123,9 @@ contract PolynomialHarness {
         return Polynomial.integral(coeffs, C);
     }
 
-    // ============================================================
+    // ---------------------------------------------------------
     // Utilities
-    // ============================================================
+    // ---------------------------------------------------------
 
     /**
      * @notice Computes the polynomial degree (highest non-zero coefficient index).
@@ -145,9 +145,9 @@ contract PolynomialHarness {
         return Polynomial.trimTrailingZeros(coeffs);
     }
 
-    // ============================================================
-    // Test Helpers
-    // ============================================================
+    // ---------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------
 
     /**
      * @notice Converts an integer to quad precision.
