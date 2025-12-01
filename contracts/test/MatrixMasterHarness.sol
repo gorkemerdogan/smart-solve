@@ -20,7 +20,7 @@ contract MatrixMasterHarness {
     using MatrixMaster for MatrixMaster.Matrix;
 
     // ---------------------------------------------------------
-    // Internal helpers
+    // Helpers
     // ---------------------------------------------------------
 
     /**
