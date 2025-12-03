@@ -8,8 +8,7 @@ import { Differentiation } from "../libraries/numeric/Differentiation.sol";
 /**
  * @title DifferentiationHarness
  * @notice Test harness for the Differentiation library.
- * @dev Exposes internal library functions to external callers for testing.
- * Includes mock functions (x^2, x^3, etc.) to act as integration targets.
+ *         Includes mock functions (x^2, x^3, etc.) to act as integration targets.
  */
 contract DifferentiationHarness {
     using MathLib for bytes16;
@@ -29,7 +28,7 @@ contract DifferentiationHarness {
 
     /**
      * @notice Converts a rational number num/den to quadruple precision.
-     * @dev    Reverts if `den` equals zero.
+     *         Reverts if `den` equals zero.
      * @param num Signed numerator.
      * @param den Signed denominator (must be non-zero).
      * @return q  Quadruple-precision value representing num/den.
@@ -41,29 +40,8 @@ contract DifferentiationHarness {
         q = qNum.div(qDen);
     }
 
-    /// @notice Returns a hardcoded IEEE-754 binary128 constant for PI.
-    function PI() external pure returns (bytes16) {
-        return QC.PI();
-    }
-
-    // ------------------------------------------------------------
-    // QUAD <-> FLOAT (scaled) (JS testing compatible)
-    // ------------------------------------------------------------
-
     /// @notice Scaling factor used for JS-style fixed-decimal conversions.
     uint256 public constant SCALE = 1e12;
-
-    /**
-     * @notice Converts a scaled integer (scaled by SCALE) into quadruple precision.
-     * @dev Example: scaledValue = 1234500000000 → represents 1.2345.
-     * @param scaledValue Integer representing a float multiplied by SCALE.
-     * @return Quadruple-precision value.
-     */
-    function fromFloat(int256 scaledValue) external pure returns (bytes16) {
-        bytes16 qInt = MathLib.fromInt(scaledValue);
-        bytes16 qScale = MathLib.fromUInt(SCALE);
-        return MathLib.div(qInt, qScale);
-    }
 
     /**
      * @notice Converts a quadruple-precision number into a scaled integer (scaled by SCALE).
@@ -74,6 +52,11 @@ contract DifferentiationHarness {
         bytes16 qScale = MathLib.fromUInt(SCALE);
         bytes16 scaled = MathLib.mul(x, qScale);
         return MathLib.toInt(scaled);
+    }
+
+    /// @notice Returns a hardcoded IEEE-754 binary128 constant for PI.
+    function PI() external pure returns (bytes16) {
+        return QC.PI();
     }
 
     // ------------------------------------------------------------
@@ -110,7 +93,7 @@ contract DifferentiationHarness {
 
     /**
      * @notice f(x) = x^2
-     * @dev Derivative f'(x) = 2x
+     *         Derivative f'(x) = 2x
      */
     function f_square(bytes16 x) external pure returns (bytes16) {
         return x.mul(x);
@@ -118,7 +101,7 @@ contract DifferentiationHarness {
 
     /**
      * @notice f(x) = 3x − 2
-     * @dev Derivative f'(x) = 3
+     *         Derivative f'(x) = 3
      */
     function f_linear(bytes16 x) external pure returns (bytes16) {
         bytes16 three = MathLib.fromInt(3);
@@ -128,7 +111,7 @@ contract DifferentiationHarness {
 
     /**
      * @notice f(x) = 5
-     * @dev Derivative f'(x) = 0
+     *         Derivative f'(x) = 0
      */
     function f_constFive(bytes16) external pure returns (bytes16) {
         return MathLib.fromInt(5);
@@ -136,7 +119,7 @@ contract DifferentiationHarness {
 
     /**
      * @notice f(x) = |x|
-     * @dev Derivative is -1 for x < 0, 1 for x > 0. Undefined at 0.
+     *         Derivative is -1 for x < 0, 1 for x > 0. Undefined at 0.
      */
     function f_abs(bytes16 x) external pure returns (bytes16) {
         return MathLib.abs(x);
@@ -144,7 +127,7 @@ contract DifferentiationHarness {
 
     /**
      * @notice f(x) = x^3
-     * @dev Derivative f'(x) = 3x^2
+     *         Derivative f'(x) = 3x^2
      */
     function f_cube(bytes16 x) external pure returns (bytes16) {
         return x.mul(x).mul(x); // x * x * x
