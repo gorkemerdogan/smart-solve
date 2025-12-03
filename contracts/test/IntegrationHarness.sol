@@ -39,7 +39,7 @@ contract IntegrationHarness {
 
     /**
      * @notice Converts a rational number num/den to quadruple precision.
-     * @dev    Reverts if `den` equals zero.
+     *         Reverts if `den` equals zero.
      * @param num Signed numerator.
      * @param den Signed denominator (must be non-zero).
      * @return q  Quadruple-precision value representing num/den.
@@ -49,6 +49,20 @@ contract IntegrationHarness {
         bytes16 qNum = MathLib.fromInt(num);
         bytes16 qDen = MathLib.fromInt(den);
         q = qNum.div(qDen);
+    }
+
+    /// @notice Scaling factor used for JS-style fixed-decimal conversions.
+    uint256 public constant SCALE = 1e12;
+
+    /**
+     * @notice Converts a quadruple-precision number into a scaled integer (scaled by SCALE).
+     * @param x Quadruple-precision value.
+     * @return Integer representing x * SCALE.
+     */
+    function toFloat(bytes16 x) external pure returns (int256) {
+        bytes16 qScale = MathLib.fromUInt(SCALE);
+        bytes16 scaled = MathLib.mul(x, qScale);
+        return MathLib.toInt(scaled);
     }
 
     /**
@@ -122,8 +136,8 @@ contract IntegrationHarness {
 
     /**
      * @notice Integrand that always reverts.
-     * @dev Used to verify that Integration library short-circuits when a == b
-     *      and avoids unnecessary function calls.
+     *         Used to verify that Integration library short-circuits when a == b
+     *         and avoids unnecessary function calls.
      */
     function f_revert(bytes16 /*x*/) external pure returns (bytes16) {
         revert("f_revert called");
@@ -148,7 +162,7 @@ contract IntegrationHarness {
 
     /**
      * @notice Integrand f(x) = 1/x.
-     * @dev Domain excludes x = 0.
+     *         Domain excludes x = 0.
      * @param x Input value.
      * @return v Quad-precision value 1/x.
      */
@@ -179,9 +193,9 @@ contract IntegrationHarness {
 
     /**
      * @notice Piecewise integrand:
-     *         - [0,1] → 1
-     *         - (1,2] → 3
-     * @dev Reverts outside [0,2].
+     *             - [0,1] → 1
+     *             - (1,2] → 3
+     *         Reverts outside [0,2].
      * @param x Input value.
      * @return v Quad-precision piecewise-defined value.
      */
