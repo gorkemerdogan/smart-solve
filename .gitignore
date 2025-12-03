@@ -19,3 +19,4 @@ ignition/deployments/chain-31337
 /contracts/.DS_Store
 /contracts/facets/.DS_Store
 /test/.DS_Store
+.DS_Store
