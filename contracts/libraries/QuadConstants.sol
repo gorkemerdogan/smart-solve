@@ -7,27 +7,17 @@ import "abdk-libraries-solidity/ABDKMathQuad.sol";
  * @title QuadConstants
  * @notice Shared high-precision constants and tiny helpers for IEEE-754
  *         binary128 (quadruple precision) using ABDKMathQuad.
- *
- *         Design notes:
- *         - Everything is returned as bytes16 (ABDK's quad type).
- *         - Implemented as `internal pure` functions, not `constant` values,
- *           because Solidity does not allow calling library functions
- *           (e.g. fromInt, div) in constant initializers.
- *         - This centralizes π, tolerances, and small integers so that
- *           Integration/RootFinding/Trigonometric libraries all use the
- *           *same* definitions.
  */
 library QuadConstants {
     using ABDKMathQuad for bytes16;
 
     // -------------------------------------------------------------
-    // HELPERS
+    // Helpers
     // -------------------------------------------------------------
 
     /**
      * @notice Constructs a quadruple-precision rational number num/den.
-     * @dev Convenience wrapper for ABDKMathQuad.fromInt(num).div(fromInt(den)).
-     *      Useful to avoid repeating boilerplate throughout trig/numeric libraries.
+     *         Convenience wrapper for ABDKMathQuad.fromInt(num).div(fromInt(den)).
      *
      * @param num Numerator (signed integer)
      * @param den Denominator (signed integer), must be non-zero
@@ -48,14 +38,14 @@ library QuadConstants {
     }
 
     // -------------------------------------------------------------
-    // π AND FRIENDS
+    // π
     // -------------------------------------------------------------
 
     /**
      * @notice Returns π (pi) in IEEE-754 quadruple precision.
-     * @dev Encoded as a canonical 128-bit constant approximating:
-     *        3.1415926535897932384626433832795
-     *      Provides 31 decimal digits, sufficient for quad-precision math.
+     *         Encoded as a canonical 128-bit constant approximating:
+     *         3.1415926535897932384626433832795
+     *         Provides 31 decimal digits, sufficient for quad-precision math.
      * @return bytes16 π
      */
     function PI() internal pure returns (bytes16) {
@@ -87,12 +77,12 @@ library QuadConstants {
     }
 
     // -------------------------------------------------------------
-    // TOLERANCES
+    // Tolerences
     // -------------------------------------------------------------
 
     /**
      * @notice Returns 1e-6 as a quadruple-precision constant.
-     * @dev Useful as a "small-angle" threshold in trigonometric approximations.
+     *         Useful as a "small-angle" threshold in trigonometric approximations.
      * @return bytes16 1 × 10⁻⁶
      */
     function EPS_1e6() internal pure returns (bytes16) {
@@ -101,7 +91,7 @@ library QuadConstants {
 
     /**
      * @notice Returns 1e-9 as a quadruple-precision constant.
-     * @dev Good for mid-range error bounds.
+     *         Good for mid-range error bounds.
      * @return bytes16 1 × 10⁻⁹
      */
     function EPS_1e9() internal pure returns (bytes16) {
@@ -110,7 +100,7 @@ library QuadConstants {
 
     /**
      * @notice Returns 1e-12 as a quadruple-precision constant.
-     * @dev Default tolerance used in SmartSolve numeric routines.
+     *         Default tolerance used in SmartSolve numeric routines.
      * @return bytes16 1 × 10⁻¹²
      */
     function EPS_1e12() internal pure returns (bytes16) {
@@ -119,7 +109,7 @@ library QuadConstants {
 
     /**
      * @notice Returns 1e-15 as a quadruple-precision constant.
-     * @dev Recommended minimum tolerance (`minTol`) for root-finding algorithms.
+     *         Recommended minimum tolerance (`minTol`) for root-finding algorithms.
      *
      * @return bytes16 1 × 10⁻¹⁵
      */
@@ -129,7 +119,7 @@ library QuadConstants {
 
     /**
      * @notice Returns 1e-18 as a quadruple-precision constant.
-     * @dev Mainly useful for testing clamping logic (too strict tolerances).
+     *         Mainly useful for testing clamping logic (too strict tolerances).
      *
      * @return bytes16 1 × 10⁻¹⁸
      */
@@ -139,7 +129,7 @@ library QuadConstants {
 
     /**
      * @notice Returns 1e-30 as a quadruple-precision constant.
-     * @dev Very small epsilon, stored as a precomputed hex literal for accuracy.
+     *         Very small epsilon, stored as a precomputed hex literal for accuracy.
      *
      * @return bytes16 1 × 10⁻³⁰
      */
@@ -148,12 +138,12 @@ library QuadConstants {
     }
 
     // -------------------------------------------------------------
-    // DEFAULT NUMERIC CONFIG
+    // Default Config
     // -------------------------------------------------------------
 
     /**
      * @notice Returns the default numerical tolerance for SmartSolve.
-     * @dev Alias for EPS_1e12(), used by root-finding and integration routines.
+     *         Alias for EPS_1e12(), used by root-finding and integration routines.
      *
      * @return bytes16 1 × 10⁻¹²
      */
@@ -163,7 +153,7 @@ library QuadConstants {
 
     /**
      * @notice Returns the default minimum tolerance for SmartSolve.
-     * @dev Alias for EPS_1e15(), used as a floor when clamping tolerance.
+     *         Alias for EPS_1e15(), used as a floor when clamping tolerance.
      *
      * @return bytes16 1 × 10⁻¹⁵
      */

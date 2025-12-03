@@ -9,17 +9,21 @@ import { LibSmartSolve } from "../libraries/LibSmartSolve.sol";
  * @notice Implements IDiamondCut.
  *         Exposes the diamondCut() function so the owner can
  *         add/replace/remove function selectors to facets.
- * @dev Delegates all logic to LibSmartSolve.diamondCut().
- *      This facet only exposes the external entry point required by the diamond standard.
- *      Access control: restricted to the contract owner (IERC173).
+ *  
+ *         Delegates all logic to LibSmartSolve.diamondCut().
+ *         This facet only exposes the external entry point required by the diamond standard.
+ *         Access control is restricted to the contract owner (IERC173).
  */
 
 contract DiamondCutFacet is IDiamondCut {
-    /// @notice Add/replace/remove functions and optionally execute a function
-    ///         with delegatecall, often used for initialization
-    /// @param _diamondCut Array of facet addresses and function selectors
-    /// @param _init Address of contract or facet to execute calldata on
-    /// @param _calldata Calldata to execute with delegatecall
+    
+    /** 
+     * @notice Add/replace/remove functions and optionally execute a function
+     *         with delegatecall, often used for initialization
+     * @param _diamondCut Array of facet addresses and function selectors
+     * @param _init Address of contract or facet to execute calldata on
+     * @param _calldata Calldata to execute with delegatecall
+     */
     function diamondCut(
         FacetCut[] calldata _diamondCut,
         address _init,

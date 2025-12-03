@@ -4,8 +4,6 @@ pragma solidity ^0.8.20;
 /**
  * @title IERC165
  * @notice ERC-165 standard interface for contract interface detection.
- * @dev Provides a mechanism to declare and query support for interfaces
- *      using a standardized 4-byte identifier.
  */
 interface IERC165 {
     /**

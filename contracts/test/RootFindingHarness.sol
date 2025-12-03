@@ -7,11 +7,7 @@ import { MathLib } from "../libraries/MathLib.sol";
  * @title RootFindingHarness
  * @notice Provides deterministic test functions for root-finding algorithms and
  *         helper constructors for quadruple-precision values.
- *
- * @dev
- *  - All numeric operations use IEEE-754 binary128 (bytes16) via ABDKMathQuad.
- *  - Functions are external/pure to support direct invocation from a diamond facet.
- *  - Includes reference functions f(x) and df(x) used in Newton/Bisection tests.
+ *         Includes reference functions f(x) and df(x) used in Newton/Bisection tests.
  */
 contract RootFindingHarness {
     using MathLib for bytes16;
@@ -31,7 +27,7 @@ contract RootFindingHarness {
 
     /**
      * @notice Converts a rational number num/den to quadruple precision.
-     * @dev Reverts if `den` equals zero.
+     *         Reverts if `den` equals zero.
      * @param num Signed numerator.
      * @param den Signed denominator (must be non-zero).
      * @return q Quadruple-precision value representing num/den.

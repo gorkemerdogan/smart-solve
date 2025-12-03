@@ -6,15 +6,6 @@ pragma solidity ^0.8.20;
  * @notice Interface defining the inspection (loupe) functions for EIP-2535 diamonds.
  *         Provides read-only access to facet addresses and their associated
  *         function selectors.
- * @dev Enables enumeration of facets, selectors within each facet, the full
- *      facet address list, and the facet responsible for a specific function
- *      selector.
- *
- *      Functions:
- *      - facets(): returns all facets and their selectors
- *      - facetFunctionSelectors(facet): returns selectors for the specified facet
- *      - facetAddresses(): returns all facet addresses
- *      - facetAddress(selector): returns the facet implementing the selector
  */
 interface IDiamondLoupe {
     struct Facet {

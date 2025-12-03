@@ -6,13 +6,6 @@ import { MathLib } from "../libraries/MathLib.sol";
 /**
  * @title LibNumericConfig
  * @notice Stores global numeric configuration in diamond storage.
- * @dev Contains tolerance values (tol, minTol) encoded as bytes16 (ABDKMathQuad)
- *      and maxIter as the global iteration cap for numerical routines.
- *      Default Max Iterations: 100
- *          uint256 private constant DEFAULT_MAX_ITER = 100;
- *      Default Tolerance: 1e-18 (Standard high precision)
- *          0x3fc56d5cfaacc19b601e1b7b51944da0 (approx 1e-18 in Quad)
- *      Default Differentiation Step: 1e-8
  */
 library LibNumericConfig {
 
@@ -23,10 +16,10 @@ library LibNumericConfig {
 
     /**
     * @notice Global numeric configuration values.
-    * @param tol Numerical tolerance encoded as bytes16
-    * @param minTol Minimum allowable tolerance encoded as bytes16
-    * @param maxIter Maximum iteration count for numeric loops
-    * @param maxIter Step size 'h' for differentiation.
+    * @param  tol     Numerical tolerance encoded as bytes16
+    * @param  minTol  Minimum allowable tolerance encoded as bytes16
+    * @param  maxIter Maximum iteration count for numeric loops
+    * @param  maxIter Step size 'h' for differentiation.
     */
     struct NumericConfig {
         bytes16 tol;
@@ -37,8 +30,7 @@ library LibNumericConfig {
 
     /**
      * @notice Returns a pointer to NumericConfig in storage
-     * @dev Uses inline assembly to assign SLOT as the storage location.
-     * This is the standard EIP-2535 diamond storage pattern.
+     *         Uses inline assembly to assign SLOT as the storage location.
      */
     function cfg() internal pure returns (NumericConfig storage c) {
         bytes32 position = SLOT;
@@ -46,7 +38,7 @@ library LibNumericConfig {
     }
 
     // ------------------------------------------------------------
-    //  Setters
+    // Setters
     // ------------------------------------------------------------
 
     /**
@@ -82,12 +74,12 @@ library LibNumericConfig {
     }
 
     // ------------------------------------------------------------
-    //  Getters
+    // Getters
     // ------------------------------------------------------------
 
     /**
      * @notice Get the global default tolerance.
-     * @dev Returns 1e-18 if uninitialized.
+     *         Returns 1e-18 if uninitialized.
      */
     function getTol() internal view returns (bytes16) {
         bytes16 t = cfg().tol;
@@ -99,7 +91,7 @@ library LibNumericConfig {
 
     /**
      * @notice Get the minimum allowable tolerance (Gas Guardrail).
-     * @dev Returns 1e-32 if uninitialized.
+     *         Returns 1e-32 if uninitialized.
      */
     function getMinTol() internal view returns (bytes16) {
         bytes16 t = cfg().minTol;
@@ -111,7 +103,7 @@ library LibNumericConfig {
 
     /**
      * @notice Get the maximum number of iterations.
-     * @dev Returns 100 if uninitialized.
+     *         Returns 100 if uninitialized.
      */
     function getMaxIter() internal view returns (uint256) {
         uint256 m = cfg().maxIter;
@@ -120,7 +112,7 @@ library LibNumericConfig {
 
     /**
      * @notice Get the differentiation step size.
-     * @dev Returns 1e-8 if uninitialized.
+     *         Returns 1e-8 if uninitialized.
      */
     function getDiffStep() internal view returns (bytes16) {
         bytes16 h = cfg().diffStep;

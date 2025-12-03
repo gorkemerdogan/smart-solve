@@ -7,8 +7,6 @@ import { MathLib } from "../libraries/MathLib.sol";
 /**
  * @title PolynomialHarness
  * @notice Exposes internal functions of the Polynomial library for testing and verification.
- * @dev All methods are direct passthroughs to library implementations. Additional helpers
- *      are provided for constructing quad-precision constants and producing debug strings.
  */
 contract PolynomialHarness {
     using MathLib for bytes16;
@@ -160,7 +158,7 @@ contract PolynomialHarness {
 
     /**
      * @notice Converts a rational number num/den into quad precision.
-     * @dev Reverts if den = 0.
+     *         Reverts if den = 0.
      * @param num Signed numerator.
      * @param den Signed denominator.
      * @return q Quad-precision representation of num/den.
@@ -172,7 +170,7 @@ contract PolynomialHarness {
 
     /**
      * @notice Returns a hexadecimal string representation of a quad value.
-     * @dev Intended for logging and debugging during unit tests.
+     *         For logging and debugging during unit tests.
      * @param x Quad-precision number.
      * @return str Hexadecimal string "0x…".
      */

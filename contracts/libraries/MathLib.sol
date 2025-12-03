@@ -13,9 +13,9 @@ import { ABDKMathQuad } from "abdk-libraries-solidity/ABDKMathQuad.sol";
  */
 library MathLib {
 
-    /*──────────────────────────────────────────────────────────
-        BASIC OPS
-    ───────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    // Basic Operations
+    // ------------------------------------------------------------
 
     /**
      * @notice Adds two IEEE-754 quadruple-precision numbers.
@@ -49,7 +49,7 @@ library MathLib {
 
     /**
      * @notice Divides two quadruple-precision numbers.
-     * @dev Reverts if `b == 0`.
+     *         Reverts if `b == 0`.
      * @param a Numerator
      * @param b Denominator
      * @return bytes16 a / b
@@ -60,7 +60,7 @@ library MathLib {
 
     /**
      * @notice Computes sqrt(a) in IEEE-754 quad.
-     * @dev Returns NaN if a < 0.
+     *         Returns NaN if a < 0.
      * @param a Input number
      * @return bytes16 √a
      */
@@ -86,16 +86,16 @@ library MathLib {
         return ABDKMathQuad.abs(a);
     }
 
-    /*──────────────────────────────────────────────────────────
-        FLOOR
-    ───────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    // Floor
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes floor(x) in IEEE-754 quadruple precision.
      * @dev ABDKMathQuad has no native floor(), so this uses truncation rules:
-     *      - If x ≥ 0: floor(x) = trunc(x)
-     *      - If x < 0 and x is integer: floor(x) = x
-     *      - If x < 0 and fractional: floor(x) = trunc(x) − 1
+     *       - If x ≥ 0: floor(x) = trunc(x)
+     *       - If x < 0 and x is integer: floor(x) = x
+     *       - If x < 0 and fractional: floor(x) = trunc(x) − 1
      *
      * @param x Quad-precision input value
      * @return floorX Quad-precision floor(x)
@@ -150,16 +150,16 @@ library MathLib {
         return ti - 1;
     }
 
-    /*──────────────────────────────────────────────────────────
-        COMPARE
-    ───────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    // Comparison
+    // ------------------------------------------------------------
 
     /**
      * @notice Compares two quad numbers.
-     * @dev Returns:
-     *      -1 if a < b
-     *       0 if a == b
-     *       1 if a > b
+     *         Returns:
+     *            -1 if a < b
+     *             0 if a == b
+     *             1 if a > b
      *
      * @param a First operand
      * @param b Second operand
@@ -180,7 +180,7 @@ library MathLib {
 
     /**
     * @notice Returns true if `x` is exactly zero in IEEE-754 quad format.
-    * @dev Uses cmp(x, 0) to correctly treat +0 and -0 as zero.
+    *         Uses cmp(x, 0) to correctly treat +0 and -0 as zero.
     *
     * @param x  Quadruple-precision value (bytes16)
     * @return   True if x == 0, false otherwise
@@ -226,7 +226,7 @@ library MathLib {
 
     /**
      * @notice Restricts a value x to stay within a lower bound (lo) and upper bound (hi).
-     * @dev Reverts if lo > hi.
+     *         Reverts if lo > hi.
      * @param x The value to clamp (bytes16)
      * @param lo The lower bound (bytes16)
      * @param hi The upper bound (bytes16)
@@ -246,9 +246,9 @@ library MathLib {
         return x;
     }
 
-    /*──────────────────────────────────────────────────────────
-        CONVERSIONS
-    ───────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    // Conversions
+    // ------------------------------------------------------------
 
     /**
      * @notice Converts a signed integer to IEEE-754 quad.

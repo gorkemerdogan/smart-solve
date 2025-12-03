@@ -9,21 +9,19 @@ import { QuadConstants } from "../QuadConstants.sol";
  * @title RootFinding
  * @notice High-precision numerical root-finding algorithms (Bisection, Newton, Secant)
  *         implemented with IEEE-754 binary128 (bytes16) via ABDKMathQuad (from MathLib).
- * @dev Stateless, pure/parametric library. Facets (or other contracts) should inject
- *      tolerance (tol) and maxIter from configuration (e.g., LibNumericConfig).
  */
 library RootFinding {
     using MathLib for bytes16;
 
     bytes16 private constant QZERO = 0x00000000000000000000000000000000;
 
-    // ================================================================
+    // ------------------------------------------------------------
     // Result & internal working-state structs
-    // ================================================================
+    // ------------------------------------------------------------
 
     /**
      * @notice Result container for any root-finding algorithm.
-     * @dev Encapsulates the final approximation, iteration count, convergence flag, and f(root).
+     *         Encapsulates the final approximation, iteration count, convergence flag, and f(root).
      * @param root       Final root approximation (bytes16)
      * @param iterations Number of iterations performed
      * @param converged  True if tolerance satisfied
@@ -38,9 +36,9 @@ library RootFinding {
 
     /**
      * @notice Internal transient state used by the Newton–Raphson method.
-     * @param x Current iterate
-     * @param fx Current value f(x)
-     * @param atTol Effective tolerance applied during iteration
+     * @param  x Current iterate
+     * @param  fx Current value f(x)
+     * @param  atTol Effective tolerance applied during iteration
      */
     struct NewtonState {
         bytes16 x;     // current iterate
@@ -70,11 +68,11 @@ library RootFinding {
 
     /**
      * @notice Internal transient state for the secant method.
-     * @param xPrev Previous iterate
-     * @param x Current iterate
-     * @param fPrev f(xPrev)
-     * @param fx f(x)
-     * @param atTol Effective tolerance applied during iteration
+     * @param  xPrev Previous iterate
+     * @param  x Current iterate
+     * @param  fPrev f(xPrev)
+     * @param  fx f(x)
+     * @param  atTol Effective tolerance applied during iteration
      */
     struct SecantState {
         bytes16 xPrev;
@@ -84,18 +82,18 @@ library RootFinding {
         bytes16 atTol;
     }
 
-    // ================================================================
+    // ------------------------------------------------------------
     // Internal helpers
-    // ================================================================
+    // ------------------------------------------------------------
 
     /**
      * @notice Evaluates the integrand or function via staticcall.
-     * @dev Calls `target.selector(x)` and decodes a bytes16 return value.
-     *      Reverts on failure or insufficient return data.
-     * @param target Address exposing f(bytes16) -> bytes16
-     * @param sel Function selector for f
-     * @param x Input point
-     * @return y Result of f(x) encoded as bytes16
+     *         Calls `target.selector(x)` and decodes a bytes16 return value.
+     *         Reverts on failure or insufficient return data.
+     * @param  target Address exposing f(bytes16) -> bytes16
+     * @param  sel    Function selector for f
+     * @param  x      Input point
+     * @return y      Result of f(x) encoded as bytes16
      */
     function _eval(address target, bytes4 sel, bytes16 x) private view returns (bytes16 y) {
         (bool ok, bytes memory data) = target.staticcall(abi.encodeWithSelector(sel, x));
@@ -112,7 +110,7 @@ library RootFinding {
      *      - Otherwise uses configured tolerance from storage.
      *      - If unset, uses the library default tolerance.
      *      - Result is always ≥ configured or default minimum tolerance.
-     * @param requestedTol Tolerance supplied by the caller.
+     * @param  requestedTol Tolerance supplied by the caller.
      * @return tol Validated and clamped tolerance, guaranteed > 0.
      */
     function _clampTol(bytes16 requestedTol) private view returns (bytes16 tol) {
@@ -148,22 +146,22 @@ library RootFinding {
         return tol;
     }
 
-    // ================================================================
+    // ------------------------------------------------------------
     // Bisection (internal)
-    // ================================================================
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes a root using the bisection method on [a, b].
-     * @dev Requires f(a) and f(b) to have opposite signs. Endpoints are normalized
-     *      to ensure left ≤ right. Convergence is triggered when either:
-     *      - |f(mid)| ≤ tol, or
-     *      - interval width / 2 ≤ tol.
-     * @param target Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector for f(bytes16)
-     * @param a First endpoint of the interval
-     * @param b Second endpoint of the interval
-     * @param tol Requested tolerance (clamped to configured minimum)
-     * @param maxIter Maximum number of iterations
+     *         Requires f(a) and f(b) to have opposite signs. Endpoints are normalized
+     *         to ensure left ≤ right. Convergence is triggered when either:
+     *           - |f(mid)| ≤ tol, or
+     *           - interval width / 2 ≤ tol.
+     * @param  target     Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector  Selector for f(bytes16)
+     * @param  a          First endpoint of the interval
+     * @param  b          Second endpoint of the interval
+     * @param  tol        Requested tolerance (clamped to configured minimum)
+     * @param  maxIter    Maximum number of iterations
      * @return RootResult Struct containing root approximation and metadata
      */
     function bisection(
@@ -222,22 +220,22 @@ library RootFinding {
         return RootResult(s.mid, k, false, s.fm);
     }
 
-    // ================================================================
+    // ------------------------------------------------------------
     // Newton–Raphson (internal)
-    // ================================================================
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes a root using the Newton–Raphson method with analytic derivative.
-     * @dev Requires non-zero derivative at each iterate. Convergence is based on:
-     *      - |f(xNext)| ≤ tol, or
-     *      - |xNext − x| ≤ tol.
-     * @param target Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector for f(bytes16)
-     * @param dfTarget Contract exposing f'(bytes16)
-     * @param dfSelector Selector for f'(bytes16)
-     * @param x0 Initial guess
-     * @param tol Requested tolerance (clamped to configured minimum)
-     * @param maxIter Maximum number of iterations
+     *         Requires non-zero derivative at each iterate. Convergence is based on:
+     *           - |f(xNext)| ≤ tol, or
+     *           - |xNext − x| ≤ tol.
+     * @param  target     Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector  Selector for f(bytes16)
+     * @param  dfTarget   Contract exposing f'(bytes16)
+     * @param  dfSelector Selector for f'(bytes16)
+     * @param  x0         Initial guess
+     * @param  tol        Requested tolerance (clamped to configured minimum)
+     * @param  maxIter    Maximum number of iterations
      * @return RootResult Struct with the final iterate, iteration count, and convergence flag
      */
     function newton(
@@ -280,22 +278,22 @@ library RootFinding {
         return RootResult(s.x, k, false, s.fx);
     }
 
-    // ================================================================
+    // ------------------------------------------------------------
     // Secant (internal)
-    // ================================================================
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes a root using the secant method (derivative-free).
-     * @dev Uses two initial values and updates via the secant update formula.
-     *      Reverts if consecutive function values yield zero slope. Converges when:
-     *      - |f(xNext)| ≤ tol, or
-     *      - |xNext − x| ≤ tol.
-     * @param target Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector for f(bytes16)
-     * @param x0 First initial point
-     * @param x1 Second initial point
-     * @param tol Requested tolerance (clamped to configured minimum)
-     * @param maxIter Maximum number of iterations
+     *         Uses two initial values and updates via the secant update formula.
+     *         Reverts if consecutive function values yield zero slope. Converges when:
+     *           - |f(xNext)| ≤ tol, or
+     *           - |xNext − x| ≤ tol.
+     * @param  target     Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector  Selector for f(bytes16)
+     * @param  x0         First initial point
+     * @param  x1         Second initial point
+     * @param  tol        Requested tolerance (clamped to configured minimum)
+     * @param  maxIter    Maximum number of iterations
      * @return RootResult Struct containing the resulting approximation
      */
     function secant(

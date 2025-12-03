@@ -5,9 +5,9 @@ import { IDiamondLoupe } from "../interfaces/IDiamondLoupe.sol";
 import { LibSmartSolve } from "../libraries/LibSmartSolve.sol";
 
 /**
- * @title DiamondLoupeFacet
+ * @title  DiamondLoupe Facet
  * @notice Implements the IDiamondLoupe interface (EIP-2535).
- * @dev Allows querying facet addresses, selectors, and mappings from selectors to facets.
+ *         Allows querying facet addresses, selectors, and mappings from selectors to facets.
  */
 
 contract DiamondLoupeFacet is IDiamondLoupe {

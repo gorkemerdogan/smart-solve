@@ -6,20 +6,19 @@ import { QuadConstants as QC } from "../QuadConstants.sol";
 import { TrigonometrySinCos as TSC } from "./TrigonometrySinCos.sol";
 
 /**
- * @title TrigonometryArc
+ * @title TrigonometryArc Library
  * @notice High-precision inverse trigonometric functions (asin, acos, atan) in
  *         IEEE-754 binary128 (bytes16) arithmetic.
- * @dev Implements domain checks, stable polynomial approximations, half-angle
- *      reductions, and Newton refinements. All operations are performed using
- *      MathLib and TrigonometrySinCos.
+ *         Implements domain checks, stable polynomial approximations, half-angle
+ *         reductions, and Newton refinements.
  */
 library TrigonometryArc {
     bytes16 internal constant QZERO = 0x00000000000000000000000000000000;
     bytes16 internal constant QNAN  = 0x7fff8000000000000000000000000000;
 
-    /*──────────────────────────────────────────────────────────
-        asin(x)
-    ──────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    //  asin(x)
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes asin(x) in binary128 precision.
@@ -142,9 +141,9 @@ library TrigonometryArc {
         return y;
     }
 
-    /*──────────────────────────────────────────────────────────
-        acos(x)
-    ──────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    //  acos(x)
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes acos(x) in binary128 precision.
@@ -170,9 +169,9 @@ library TrigonometryArc {
         return MathLib.sub(QC.HALF_PI(), a);
     }
 
-    /*──────────────────────────────────────────────────────────
-        atan(x)
-    ──────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------
+    //  atan(x)
+    // ------------------------------------------------------------
     /**
      * @notice Computes atan(x) in binary128 precision.
      * @dev Strategy:

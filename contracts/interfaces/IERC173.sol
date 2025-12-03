@@ -5,8 +5,6 @@ pragma solidity ^0.8.20;
  * @title IERC173
  * @notice ERC-173 ownership standard defining a minimal interface for
  *         single-owner contract control.
- * @dev Provides functions for retrieving and updating the contract owner,
- *      along with the OwnershipTransferred event.
  */
 interface IERC173 {
     /**

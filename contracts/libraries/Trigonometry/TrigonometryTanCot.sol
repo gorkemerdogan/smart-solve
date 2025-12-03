@@ -5,10 +5,10 @@ import { MathLib } from "../MathLib.sol";
 import { TrigonometrySinCos as TSC } from "./TrigonometrySinCos.sol";
 
 /**
- * @title TrigonometryTanCot
+ * @title  TrigonometryTanCot
  * @notice High-precision tangent and cotangent in IEEE-754 binary128 (bytes16).
- * @dev Uses sine/cosine from TrigonometrySinCos and applies domain checks
- *      for singularities where results are undefined.
+ *         Uses sine/cosine from TrigonometrySinCos and applies domain checks
+ *         for singularities where results are undefined.
  */
 library TrigonometryTanCot {
 
@@ -16,9 +16,9 @@ library TrigonometryTanCot {
     bytes16 internal constant QNAN  = 0x7fff8000000000000000000000000000;
     bytes16 internal constant TINY  = 0x00010000000000000000000000000000; // 2^-112
 
-    // ===============================================================
-    // === tan(x)
-    // ===============================================================
+    // ------------------------------------------------------------
+    // tan(x)
+    // ------------------------------------------------------------
     /**
      * @notice Computes tan(x) in binary128 precision.
      * @dev Implementation:
@@ -47,9 +47,9 @@ library TrigonometryTanCot {
         return MathLib.div(s, c);
     }
 
-    // ===============================================================
-    // === cot(x)
-    // ===============================================================
+    // ------------------------------------------------------------
+    // cot(x)
+    // ------------------------------------------------------------
     /**
      * @notice Computes cot(x) in binary128 precision.
      * @dev Implementation:

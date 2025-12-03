@@ -4,32 +4,30 @@ pragma solidity ^0.8.20;
 import { MathLib } from "../MathLib.sol";
 
 /**
- * @title Integration
+ * @title Integration Library
  * @notice High-precision numerical integration on uniform grids using
  *         trapezoidal rule, Simpson's 1/3 rule, and Simpson's 3/8 rule.
  *
- *         All scalars are IEEE-754 binary128 (bytes16) via ABDKMathQuad (MathLib).
  *         The integrand f is provided as an external view function
  *         f(bytes16) -> bytes16, addressed by (target, selector).
- *
- *         These routines are stateless and do not touch storage.
  */
 library Integration {
     using MathLib for bytes16;
 
     bytes16 private constant QZERO = bytes16(0x00000000000000000000000000000000);
 
-    // ================================================================
-    // Internal helpers
-    // ================================================================
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
 
     /**
      * @notice Evaluates the integrand at a given point by staticcalling the target contract.
-     * @dev Performs a staticcall to `target` using selector `sel` with argument `x`.
-     *      Reverts if the call fails or returns insufficient data.
-     * @param target Address of the contract exposing f(bytes16) -> bytes16
-     * @param sel Function selector for the integrand
-     * @param x Input point where the integrand is evaluated
+     *         Performs a staticcall to `target` using selector `sel` with argument `x`.
+     *         Reverts if the call fails or returns insufficient data.
+     *
+     * @param  target Address of the contract exposing f(bytes16) -> bytes16
+     * @param  sel Function selector for the integrand
+     * @param  x Input point where the integrand is evaluated
      * @return y Result of f(x) as bytes16
      */
     function _eval(address target, bytes4 sel, bytes16 x) private view returns (bytes16 y) {
@@ -42,11 +40,12 @@ library Integration {
 
     /**
      * @notice Validates shared integration constraints for all numerical schemes.
-     * @dev Ensures:
-     *      - target address is nonzero
-     *      - n > 0
-     *      - b >= a (based on MathLib.cmp)
-     *      Used by all integration routines prior to computation.
+     *         Ensures:
+     *          - target address is nonzero
+     *          - n > 0
+     *          - b >= a (based on MathLib.cmp)
+     *          Used by all integration routines prior to computation.
+     *
      * @param target Address of the contract exposing the integrand
      * @param a Lower bound
      * @param b Upper bound
@@ -58,19 +57,20 @@ library Integration {
         require(MathLib.cmp(b, a) >= 0, "Integration: upper bound b must be >= a");
     }
 
-    // ================================================================
+    // ------------------------------------------------------------
     // Trapezoidal rule
-    // ================================================================
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes the composite trapezoidal rule on a uniform grid.
-     * @dev Requires n > 0 and b >= a. Performs O(n) staticcalls to the integrand.
-     *      All computation is done in memory; no storage access occurs.
-     * @param target Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector of f(bytes16) in `target`
-     * @param a Lower integration bound (bytes16)
-     * @param b Upper integration bound (bytes16)
-     * @param n Number of subintervals (must be > 0)
+     *         Requires n > 0 and b >= a. Performs O(n) staticcalls to the integrand.
+     *         All computation is done in memory; no storage access occurs.
+     *
+     * @param  target Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector Selector of f(bytes16) in `target`
+     * @param  a Lower integration bound (bytes16)
+     * @param  b Upper integration bound (bytes16)
+     * @param  n Number of subintervals (must be > 0)
      * @return I Approximate integral value encoded as bytes16
      */
     function trapezoidal(address target, bytes4 fSelector, bytes16 a, bytes16 b, uint256 n) internal view returns (bytes16 I) {
@@ -98,19 +98,19 @@ library Integration {
         return h.mul(sum);
     }
 
-    // ================================================================
+    // ------------------------------------------------------------
     // Simpson's 1/3 rule
-    // ================================================================
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes the composite Simpson’s 1/3 rule on a uniform grid.
-     * @dev Requires n > 0, n even, and b >= a. Performs O(n) staticcalls to the integrand.
-     *      All computation occurs in memory; no storage is modified.
-     * @param target Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector of f(bytes16) in `target`
-     * @param a Lower integration bound (bytes16)
-     * @param b Upper integration bound (bytes16)
-     * @param n Number of subintervals (must be even and > 0)
+     *         Requires n > 0, n even, and b >= a. Performs O(n) staticcalls to the integrand.
+     *         All computation occurs in memory; no storage is modified.
+     * @param  target Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector Selector of f(bytes16) in `target`
+     * @param  a Lower integration bound (bytes16)
+     * @param  b Upper integration bound (bytes16)
+     * @param  n Number of subintervals (must be even and > 0)
      * @return I Approximate integral value encoded as bytes16
      */
     function simpson13(address target, bytes4 fSelector, bytes16 a, bytes16 b, uint256 n) internal view returns (bytes16 I) {
@@ -147,19 +147,19 @@ library Integration {
         return h.div(MathLib.fromInt(3)).mul(inner);
     }
 
-    // ================================================================
+    // ------------------------------------------------------------
     // Simpson's 3/8 rule
-    // ================================================================
+    // ------------------------------------------------------------
 
     /**
      * @notice Computes the composite Simpson’s 3/8 rule on a uniform grid.
-     * @dev Requires n > 0, n divisible by 3, and b >= a. Performs O(n) staticcalls
-     *      to the integrand. All arithmetic is performed in memory.
-     * @param target Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector of f(bytes16) in `target`
-     * @param a Lower integration bound (bytes16)
-     * @param b Upper integration bound (bytes16)
-     * @param n Number of subintervals (must be > 0 and divisible by 3)
+     *         Requires n > 0, n divisible by 3, and b >= a. Performs O(n) staticcalls
+     *         to the integrand. All arithmetic is performed in memory.
+     * @param  target Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector Selector of f(bytes16) in `target`
+     * @param  a Lower integration bound (bytes16)
+     * @param  b Upper integration bound (bytes16)
+     * @param  n Number of subintervals (must be > 0 and divisible by 3)
      * @return I Approximate integral value encoded as bytes16
      */
     function simpson38(address target, bytes4 fSelector, bytes16 a, bytes16 b, uint256 n) internal view returns (bytes16 I) {

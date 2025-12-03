@@ -6,11 +6,9 @@ import { TrigonometryTanCot as TT } from "./TrigonometryTanCot.sol";
 import { TrigonometryArc as TA } from "./TrigonometryArc.sol";
 
 /**
- * @title Trigonometry
+ * @title Trigonometry Library
  * @notice High-precision trigonometric utilities mapped to internal
  *         sine/cosine, tangent/cotangent, and arc-function modules.
- * @dev All functions operate on IEEE-754 binary128 (bytes16) values.
- *      Acts as a façade to the underlying specialized submodules.
  */
 library Trigonometry {
 
@@ -34,7 +32,7 @@ library Trigonometry {
 
     /**
      * @notice Computes tan(x) using high-precision binary128 arithmetic.
-     * @dev May revert internally for points where tangent is undefined.
+     *         May revert internally for points where tangent is undefined.
      * @param x Input angle in radians (bytes16)
      * @return bytes16 Tangent of x
      */
@@ -44,7 +42,7 @@ library Trigonometry {
 
     /**
      * @notice Computes cot(x) using high-precision binary128 arithmetic.
-     * @dev May revert internally for points where cotangent is undefined.
+     *         May revert internally for points where cotangent is undefined.
      * @param x Input angle in radians (bytes16)
      * @return bytes16 Cotangent of x
      */
@@ -54,7 +52,7 @@ library Trigonometry {
 
     /**
      * @notice Computes arcsin(x) using high-precision binary128 arithmetic.
-     * @dev Expects x ∈ [-1, 1].
+     *         Expects x ∈ [-1, 1].
      * @param x Input value (bytes16)
      * @return bytes16 arcsin(x) in radians
      */
@@ -64,7 +62,7 @@ library Trigonometry {
 
     /**
      * @notice Computes arccos(x) using high-precision binary128 arithmetic.
-     * @dev Expects x ∈ [-1, 1].
+     *         Expects x ∈ [-1, 1].
      * @param x Input value (bytes16)
      * @return bytes16 arccos(x) in radians
      */

@@ -5,34 +5,36 @@ import { Integration } from "../../libraries/numeric/Integration.sol";
 import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 
 /**
- * @title IntegrationFacet
+ * @title  IntegrationFacet
  * @notice Diamond facet exposing high-precision numerical integration rules
  *         (Trapezoidal, Simpson 1/3, Simpson 3/8) implemented in the
  *         Integration library with ABDKMathQuad (bytes16).
+ *          
+ *         The integrand is provided as (target, selector): f(bytes16) -> bytes16.
+ *         This facet reuses LibNumericConfig.maxIter as the default number of
+ *         sub-intervals n for all rules.
  *
- * @dev
- *  - The integrand is provided as (target, selector): f(bytes16) -> bytes16.
- *  - This facet reuses LibNumericConfig.maxIter as the default number of
- *    sub-intervals n for all rules.
  *  - TODO: LibNumericConfig.tol / minTol are not used by the fixed-grid rules yet,
  *    but kept in storage for future adaptive schemes.
  *
- *  For each rule exposed two variants:
- *    1) integrateXXX(...)            → uses n from LibNumericConfig.maxIter
- *    2) integrateXXXWithN(..., n)    → uses the explicit n provided
+ *         For each rule exposed two variants:
+ *           1) integrateXXX(...)            → uses n from LibNumericConfig.maxIter
+ *           2) integrateXXXWithN(..., n)    → uses the explicit n provided
  *
- *  The low-level Integration library is expected to work purely with in-memory
- *  variables (no storage in the library).
+ *         The low-level Integration library is expected to work purely with in-memory
+ *         variables (no storage in the library).
  */
 contract IntegrationFacet {
-    /*────────────────────── config helpers ──────────────────────*/
+
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
 
     /**
-     * @dev Returns the default grid size n taken from LibNumericConfig.
-     * If maxIter is unset (0), falls back to 102.
-     *
-     * @dev This function *guarantees* n is a multiple of 6
-     * (and > 0) to be universally valid for all Simpson rules.
+     * @return n the default grid size n taken from LibNumericConfig.
+     *         If maxIter is unset (0), falls back to 102.
+     *         This function guarantees n is a multiple of 6
+     *         (and > 0) to be universally valid for all Simpson rules.
      */
     function _defaultN() internal view returns (uint256 n) {
         n = LibNumericConfig.getMaxIter();
@@ -54,7 +56,9 @@ contract IntegrationFacet {
         }
     }
 
-    /*──────────────────── trapezoidal rule ─────────────────────*/
+    // ------------------------------------------------------------
+    // Trapezoidal Rule
+    // ------------------------------------------------------------
 
     /**
      * @notice Trapezoidal rule using n from LibNumericConfig.maxIter.
@@ -91,7 +95,9 @@ contract IntegrationFacet {
         return Integration.trapezoidal(target, fSelector, a, b, n);
     }
 
-    /*──────────────────── Simpson 1/3 rule ─────────────────────*/
+    // ------------------------------------------------------------
+    // Simpson 1/3 Rule
+    // ------------------------------------------------------------
 
     /**
      * @notice Simpson’s 1/3 rule using n from LibNumericConfig.maxIter.
@@ -124,7 +130,9 @@ contract IntegrationFacet {
         return Integration.simpson13(target, fSelector, a, b, n);
     }
 
-    /*──────────────────── Simpson 3/8 rule ─────────────────────*/
+    // ------------------------------------------------------------
+    // Simpson 3/8 Rule
+    // ------------------------------------------------------------
 
     /**
      * @notice Simpson’s 3/8 rule using n from LibNumericConfig.maxIter.

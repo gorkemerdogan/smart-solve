@@ -7,15 +7,15 @@ import { QuadConstants as QC } from "../QuadConstants.sol";
 /**
  * @title TrigonometrySinCos
  * @notice High-precision sine and cosine evaluation in IEEE-754 binary128 (bytes16).
- * @dev Implements quadrant-aware angle reduction followed by degree-limited
- *      core polynomials on the interval [-π/4, +π/4]. Provides sin(x) and cos(x)
- *      used by higher-level trigonometry modules.
+ *         Implements quadrant-aware angle reduction followed by degree-limited
+ *         core polynomials on the interval [-π/4, +π/4]. Provides sin(x) and cos(x)
+ *         used by higher-level trigonometry modules.
  */
 library TrigonometrySinCos {
 
-    // ===============================================================
-    // === HELPERS
-    // ===============================================================
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
 
     bytes16 internal constant QZERO = 0x00000000000000000000000000000000;
 
@@ -176,9 +176,9 @@ library TrigonometrySinCos {
         return MathLib.add(MathLib.fromUInt(1), zq);
     }
 
-    // ===============================================================
-    // === sin(x)
-    // ===============================================================
+    // ------------------------------------------------------------
+    // sin(x)
+    // ------------------------------------------------------------
     /**
      * @notice Computes sin(x) in binary128 precision.
      * @dev Procedure:
@@ -230,9 +230,9 @@ library TrigonometrySinCos {
         return y;
     }
 
-    // ===============================================================
-    // === cos(x)
-    // ===============================================================
+    // ------------------------------------------------------------
+    // cos(x)
+    // ------------------------------------------------------------
     /**
      * @notice Computes cos(x) in binary128 precision.
      * @dev Procedure mirrors sin(x):

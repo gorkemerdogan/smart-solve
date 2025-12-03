@@ -12,7 +12,7 @@ import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
  * @dev
  *  - All matrices are stored in row-major order:
  *        index = row * cols + col
- *  - This library is designed for *ephemeral numeric computation* (off-chain
+ *  - This library is designed for ephemeral numeric computation (off-chain
  *    simulation, benchmarking, or view calls), not for storing huge matrices
  *    permanently on-chain.
  *  - Uses strict dimension checks and reverts on mismatch.
@@ -44,7 +44,7 @@ library MatrixMaster {
 
     /**
      * @notice Require that matrix is square (n×n).
-     * @param m Matrix to check
+     * @param  m Matrix to check
      */
     modifier isSquare(Matrix memory m) {
         require(m.rows == m.cols, "MatrixMaster: matrix must be square");
@@ -52,7 +52,7 @@ library MatrixMaster {
     }
 
     /**
-     * @notice Require that two matrices have identical shapes.
+     * @notice  Require that two matrices have identical shapes.
      * @param a First matrix
      * @param b Second matrix
      */
@@ -62,8 +62,8 @@ library MatrixMaster {
     }
 
     /**
-     * @notice Basic bounds check for element access.
-     * @param m Matrix to check
+     * @notice    Basic bounds check for element access.
+     * @param m   Matrix to check
      * @param row Row index to validate
      * @param col Column index to validate
      */
@@ -83,15 +83,15 @@ library MatrixMaster {
     }
 
     // ──────────────────────────────────────────────────────────
-    // Internal index helpers
+    // Helpers
     // ──────────────────────────────────────────────────────────
 
     /**
      * @notice Compute row-major index into `data` array.
-     * @param cols Number of columns in the matrix
-     * @param row  Zero-based row index
-     * @param col  Zero-based column index
-     * @return idx Linear index = row * cols + col
+     * @param  cols Number of columns in the matrix
+     * @param  row  Zero-based row index
+     * @param  col  Zero-based column index
+     * @return idx  Linear index = row * cols + col
      */
     function _idx(uint256 cols, uint256 row, uint256 col) private pure returns (uint256 idx) {
         unchecked { return row * cols + col; }
@@ -103,9 +103,9 @@ library MatrixMaster {
 
     /**
      * @notice Create a rows×cols matrix filled with zeros.
-     * @param rows Number of rows
-     * @param cols Number of columns
-     * @return m New zero matrix
+     * @param  rows Number of rows
+     * @param  cols Number of columns
+     * @return m    New zero matrix
      */
     function zeros(uint256 rows, uint256 cols) internal pure validDims(rows, cols) returns (Matrix memory m) {
         uint256 len = rows * cols;
@@ -115,9 +115,9 @@ library MatrixMaster {
 
     /**
      * @notice Create a rows×cols matrix filled with ones.
-     * @param rows Number of rows
-     * @param cols Number of columns
-     * @return m New matrix with all entries = 1.0
+     * @param  rows Number of rows
+     * @param  cols Number of columns
+     * @return m    New matrix with all entries = 1.0
      */
     function ones(uint256 rows, uint256 cols) internal pure validDims(rows, cols) returns (Matrix memory m) {
         uint256 len = rows * cols;
@@ -133,7 +133,7 @@ library MatrixMaster {
 
     /**
      * @notice Create an n×n identity matrix.
-     * @param n Matrix dimension (n > 0)
+     * @param  n Matrix dimension (n > 0)
      * @return m Identity matrix with 1 on diagonal and 0 elsewhere
      */
     function createIdentityMatrix(uint256 n) internal pure returns (Matrix memory m) {
@@ -150,8 +150,8 @@ library MatrixMaster {
 
     /**
      * @notice Create a diagonal matrix from diagonal entries.
-     * @param diag Array of diagonal entries, length = n
-     * @return m n×n matrix with diag[i] on (i,i), zeros elsewhere
+     * @param  diag Array of diagonal entries, length = n
+     * @return m    n×n matrix with diag[i] on (i,i), zeros elsewhere
      */
     function fromDiagonal(bytes16[] memory diag) internal pure returns (Matrix memory m) {
         uint256 n = diag.length;
@@ -167,14 +167,13 @@ library MatrixMaster {
 
     /**
      * @notice Create a rows×cols matrix with deterministic pseudo-random values.
-     * @dev
-     *  - This is NOT secure randomness. It is intended only for testing
-     *    and deterministic benchmarks.
-     *  - Values are in [0, 1) scaled from keccak256(seed, i).
-     * @param rows Number of rows
-     * @param cols Number of columns
-     * @param seed Arbitrary seed for deterministic generation
-     * @return m New matrix with pseudo-random contents
+     *         This is NOT secure randomness. It is intended only for testing and deterministic benchmarks.
+     *         Values are in [0, 1) scaled from keccak256(seed, i).
+     *
+     * @param  rows Number of rows
+     * @param  cols Number of columns
+     * @param  seed Arbitrary seed for deterministic generation
+     * @return m    New matrix with pseudo-random contents
      */
     function randomMatrix(uint256 rows, uint256 cols, bytes32 seed) internal pure validDims(rows, cols) returns (Matrix memory m) {
         uint256 len = rows * cols;
@@ -202,9 +201,9 @@ library MatrixMaster {
 
     /**
      * @notice Get element at (row, col).
-     * @param m   Matrix to read
-     * @param row Zero-based row index
-     * @param col Zero-based column index
+     * @param  m     Matrix to read
+     * @param  row   Zero-based row index
+     * @param  col   Zero-based column index
      * @return value Element m[row, col]
      */
     function get(Matrix memory m, uint256 row, uint256 col) internal pure checkBounds(m, row, col) returns (bytes16) {
@@ -213,7 +212,7 @@ library MatrixMaster {
 
     /**
      * @notice Set element at (row, col) to `val`.
-     * @dev Mutates the matrix in-place (in memory).
+     *         Mutates the matrix in-place (in memory).
      * @param m     Matrix to modify
      * @param row   Zero-based row index
      * @param col   Zero-based column index
@@ -229,15 +228,13 @@ library MatrixMaster {
 
     /**
      * @notice Extract a contiguous submatrix [rowStart:rowEnd, colStart:colEnd).
-     * @dev
-     *  - rowEnd and colEnd are exclusive upper bounds.
-     *  - Requires 0 <= rowStart < rowEnd <= rows, same for columns.
-     * @param m         Source matrix
-     * @param rowStart  Inclusive starting row
-     * @param rowEnd    Exclusive ending row
-     * @param colStart  Inclusive starting column
-     * @param colEnd    Exclusive ending column
-     * @return out      New matrix with shape (rowEnd-rowStart) × (colEnd-colStart)
+     *         Requires 0 <= rowStart < rowEnd <= rows, same for columns.
+     * @param  m         Source matrix
+     * @param  rowStart  Inclusive starting row
+     * @param  rowEnd    Exclusive ending row
+     * @param  colStart  Inclusive starting column
+     * @param  colEnd    Exclusive ending column
+     * @return out       New matrix with shape (rowEnd-rowStart) × (colEnd-colStart)
      */
     function slice(Matrix memory m, uint256 rowStart, uint256 rowEnd, uint256 colStart, uint256 colEnd) internal pure returns (Matrix memory out) {
         require(rowStart < rowEnd && colStart < colEnd, "MatrixMaster: invalid slice range");
@@ -259,9 +256,8 @@ library MatrixMaster {
 
     /**
      * @notice Reshape matrix to newRows×newCols without changing data order.
-     * @dev
-     *  - Requires newRows * newCols == rows * cols.
-     *  - Reuses the same `data` array (no copy).
+     *         Requires newRows * newCols == rows * cols.
+     *         Reuses the same `data` array (no copy).
      * @param m        Input matrix
      * @param newRows  New number of rows
      * @param newCols  New number of columns
@@ -281,8 +277,8 @@ library MatrixMaster {
     // ──────────────────────────────────────────────────────────
 
     /**
-     * @notice Compute the transpose Aᵀ.
-     * @param a Input matrix A (rows×cols)
+     * @notice   Compute the transpose Aᵀ.
+     * @param  a Input matrix A (rows×cols)
      * @return t Transposed matrix (cols×rows)
      */
     function transpose(Matrix memory a) internal pure returns (Matrix memory t) {
@@ -305,9 +301,9 @@ library MatrixMaster {
     // ──────────────────────────────────────────────────────────
 
     /**
-     * @notice Elementwise addition C = A + B.
-     * @param a Left operand
-     * @param b Right operand
+     * @notice   Elementwise addition C = A + B.
+     * @param  a Left operand
+     * @param  b Right operand
      * @return c Result matrix with same shape
      */
     function add(Matrix memory a, Matrix memory b) internal pure checkSameShape(a, b) returns (Matrix memory c) {
@@ -322,9 +318,9 @@ library MatrixMaster {
     }
 
     /**
-     * @notice Elementwise subtraction C = A − B.
-     * @param a Left operand
-     * @param b Right operand
+     * @notice   Elementwise subtraction C = A − B.
+     * @param  a Left operand
+     * @param  b Right operand
      * @return c Result matrix with same shape
      */
     function sub(Matrix memory a, Matrix memory b) internal pure checkSameShape(a, b) returns (Matrix memory c) {
@@ -339,9 +335,9 @@ library MatrixMaster {
     }
 
     /**
-     * @notice Scalar multiplication C = k · A.
-     * @param a Input matrix
-     * @param k Scalar multiplier
+     * @notice   Scalar multiplication C = k · A.
+     * @param  a Input matrix
+     * @param  k Scalar multiplier
      * @return c Result matrix
      */
     function mulScalar(Matrix memory a, bytes16 k) internal pure returns (Matrix memory c) {
@@ -356,9 +352,9 @@ library MatrixMaster {
     }
 
     /**
-     * @notice Scalar division C = A / k.
-     * @param a Input matrix
-     * @param k Scalar divisor (must be non-zero)
+     * @notice   Scalar division C = A / k.
+     * @param  a Input matrix
+     * @param  k Scalar divisor (must be non-zero)
      * @return c Result matrix
      */
     function divScalar(Matrix memory a, bytes16 k) internal pure returns (Matrix memory c) {
@@ -380,11 +376,10 @@ library MatrixMaster {
 
     /**
      * @notice Matrix-matrix multiplication C = A · B.
-     * @dev
-     *  - A is (m×k), B is (k×n), result is (m×n).
-     *  - Uses straightforward O(m·k·n) triple loop.
-     * @param a Left operand matrix
-     * @param b Right operand matrix
+     *         A is (m×k), B is (k×n), result is (m×n).
+     *         Uses straightforward O(m·k·n) triple loop.
+     * @param  a Left operand matrix
+     * @param  b Right operand matrix
      * @return c Product matrix
      */
     function mulMatrix(Matrix memory a, Matrix memory b) internal pure checkMulShape(a, b) returns (Matrix memory c) {
@@ -415,10 +410,10 @@ library MatrixMaster {
 
     /**
      * @notice Multiply matrix A (m×n) by vector x (n×1). Result is (m×1).
-     * @dev Much faster than full matrix×matrix mulMatrix for power iteration.
+     *         Much faster than full matrix×matrix mulMatrix for power iteration.
      *
-     * @param A Matrix (m×n)
-     * @param x Vector as matrix (n×1)
+     * @param  A Matrix (m×n)
+     * @param  x Vector as matrix (n×1)
      * @return y = A * x (m×1 column vector)
      */
     function mulMatrixVector(Matrix memory A, Matrix memory x) internal pure returns (Matrix memory y) {
@@ -450,9 +445,9 @@ library MatrixMaster {
 
     /**
      * @notice Compute dot product of two column vectors (n×1).
-     * @dev Requires both vectors to be column vectors with identical lengths.
-     * @param a First vector (n×1)
-     * @param b Second vector (n×1)
+     *         Requires both vectors to be column vectors with identical lengths.
+     * @param  a First vector (n×1)
+     * @param  b Second vector (n×1)
      * @return s Scalar dot product = Σ_i a[i] * b[i]
      */
     function dot(Matrix memory a, Matrix memory b) internal pure returns (bytes16 s) {
@@ -470,7 +465,7 @@ library MatrixMaster {
 
     /**
      * @notice Compute Euclidean 2-norm ||v||₂ of a column vector (n×1).
-     * @param v Input vector (n×1)
+     * @param  v   Input vector (n×1)
      * @return nrm Vector norm = sqrt(dot(v, v))
      */
     function euclideanNorm(Matrix memory v) internal pure returns (bytes16 nrm) {
@@ -483,7 +478,7 @@ library MatrixMaster {
     /**
      * @notice Normalize a column vector v into v / ||v||₂.
      * @dev    Reverts if vector has zero norm.
-     * @param v Input vector (n×1)
+     * @param  v   Input vector (n×1)
      * @return out Normalized vector with unit Euclidean norm
      */
     function normalize(Matrix memory v) internal pure returns (Matrix memory out) {
@@ -497,10 +492,10 @@ library MatrixMaster {
 
     /**
      * @notice Create a pseudo-random column vector (n×1) with entries in [0,1).
-     * @dev    Uses deterministic keccak-based generation, NOT secure randomness.
-     * @param n    Dimension of the vector (n > 0)
-     * @param seed Seed value used to generate pseudo-random entries
-     * @return v Column vector (n×1) with pseudo-random entries
+     *         Uses deterministic keccak-based generation, NOT secure randomness.
+     * @param  n    Dimension of the vector (n > 0)
+     * @param  seed Seed value used to generate pseudo-random entries
+     * @return v    Column vector (n×1) with pseudo-random entries
      */
     function randomVector(uint256 n, bytes32 seed) internal pure validDims(n, 1) returns (Matrix memory v) {
         bytes16[] memory data = new bytes16[](n);
@@ -523,11 +518,11 @@ library MatrixMaster {
 
     /**
      * @notice Check approximate convergence between two vectors via L2 tolerance.
-     * @dev Computes ||vNew - vOld||₂ and compares to `tol`.
-     * @param vNew New iterate (n×1)
-     * @param vOld Previous iterate (n×1)
-     * @param tol  Convergence tolerance (positive scalar)
-     * @return ok True if ||vNew - vOld|| < tol
+     *         Computes ||vNew - vOld||_2 and compares to `tol`.
+     * @param  vNew New iterate (n×1)
+     * @param  vOld Previous iterate (n×1)
+     * @param  tol  Convergence tolerance (positive scalar)
+     * @return ok   True if ||vNew - vOld|| < tol
      */
     function hasConverged(Matrix memory vNew, Matrix memory vOld, bytes16 tol) internal pure checkSameShape(vNew, vOld) returns (bool ok) {
         require(vNew.cols == 1, "MatrixMaster: converged requires vectors");
@@ -553,10 +548,9 @@ library MatrixMaster {
 
     /**
      * @notice Compute determinant det(A) of a square matrix using LU decomposition.
-     * @dev
-     *  - Performs in-place LU on a working copy of A (Doolittle-style).
-     *  - Uses partial pivoting; sign of permutation affects determinant sign.
-     * @param a Input square matrix
+     *         Performs in-place LU on a working copy of A (Doolittle-style).
+     *         Uses partial pivoting; sign of permutation affects determinant sign.
+     * @param  a    Input square matrix
      * @return detA Determinant as bytes16
      */
     function det(Matrix memory a) internal pure isSquare(a) returns (bytes16 detA) {
@@ -635,10 +629,9 @@ library MatrixMaster {
 
     /**
      * @notice Compute A⁻¹ using Gauss–Jordan elimination on [A | I].
-     * @dev
-     *  - Reverts if matrix is singular (no pivot above a small threshold).
-     *  - This is O(n³) and intended for small/moderate n in off-chain-style usage.
-     * @param a Input square matrix A
+     *         Reverts if matrix is singular (no pivot above a small threshold).
+     *         This is O(n^3) and intended for small/moderate n in off-chain-style usage.
+     * @param  a    Input square matrix A
      * @return invA Inverse matrix A⁻¹
      */
     function inverse(Matrix memory a) internal pure isSquare(a) returns (Matrix memory invA) {

@@ -4,23 +4,26 @@ pragma solidity ^0.8.20;
 import { Polynomial } from "../../libraries/numeric/Polynomial.sol";
 
 /**
- * @title PolynomialFacet
+ * @title  PolynomialFacet
  * @notice External Diamond facet that exposes Polynomial (ABDK quad) utilities.
  *         All inputs/outputs use IEEE-754 quadruple precision as bytes16.
- *
- * @dev Library functions require `memory` arrays, therefore calldata arrays are copied
- *      to memory once per call.
+ *         Library functions require memory arrays, therefore calldata arrays are copied to memory once per call.
  */
 contract PolynomialFacet {
-    /*─────────────────────────── helpers ───────────────────────────*/
 
-    /// @dev Copy a calldata bytes16[] into memory (library expects memory).
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
+    // Copy a calldata bytes16[] into memory (library expects memory).
     function _toMemory(bytes16[] calldata a) internal pure returns (bytes16[] memory m) {
         m = new bytes16[](a.length);
         for (uint256 i = 0; i < a.length; ++i) m[i] = a[i];
     }
 
-    /*────────────────────── evaluation / calculus ──────────────────*/
+    // ------------------------------------------------------------
+    // Evaluation
+    // ------------------------------------------------------------
 
     /// @notice Evaluate f(x) using Horner’s method.
     function polyEvaluate(bytes16[] calldata coeffs, bytes16 x) external pure returns (bytes16 y) {
@@ -42,7 +45,9 @@ contract PolynomialFacet {
         return Polynomial.integral(_toMemory(a), C);
     }
 
-    /*──────────────────────── arithmetic ops ───────────────────────*/
+    // ------------------------------------------------------------
+    // Arithmetic Operations
+    // ------------------------------------------------------------
 
     /// @notice Coefficient-wise addition: a + b.
     function polyAdd(bytes16[] calldata a, bytes16[] calldata b) external pure returns (bytes16[] memory out) {
@@ -74,7 +79,9 @@ contract PolynomialFacet {
         return Polynomial.evalHornerMonic(_toMemory(lowerCoeffs), x);
     }
 
-    /*────────────────────────── utilities ──────────────────────────*/
+    // ------------------------------------------------------------
+    // Utilities
+    // ------------------------------------------------------------
 
     /// @notice Degree of the polynomial (highest i with non-zero coeff). Zero poly -> 0.
     function polyDegree(bytes16[] calldata a) external pure returns (uint256) {

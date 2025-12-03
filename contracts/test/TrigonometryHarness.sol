@@ -12,8 +12,6 @@ import "../libraries/Trigonometry/Trigonometry.sol";
  *         - NaN and comparison utilities
  *         - Direct passthrough calls to the Trigonometry library
  *
- * @dev Designed to be the only contract required in Hardhat tests for trigonometric validation.
- *      All numeric operations use IEEE-754 binary128 (bytes16).
  */
 contract TrigonometryHarness {
     using MathLib for bytes16;
@@ -53,7 +51,7 @@ contract TrigonometryHarness {
 
     /**
      * @notice Converts a quadruple-precision value to a signed integer.
-     * @dev Truncates toward zero, per ABDKMathQuad.toInt().
+     *         Truncates toward zero, per ABDKMathQuad.toInt().
      * @param x Quadruple-precision input.
      * @return Signed integer result.
      */
@@ -70,7 +68,7 @@ contract TrigonometryHarness {
 
     /**
      * @notice Converts a scaled integer (scaled by SCALE) into quadruple precision.
-     * @dev Example: scaledValue = 1234500000000 → represents 1.2345.
+     *         Example: scaledValue = 1234500000000 → represents 1.2345.
      * @param scaledValue Integer representing a float multiplied by SCALE.
      * @return Quadruple-precision value.
      */
@@ -115,10 +113,10 @@ contract TrigonometryHarness {
 
     /**
      * @notice Compares two quadruple-precision values.
-     * @dev Returns:
-     *      -1 if a < b  
-     *       0 if a == b  
-     *      +1 if a > b
+     *         Returns:
+     *             -1 if a < b  
+     *              0 if a == b  
+     *             +1 if a > b
      * @param a First operand.
      * @param b Second operand.
      * @return Comparison result.

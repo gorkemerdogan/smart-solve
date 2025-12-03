@@ -7,20 +7,6 @@ import { IDiamondCut } from "./interfaces/IDiamondCut.sol";
 /**
  * @title SmartSolve
  * @notice Primary diamond (EIP-2535) proxy contract for the SmartSolve system.
- *
- * @dev
- * Implements the diamond storage and facet routing pattern using LibSmartSolve.
- * This contract contains:
- *   - Constructor: initializes ownership and installs the DiamondCutFacet
- *   - fallback(): routes function selectors to the correct facet via delegatecall
- *   - receive(): enables the diamond to accept ETH
- *
- * The diamond itself stores:
- *   - Facet registry
- *   - Selector-to-facet mapping
- *   - Ownership and supported interface data
- *
- * The actual logic is implemented in facets; SmartSolve acts strictly as the proxy.
  */
 contract SmartSolve {
 
@@ -29,12 +15,6 @@ contract SmartSolve {
      *
      * @param _owner Address to set as the initial contract owner.
      * @param _diamondCutFacet Address of the facet providing the diamondCut function.
-     *
-     * @dev
-     * Steps performed:
-     *   1. Set contract owner in diamond storage.
-     *   2. Register `diamondCut` selector under the provided facet, enabling upgrades.
-     *   3. No initialization call is executed (init = address(0)).
      */
     constructor(address _owner, address _diamondCutFacet) {
         LibSmartSolve.setContractOwner(_owner);
@@ -56,14 +36,7 @@ contract SmartSolve {
 
     /**
      * @notice Fallback function routing all non-existing function calls to the correct facet.
-     *
-     * @dev
-     * Mechanism:
-     *   - Looks up msg.sig in selectorToFacetAndPosition
-     *   - Executes delegatecall to the corresponding facet
-     *   - Returns or bubbles up any revert reason
-     *
-     * Reverts if no facet implements the given selector.
+     *         Reverts if no facet implements the given selector.
      */
     fallback() external payable {
         LibSmartSolve.DiamondStorage storage ds = LibSmartSolve.diamondStorage();
@@ -89,7 +62,7 @@ contract SmartSolve {
 
     /**
      * @notice Accepts direct ETH transfers sent to the diamond.
-     * @dev ETH may be consumed by facets implementing payable logic.
+     *         ETH may be consumed by facets implementing payable logic.
      */
     receive() external payable {}
 }

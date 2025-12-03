@@ -7,15 +7,15 @@ import { QuadConstants } from "../../libraries/QuadConstants.sol";
 import { MathLib } from "../../libraries/MathLib.sol";
 
 /**
- * @title RootFindingFacet
+ * @title  RootFindingFacet
  * @notice Diamond facet exposing high-precision root-finding (bytes16 ABDK).
- * @dev Thin ABI layer: pulls tol/maxIter from LibNumericConfig and forwards
- *     to the pure RootFinding library. Returns RootFinding.RootResult.
+ *         Pulls tol/maxIter from LibNumericConfig and forwards
+ *         to the pure RootFinding library. Returns RootFinding.RootResult.
  */
 contract RootFindingFacet {
     using RootFinding for *;
 
-    /// @dev Loads configuration values, applying fallback defaults if unset.
+    // Loads configuration values, applying fallback defaults if unset.
     function _readCfg() internal view returns (bytes16 tol, uint256 maxIter) {
         LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
 

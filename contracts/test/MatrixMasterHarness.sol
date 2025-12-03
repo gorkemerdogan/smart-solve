@@ -7,11 +7,8 @@ import { MatrixMaster } from "../libraries/numeric/MatrixMaster.sol";
 /**
  * @title MatrixMasterHarness
  * @notice Wrapper contract exposing MatrixMaster library functions for testing.
- *
- * @dev
- *  - All functions are pure and stateless.
- *  - Matrices are passed as (rows, cols, flat data) and returned in the same form.
- *  - Includes small helpers for quad construction and approximate comparison.
+ *         Matrices are passed as (rows, cols, flat data) and returned in the same form.
+ *         Includes small helpers for quad construction and approximate comparison.
  */
 contract MatrixMasterHarness {
     using MathLib for bytes16;
@@ -77,7 +74,7 @@ contract MatrixMasterHarness {
 
     /**
      * @notice Construct a quadruple-precision scalar as (num / den).
-     * @dev Uses MathLib.fromUInt and MathLib.div. Reverts if den == 0.
+     *         Uses MathLib.fromUInt and MathLib.div. Reverts if den == 0.
      *
      * @param num  Unsigned integer numerator
      * @param den  Unsigned integer denominator (must be > 0)
@@ -260,7 +257,7 @@ contract MatrixMasterHarness {
 
     /**
      * @notice Wrapper for MatrixMaster.set.
-     * @dev Returns full matrix after modification.
+     *         Returns full matrix after modification.
      */
     function setHarness(
         uint256 rows,
@@ -505,7 +502,7 @@ contract MatrixMasterHarness {
 
     /**
      * @notice Wrapper for MatrixMaster.euclideanNorm.
-     * @dev Input must be vector-shaped: (n×1) or (1×n).
+     *         Input must be vector-shaped: (n×1) or (1×n).
      * @return norm  l_2-vector norm ||v||_2
      */
     function euclideanNormHarness(
@@ -519,7 +516,7 @@ contract MatrixMasterHarness {
 
     /**
      * @notice Wrapper for MatrixMaster.normalize, computing v / ||v||_2.
-     * @dev Reverts on zero vector.  
+     *         Reverts on zero vector.  
      * @return (rows, cols, data)  normalized vector with unit l_2 norm
      */
     function normalizeHarness(
