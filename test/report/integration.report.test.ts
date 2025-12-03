@@ -33,6 +33,21 @@ const QZERO = "0x00000000000000000000000000000000";
 //  Helpers
 // ------------------------------------------------------------
 
+const SCALE_DECIMALS = 12n;
+const SCALE = 10n ** SCALE_DECIMALS;
+
+function formatScaledInt(v: bigint): string {
+    const neg = v < 0n;
+    const abs = neg ? -v : v;
+
+    const intPart = abs / SCALE;
+    const fracPart = abs % SCALE;
+
+    const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
+
+    return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`;
+}
+
 async function touchGas(harness: IntegrationHarness, method: string, args: any[]) {
   const data = harness.interface.encodeFunctionData(method, args);
   const [signer] = await ethers.getSigners();
@@ -135,6 +150,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "trapezoidal", [target, selLinear, q0, q1, 10]);
       const out = await harness.trapezoidal(target, selLinear, q0, q1, 10);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(typeof out).to.equal("string");
       printBlock({
         t,
@@ -144,7 +162,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (analytic 0.5 in quad)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -157,6 +175,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "trapezoidal", [target, selSquare, q0, q1, 300]);
       const out = await harness.trapezoidal(target, selSquare, q0, q1, 300);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -166,7 +187,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (analytic 1/3 in quad)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -180,6 +201,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "trapezoidal", [target, selConst5, q0, b, 50]);
       const out = await harness.trapezoidal(target, selConst5, q0, b, 50);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -189,7 +213,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (exact area 50 in quad)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -202,6 +226,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "trapezoidal", [target, selSin, q0, qPI, 200]);
       const out = await harness.trapezoidal(target, selSin, q0, qPI, 200);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -211,7 +238,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (analytic integral 2)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -224,6 +251,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "trapezoidal", [target, selSquare, q0, q0, 100]);
       const out = await harness.trapezoidal(target, selSquare, q0, q0, 100);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.equal(q0);
       printBlock({
         t,
@@ -233,7 +263,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: q0,
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -246,6 +276,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "trapezoidal", [target, selSquare, q0, q1, 50]);
       const out = await harness.trapezoidal(target, selSquare, q0, q1, 50);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -255,7 +288,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (used for comparison only)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -275,6 +308,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "simpson13", [target, selSquare, q0, q1, 10]);
       const out = await harness.simpson13(target, selSquare, q0, q1, 10);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -284,7 +320,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (analytic 1/3 in quad)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -297,6 +333,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "simpson13", [target, selCube, q0, q1, 12]);
       const out = await harness.simpson13(target, selCube, q0, q1, 12);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -306,7 +345,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (exact 0.25 in quad)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -319,6 +358,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "simpson13", [target, selLinear, q0, q1, 20]);
       const out = await harness.simpson13(target, selLinear, q0, q1, 20);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -328,7 +370,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (comparison-only scenario)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -341,6 +383,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "simpson13", [target, selInv, q1, q2, 40]);
       const out = await harness.simpson13(target, selInv, q1, q2, 40);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -350,7 +395,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (analytic ln(2))",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -386,6 +431,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "simpson38", [target, selSquare, q0, q1, 9]);
       const out = await harness.simpson38(target, selSquare, q0, q1, 9);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -395,7 +443,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (analytic 1/3 in quad)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -407,6 +455,9 @@ describe("Integration Library - Numerical Methods", function () {
       await touchGas(harness, "simpson38", [target, selCube, q0, q1, 12]);
       const gas = await estimateGas(harness, "simpson38", [target, selCube, q0, q1, 12]);
       const out = await harness.simpson38(target, selCube, q0, q1, 12);
+
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
       printBlock({
@@ -430,6 +481,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "simpson38", [target, selInv, q1, q2, 12]);
       const out = await harness.simpson38(target, selInv, q1, q2, 12);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -439,7 +493,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (analytic ln(2))",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -453,6 +507,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "simpson38", [target, selSquare, five, five, 3]);
       const out = await harness.simpson38(target, selSquare, five, five, 3);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.equal(q0);
       printBlock({
         t,
@@ -462,7 +519,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: q0,
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -498,6 +555,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "trapezoidal", [target, selTiny, q0, q1, 30]);
       const out = await harness.trapezoidal(target, selTiny, q0, q1, 30);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -507,7 +567,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (≈5e-31 in quad)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -520,6 +580,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "trapezoidal", [target, selLarge, q0, q1, 30]);
       const out = await harness.trapezoidal(target, selLarge, q0, q1, 30);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -529,7 +592,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (≈5e19 in quad)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -542,6 +605,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "simpson13", [target, selPiecewise, q0, q2, 60]);
       const out = await harness.simpson13(target, selPiecewise, q0, q2, 60);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -551,7 +617,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (piecewise analytic ≈4)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
@@ -565,6 +631,9 @@ describe("Integration Library - Numerical Methods", function () {
       const gas = await estimateGas(harness, "simpson38", [target, selSquare, q0, tiny, 9]);
       const out = await harness.simpson38(target, selSquare, q0, tiny, 9);
 
+      const outInt = await harness.toFloat(out);
+      const outDec = formatScaledInt(outInt);
+
       expect(out).to.be.a("string");
       printBlock({
         t,
@@ -574,7 +643,7 @@ describe("Integration Library - Numerical Methods", function () {
         expectedHex: "N/A (≈3.33e-37 in quad)",
         outHex: out,
         expectedDec: expectedDec,
-        outDec: expectedDec,
+        outDec: outDec,
         gas
       });
     });
