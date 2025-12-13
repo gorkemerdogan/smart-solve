@@ -16,7 +16,7 @@ type LinearSolversHarness = Contract & {
     gradientDescentLeastSquares(m: bigint, n: bigint, Adata: string[], bdata: string[], x0data: string[], alpha: string, maxIter: bigint, tol: string): Promise<[string[], bigint]>;
     jacobi(n: bigint, Adata: string[], bdata: string[], x0data: string[], maxIter: bigint, tolDiff: string): Promise<[string[], bigint]>;
     gaussSeidel(n: bigint, Adata: string[], bdata: string[], x0data: string[], maxIter: bigint, tolDiff: string): Promise<[string[], bigint]>;
-    gaussianElimination(n: bigint, Adata: string[],  bdata: string[]): Promise<string[]>;
+    gaussianElimination(n: bigint, Adata: string[], bdata: string[]): Promise<string[]>;
     luDecomposition(n: bigint, Adata: string[]): Promise<[string[], string[]]>;
 };
 
@@ -579,6 +579,236 @@ describe("LinearSolversHarness", function () {
                 outDec: formatScaledInt(xInt),
                 gas,
             });
+        });
+    });
+
+    // ------------------------------------------------------------
+    //  Gauss–Seidel Method
+    // ------------------------------------------------------------
+
+    describe("Method 3: Gauss–Seidel Iteration", function () {
+
+        it("Test 12: 1D identity system (A=1)", async function () {
+            t++;
+
+            const n = 1n;
+
+            const A = [await harness.qFromInt(1)];
+            const b = [await harness.qFromInt(7)];
+            const x0 = [await harness.qFromInt(0)];
+
+            const tol = await harness.qFromInt(0);
+            const maxIter = 10n;
+
+            const args = [n, A, b, x0, maxIter, tol];
+
+            await touchGas(harness, "gaussSeidel", args);
+            const gas = await estimateGas(harness, "gaussSeidel", args);
+
+            const [x, iters] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
+
+            const x0Int = await harness.toFloat(x[0]);
+            expect(x0Int / SCALE).to.equal(7n);
+
+            printBlockRegular({
+                t,
+                method: "Gauss–Seidel",
+                explanation: "1D identity system converges immediately.",
+                inHex: "A=[1], b=[7], x0=[0]",
+                expectedHex: await harness.qFromInt(7),
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "7",
+                outDec: formatScaledInt(x0Int),
+                gas,
+            });
+        });
+
+        const RESIDUAL_TOLERANCE = 10n * SCALE; // allow residual < 10
+
+        it("Test 13: 2D diagonally dominant system (scaled residual check)", async function () {
+            t++;
+
+            const n = 2n;
+
+            // A = [[4,1],[2,3]]
+            const A = [await harness.qFromInt(4), await harness.qFromInt(1), await harness.qFromInt(2), await harness.qFromInt(3)];
+
+            // b = [1,2]
+            const b = [await harness.qFromInt(1), await harness.qFromInt(2)];
+
+            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
+
+            const tol = await harness.qFromInt(0);
+            const maxIter = 25n;
+
+            const args = [n, A, b, x0, maxIter, tol];
+
+            await touchGas(harness, "gaussSeidel", args);
+            const gas = await estimateGas(harness, "gaussSeidel", args);
+
+            const [x] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
+
+            const x0Int = await harness.toFloat(x[0]);
+            const x1Int = await harness.toFloat(x[1]);
+
+            // Residuals in scaled domain
+            const r0 = 4n * x0Int + 1n * x1Int - 1n * SCALE;
+            const r1 = 2n * x0Int + 3n * x1Int - 2n * SCALE;
+
+            const r0_abs = r0 < 0n ? -r0 : r0;
+            const r1_abs = r1 < 0n ? -r1 : r1;
+
+            expect(r0_abs).to.be.below(RESIDUAL_TOLERANCE);
+            expect(r1_abs).to.be.below(RESIDUAL_TOLERANCE);
+
+            printBlockRegular({
+                t,
+                method: "Gauss–Seidel",
+                explanation: "2×2 diagonally dominant system verified via scaled residual |Ax − b| < tol.",
+                inHex: "A=[[4,1],[2,3]], b=[1,2]",
+                expectedHex: `|r| < ${RESIDUAL_TOLERANCE}`,
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "residual ≈ 0",
+                outDec: `r=[${formatScaledInt(r0)}, ${formatScaledInt(r1)}]`,
+                gas,
+            });
+        });
+
+        it("Test 14: Already converged initial guess", async function () {
+            t++;
+
+            const n = 2n;
+
+            const A = [
+                await harness.qFromInt(2), await harness.qFromInt(0),
+                await harness.qFromInt(0), await harness.qFromInt(2),
+            ];
+
+            const b = [
+                await harness.qFromInt(4),
+                await harness.qFromInt(6),
+            ];
+
+            const x0 = [
+                await harness.qFromInt(2),
+                await harness.qFromInt(3),
+            ];
+
+            const tol = await harness.qFromInt(0);
+            const maxIter = 5n;
+
+            const args = [n, A, b, x0, maxIter, tol];
+
+            await touchGas(harness, "gaussSeidel", args);
+            const gas = await estimateGas(harness, "gaussSeidel", args);
+
+            const [x, iters] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
+
+            expect(iters).to.equal(1n);
+
+            printBlockRegular({
+                t,
+                method: "Gauss–Seidel",
+                explanation: "Initial guess already satisfies Ax=b.",
+                inHex: "A=2I, b=[4,6], x0=[2,3]",
+                expectedHex: "[2,3]",
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "[2,3]",
+                outDec: "[2,3]",
+                gas,
+            });
+        });
+
+        it("Test 15: Negative values system", async function () {
+            t++;
+
+            const n = 1n;
+
+            const A = [await harness.qFromInt(-2)];
+            const b = [await harness.qFromInt(-8)];
+            const x0 = [await harness.qFromInt(0)];
+
+            const tol = await harness.qFromInt(0);
+            const maxIter = 10n;
+
+            const args = [n, A, b, x0, maxIter, tol];
+
+            await touchGas(harness, "gaussSeidel", args);
+            const gas = await estimateGas(harness, "gaussSeidel", args);
+
+            const [x] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
+
+            const x0Int = await harness.toFloat(x[0]);
+            expect(x0Int / SCALE).to.equal(4n);
+
+            printBlockRegular({
+                t,
+                method: "Gauss–Seidel",
+                explanation: "Negative scalar system.",
+                inHex: "A=[-2], b=[-8]",
+                expectedHex: "4",
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "4",
+                outDec: formatScaledInt(x0Int),
+                gas,
+            });
+        });
+
+        it("Test 16: Zero diagonal should revert", async function () {
+            t++;
+
+            const n = 2n;
+
+            const A = [
+                await harness.qFromInt(0), await harness.qFromInt(1),
+                await harness.qFromInt(1), await harness.qFromInt(1),
+            ];
+
+            const b = [
+                await harness.qFromInt(1),
+                await harness.qFromInt(2),
+            ];
+
+            const x0 = [
+                await harness.qFromInt(0),
+                await harness.qFromInt(0),
+            ];
+
+            const tol = await harness.qFromInt(0);
+            const maxIter = 5n;
+
+            await expect(
+                harness.gaussSeidel(n, A, b, x0, maxIter, tol)
+            ).to.be.reverted;
+
+            printBlockRegular({
+                t,
+                method: "Gauss–Seidel",
+                explanation: "Zero diagonal element should revert.",
+                inHex: "A has zero diagonal",
+                expectedHex: "Revert",
+                outHex: "Revert",
+                expectedDec: "Revert",
+                outDec: "Revert",
+                gas: "N/A",
+            });
+        });
+
+        it("Test 17: maxIter = 1 executes exactly one iteration", async function () {
+            t++;
+
+            const n = 1n;
+
+            const A = [await harness.qFromInt(5)];
+            const b = [await harness.qFromInt(10)];
+            const x0 = [await harness.qFromInt(0)];
+
+            const tol = await harness.qFromInt(0);
+            const maxIter = 1n;
+
+            const [_, iters] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
+
+            expect(iters).to.equal(1n);
         });
     });
 });
