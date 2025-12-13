@@ -17,7 +17,7 @@ contract MatrixMasterHarness {
     using MatrixMaster for MatrixMaster.Matrix;
 
     // ---------------------------------------------------------
-    // Helpers
+    // Helpers (Matrix)
     // ---------------------------------------------------------
 
     /**
@@ -52,59 +52,6 @@ contract MatrixMasterHarness {
         MatrixMaster.Matrix memory m
     ) private pure returns (uint256 rows, uint256 cols, bytes16[] memory data) {
         return (m.rows, m.cols, m.data);
-    }
-
-    // ---------------------------------------------------------
-    // Quad helpers for tests
-    // ---------------------------------------------------------
-
-    /**
-     * @notice Convert integer to quad using MathLib.
-     */
-    function qFromInt(int256 x) external pure returns (bytes16) {
-        return MathLib.fromInt(x);
-    }
-
-    /**
-     * @notice Convert unsigned integer to quad using MathLib.
-     */
-    function qFromUInt(uint256 x) external pure returns (bytes16) {
-        return MathLib.fromUInt(x);
-    }
-
-    /**
-     * @notice Construct a quadruple-precision scalar as (num / den).
-     *         Uses MathLib.fromUInt and MathLib.div. Reverts if den == 0.
-     *
-     * @param num  Unsigned integer numerator
-     * @param den  Unsigned integer denominator (must be > 0)
-     * @return q   Quadruple-precision num/den
-     */
-    function qFromFrac(uint256 num, uint256 den) external pure returns (bytes16 q) {
-        require(den != 0, "MatrixFacet: qFromFrac division by zero");
-
-        bytes16 a = MathLib.fromUInt(num);
-        bytes16 b = MathLib.fromUInt(den);
-
-        q = a.div(b);
-    }
-
-    /**
-     * @notice Approximate comparison of two quad values with tolerance.
-     * @param a    First value
-     * @param b    Second value
-     * @param tol  Allowed absolute deviation |a-b| ≤ tol
-     * @return ok  True if within tolerance
-     */
-    function qApprox(
-        bytes16 a,
-        bytes16 b,
-        bytes16 tol
-    ) public pure returns (bool ok) {
-        bytes16 diff = a.sub(b);
-        bytes16 absDiff = MathLib.abs(diff);
-        // absDiff <= tol  <=>  cmp(absDiff, tol) <= 0
-        return MathLib.cmp(absDiff, tol) <= 0;
     }
 
     /**
@@ -596,5 +543,63 @@ contract MatrixMasterHarness {
             MatrixMaster.powerIteration(A, seed, tol);
 
         return (lam, x.rows, x.cols, x.data);
+    }
+
+    // ---------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------
+
+    /**
+     * @notice Approximate comparison of two quad values with tolerance.
+     * @param a    First value
+     * @param b    Second value
+     * @param tol  Allowed absolute deviation |a-b| ≤ tol
+     * @return ok  True if within tolerance
+     */
+    function qApprox(
+        bytes16 a,
+        bytes16 b,
+        bytes16 tol
+    ) public pure returns (bool ok) {
+        bytes16 diff = a.sub(b);
+        bytes16 absDiff = MathLib.abs(diff);
+        // absDiff <= tol  <=>  cmp(absDiff, tol) <= 0
+        return MathLib.cmp(absDiff, tol) <= 0;
+    }
+
+    // ------------------------------------------------------------
+    //  Numerical Helpers
+    // ------------------------------------------------------------
+
+    /**
+     * @notice Converts a signed integer to IEEE-754 quadruple precision.
+     * @param  n Signed integer.
+     * @return q Quadruple-precision representation of `n`.
+     */
+    function qFromInt(int256 n) external pure returns (bytes16 q) {
+        q = MathLib.fromInt(n);
+    }
+
+    /**
+     * @notice Converts a uint256 into its quad-precision representation.
+     * @param x Unsigned integer value.
+     * @return q Quad-precision number representing x.
+     */
+    function qFromUInt(uint256 x) external pure returns (bytes16) {
+        return MathLib.fromUInt(x);
+    }
+
+    /**
+     * @notice Converts a rational number num/den to quadruple precision.
+     *         Reverts if `den` equals zero.
+     * @param num Signed numerator.
+     * @param den Signed denominator (must be non-zero).
+     * @return q  Quadruple-precision value representing num/den.
+     */
+    function qFromFrac(int256 num, int256 den) external pure returns (bytes16 q) {
+        require(den != 0, "den=0");
+        bytes16 qNum = MathLib.fromInt(num);
+        bytes16 qDen = MathLib.fromInt(den);
+        q = MathLib.div(qNum, qDen);
     }
 }

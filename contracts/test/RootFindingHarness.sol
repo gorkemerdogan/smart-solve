@@ -13,33 +13,6 @@ contract RootFindingHarness {
     using MathLib for bytes16;
 
     // ------------------------------------------------------------------------
-    // Quadruple helper constructors
-    // ------------------------------------------------------------------------
-
-    /**
-     * @notice Converts a signed integer to IEEE-754 quadruple precision.
-     * @param n Signed integer.
-     * @return q Quadruple-precision representation of `n`.
-     */
-    function qFromInt(int256 n) external pure returns (bytes16 q) {
-        q = MathLib.fromInt(n);
-    }
-
-    /**
-     * @notice Converts a rational number num/den to quadruple precision.
-     *         Reverts if `den` equals zero.
-     * @param num Signed numerator.
-     * @param den Signed denominator (must be non-zero).
-     * @return q Quadruple-precision value representing num/den.
-     */
-    function qFromFrac(int256 num, int256 den) external pure returns (bytes16 q) {
-        require(den != 0, "den=0");
-        bytes16 qNum = MathLib.fromInt(num);
-        bytes16 qDen = MathLib.fromInt(den);
-        q = qNum.div(qDen);
-    }
-
-    // ------------------------------------------------------------------------
     // Test functions f(x) and df(x) for root-finding
     // ------------------------------------------------------------------------
 
@@ -87,9 +60,41 @@ contract RootFindingHarness {
         y = three.mul(x2).sub(one);
     }
 
-    // ------------------------------------------------------------------------
-    // Utilities
-    // ------------------------------------------------------------------------
+    // ------------------------------------------------------------
+    //  Numerical Helpers
+    // ------------------------------------------------------------
+
+    /**
+     * @notice Converts a signed integer to IEEE-754 quadruple precision.
+     * @param  n Signed integer.
+     * @return q Quadruple-precision representation of `n`.
+     */
+    function qFromInt(int256 n) external pure returns (bytes16 q) {
+        q = MathLib.fromInt(n);
+    }
+
+    /**
+     * @notice Converts a uint256 into its quad-precision representation.
+     * @param x Unsigned integer value.
+     * @return q Quad-precision number representing x.
+     */
+    function qFromUInt(uint256 x) external pure returns (bytes16) {
+        return MathLib.fromUInt(x);
+    }
+
+    /**
+     * @notice Converts a rational number num/den to quadruple precision.
+     *         Reverts if `den` equals zero.
+     * @param num Signed numerator.
+     * @param den Signed denominator (must be non-zero).
+     * @return q  Quadruple-precision value representing num/den.
+     */
+    function qFromFrac(int256 num, int256 den) external pure returns (bytes16 q) {
+        require(den != 0, "den=0");
+        bytes16 qNum = MathLib.fromInt(num);
+        bytes16 qDen = MathLib.fromInt(den);
+        q = MathLib.div(qNum, qDen);
+    }
 
     /**
      * @notice Compares two quadruple-precision values.
