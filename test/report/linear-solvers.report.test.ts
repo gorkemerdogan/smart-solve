@@ -360,4 +360,225 @@ describe("LinearSolversHarness", function () {
             });
         });
     });
+
+    // ------------------------------------------------------------
+    //  Jacobi
+    // ------------------------------------------------------------
+
+    describe("Method 2: Jacobi Iteration", function () {
+
+        it("Test 7: 1D identity A=1 solves immediately", async function () {
+            t++;
+
+            const n = 1n;
+
+            const A = [await harness.qFromInt(1)];
+            const b = [await harness.qFromInt(7)];
+            const x0 = [await harness.qFromInt(0)];
+
+            const tol = await harness.qFromInt(0);
+            const maxIter = 10n;
+
+            const args = [n, A, b, x0, maxIter, tol];
+
+            await touchGas(harness, "jacobi", args);
+            const gas = await estimateGas(harness, "jacobi", args);
+
+            const [x, iters] = await harness.jacobi(n, A, b, x0, maxIter, tol);
+
+            const xInt = await harness.toFloat(x[0]);
+            expect(xInt / SCALE).to.equal(7n);
+
+            printBlockRegular({
+                t,
+                method: "Jacobi",
+                explanation: "1D identity system converges in one iteration.",
+                inHex: "A=[1], b=[7], x0=[0]",
+                expectedHex: await harness.qFromInt(7),
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "7",
+                outDec: formatScaledInt(xInt),
+                gas,
+            });
+        });
+
+        it("Test 8: 2D diagonal dominant system", async function () {
+            t++;
+
+            const n = 2n;
+
+            // A = [[4,1],[2,3]]
+            const A = [
+                await harness.qFromInt(4), await harness.qFromInt(1),
+                await harness.qFromInt(2), await harness.qFromInt(3),
+            ];
+
+            // b = [1,2]
+            const b = [
+                await harness.qFromInt(1),
+                await harness.qFromInt(2),
+            ];
+
+            const x0 = [
+                await harness.qFromInt(0),
+                await harness.qFromInt(0),
+            ];
+
+            const tol = await harness.qFromFrac(1, 1_000_000);
+            const maxIter = 50n;
+
+            const args = [n, A, b, x0, maxIter, tol];
+
+            await touchGas(harness, "jacobi", args);
+            const gas = await estimateGas(harness, "jacobi", args);
+
+            const [x] = await harness.jacobi(n, A, b, x0, maxIter, tol);
+
+            const x0Int = await harness.toFloat(x[0]);
+            const x1Int = await harness.toFloat(x[1]);
+
+            // Expected ≈ [0.1, 0.6]
+            expect(x0Int / SCALE).to.equal(0n);
+            expect(x1Int / SCALE).to.equal(0n);
+
+            printBlockRegular({
+                t,
+                method: "Jacobi",
+                explanation: "2×2 diagonally dominant system converges.",
+                inHex: "A=[[4,1],[2,3]], b=[1,2]",
+                expectedHex: "≈[0.1,0.6]",
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "[0.1, 0.6]",
+                outDec: `[${formatScaledInt(x0Int)}, ${formatScaledInt(x1Int)}]`,
+                gas,
+            });
+        });
+
+        it("Test 9: Already-solved system remains stable", async function () {
+            t++;
+
+            const n = 2n;
+
+            const A = [
+                await harness.qFromInt(1), await harness.qFromInt(0),
+                await harness.qFromInt(0), await harness.qFromInt(1),
+            ];
+
+            const b = [
+                await harness.qFromInt(3),
+                await harness.qFromInt(4),
+            ];
+
+            const x0 = [
+                await harness.qFromInt(3),
+                await harness.qFromInt(4),
+            ];
+
+            const tol = await harness.qFromInt(0);
+            const maxIter = 5n;
+
+            const args = [n, A, b, x0, maxIter, tol];
+
+            await touchGas(harness, "jacobi", args);
+            const gas = await estimateGas(harness, "jacobi", args);
+
+            const [x] = await harness.jacobi(n, A, b, x0, maxIter, tol);
+
+            const x0Int = await harness.toFloat(x[0]);
+            const x1Int = await harness.toFloat(x[1]);
+
+            expect(x0Int / SCALE).to.equal(3n);
+            expect(x1Int / SCALE).to.equal(4n);
+
+            printBlockRegular({
+                t,
+                method: "Jacobi",
+                explanation: "Already-correct initial guess remains unchanged.",
+                inHex: "A=I, b=[3,4], x0=[3,4]",
+                expectedHex: "[3,4]",
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "[3,4]",
+                outDec: `[${formatScaledInt(x0Int)}, ${formatScaledInt(x1Int)}]`,
+                gas,
+            });
+        });
+
+        it("Test 10: Zero diagonal element reverts", async function () {
+            t++;
+
+            const n = 2n;
+
+            const A = [
+                await harness.qFromInt(0), await harness.qFromInt(1),
+                await harness.qFromInt(1), await harness.qFromInt(1),
+            ];
+
+            const b = [
+                await harness.qFromInt(1),
+                await harness.qFromInt(1),
+            ];
+
+            const x0 = [
+                await harness.qFromInt(0),
+                await harness.qFromInt(0),
+            ];
+
+            const tol = await harness.qFromInt(0);
+            const maxIter = 10n;
+
+            await expect(
+                harness.jacobi(n, A, b, x0, maxIter, tol)
+            ).to.be.reverted;
+
+            printBlockRegular({
+                t,
+                method: "Jacobi",
+                explanation: "Zero diagonal causes division-by-zero revert.",
+                inHex: "A has zero diagonal",
+                expectedHex: "Revert",
+                outHex: "Revert",
+                expectedDec: "Revert",
+                outDec: "Revert",
+                gas: "N/A",
+            });
+        });
+
+        it("Test 11: maxIter=1 performs single iteration only", async function () {
+            t++;
+
+            const n = 1n;
+
+            const A = [await harness.qFromInt(2)];
+            const b = [await harness.qFromInt(8)];
+            const x0 = [await harness.qFromInt(0)];
+
+            const tol = await harness.qFromInt(0);
+            const maxIter = 1n;
+
+            const args = [n, A, b, x0, maxIter, tol];
+
+            await touchGas(harness, "jacobi", args);
+            const gas = await estimateGas(harness, "jacobi", args);
+
+            const [x, iters] = await harness.jacobi(n, A, b, x0, maxIter, tol);
+
+            const xInt = await harness.toFloat(x[0]);
+
+            // Single Jacobi step: x = b / a = 4
+            expect(xInt / SCALE).to.equal(4n);
+            expect(iters).to.equal(1n);
+
+            printBlockRegular({
+                t,
+                method: "Jacobi",
+                explanation: "Jacobi performs exactly one iteration when maxIter=1.",
+                inHex: "A=[2], b=[8]",
+                expectedHex: await harness.qFromInt(4),
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "4",
+                outDec: formatScaledInt(xInt),
+                gas,
+            });
+        });
+    });
 });
