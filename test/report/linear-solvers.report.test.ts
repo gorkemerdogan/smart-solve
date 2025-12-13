@@ -10,13 +10,14 @@ import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
 
 type LinearSolversHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
+    qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
     toFloat(q: string): Promise<bigint>;
 
     gradientDescentLeastSquares(m: bigint, n: bigint, Adata: string[], bdata: string[], x0data: string[], alpha: string, maxIter: bigint, tol: string): Promise<[string[], bigint]>;
-    jacobiHarness(n: bigint, A: bigint[], b: bigint[], x0: bigint[], maxIter: bigint, tol: bigint): Promise<[bigint[], bigint]>;
-    gaussSeidelHarness(n: bigint, A: bigint[], b: bigint[], x0: bigint[], maxIter: bigint, tol: bigint,): Promise<[bigint[], bigint]>;
-    gaussianEliminationHarness(n: bigint, A: bigint[], b: bigint[]): Promise<bigint[]>;
-    luDecompositionHarness(n: bigint, A: bigint[]): Promise<[bigint[], bigint[]]>;
+    jacobi(n: bigint, Adata: string[], bdata: string[], x0data: string[], maxIter: bigint, tolDiff: string): Promise<[string[], bigint]>;
+    gaussSeidel(n: bigint, Adata: string[], bdata: string[], x0data: string[], maxIter: bigint, tolDiff: string): Promise<[string[], bigint]>;
+    gaussianElimination(n: bigint, Adata: string[],  bdata: string[]): Promise<string[]>;
+    luDecomposition(n: bigint, Adata: string[]): Promise<[string[], string[]]>;
 };
 
 // ------------------------------------------------------------
