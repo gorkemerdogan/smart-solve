@@ -41,7 +41,7 @@ library MathLib {
      * @notice Multiplies two quadruple-precision numbers.
      * @param a First operand
      * @param b Second operand
-     * @return bytes16 a × b
+     * @return bytes16 a x b
      */
     function mul(bytes16 a, bytes16 b) public pure returns (bytes16) {
         return ABDKMathQuad.mul(a, b);
