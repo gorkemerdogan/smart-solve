@@ -141,6 +141,7 @@ export function printBlockRegular({t, method, explanation, gas, inHex = "-", exp
         `Expected Output (hex): ${expectedHex}`,
         `Output (hex): ${outHex}`,
         `Expected Output (dec): ${expectedDec}`,
+        `Output (dec): ${outDec}`,
         sep,
     ];
 
