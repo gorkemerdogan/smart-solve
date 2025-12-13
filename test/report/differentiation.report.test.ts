@@ -11,7 +11,7 @@ import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
 type DifferentiationHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
-   
+
     toFloat(q: string): Promise<bigint>;
 
     forwardDiffHarness(target: string, selector: string, x: string, h: string): Promise<string>;

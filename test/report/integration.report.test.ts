@@ -38,15 +38,15 @@ const SCALE_DECIMALS = 12n;
 const SCALE = 10n ** SCALE_DECIMALS;
 
 function formatScaledInt(v: bigint): string {
-    const neg = v < 0n;
-    const abs = neg ? -v : v;
+  const neg = v < 0n;
+  const abs = neg ? -v : v;
 
-    const intPart = abs / SCALE;
-    const fracPart = abs % SCALE;
+  const intPart = abs / SCALE;
+  const fracPart = abs % SCALE;
 
-    const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
+  const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
 
-    return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`;
+  return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`;
 }
 
 // ------------------------------------------------------------

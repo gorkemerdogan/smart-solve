@@ -401,7 +401,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
 
         it("Test 7: mulMatrix vector inner product (1xN · Nx1)", async function () {
             t++;
-            
+
             const row = [await qInt(1), await qInt(2), await qInt(3)]; // row: [1,2,3] as 1x3
             const col = [await qInt(4), await qInt(5), await qInt(6)]; // col: [4,5,6] as 3x1
 
@@ -432,7 +432,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
 
         it("Test 8: mulMatrix vector outer product (Nx1 · 1xN)", async function () {
             t++;
-            
+
             const col = [await qInt(1), await qInt(2), await qInt(3)]; // col: [1,2,3] as 3x1
             const row = [await qInt(4), await qInt(5), await qInt(6)]; // row: [4,5,6] as 1x3
 

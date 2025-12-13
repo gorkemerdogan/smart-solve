@@ -131,7 +131,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             await touchGas(harness, "euclideanNormHarness", [1n, 2n, v]);
             const gas = await estimateGas(harness, "euclideanNormHarness", [1n, 2n, v]);
 
-            await expect( harness.euclideanNormHarness(1n, 2n, v)).to.be.revertedWith("MatrixMaster: euclideanNorm requires column vector");
+            await expect(harness.euclideanNormHarness(1n, 2n, v)).to.be.revertedWith("MatrixMaster: euclideanNorm requires column vector");
 
             printBlockMatrix({
                 t,
