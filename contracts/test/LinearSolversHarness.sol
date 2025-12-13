@@ -19,8 +19,8 @@ contract LinearSolversHarness {
     function gradientDescentLeastSquares(
         uint256 m,
         uint256 n,
-        bytes16[] calldata Adata, // m×n row-major
-        bytes16[] calldata bdata, // m×1
+        bytes16[] calldata Adata,  // m×n row-major
+        bytes16[] calldata bdata,  // m×1
         bytes16[] calldata x0data, // n×1
         bytes16 alpha,
         uint256 maxIter,
@@ -44,8 +44,8 @@ contract LinearSolversHarness {
 
     function jacobi(
         uint256 n,
-        bytes16[] calldata Adata, // n×n
-        bytes16[] calldata bdata, // n×1
+        bytes16[] calldata Adata,  // n×n
+        bytes16[] calldata bdata,  // n×1
         bytes16[] calldata x0data, // n×1
         uint256 maxIter,
         bytes16 tolDiff
@@ -67,8 +67,8 @@ contract LinearSolversHarness {
 
     function gaussSeidel(
         uint256 n,
-        bytes16[] calldata Adata, // n×n
-        bytes16[] calldata bdata, // n×1
+        bytes16[] calldata Adata,  // n×n
+        bytes16[] calldata bdata,  // n×1
         bytes16[] calldata x0data, // n×1
         uint256 maxIter,
         bytes16 tolDiff
