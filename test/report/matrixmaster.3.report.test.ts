@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
@@ -47,59 +47,6 @@ async function newHarness(): Promise<MatrixMasterHarness> {
 function asMatrix(tuple: [bigint, bigint, string[]]) {
     const [rows, cols, data] = tuple;
     return { rows, cols, data: [...data] };
-}
-
-// ------------------------------------------------------------
-//  Gas Estimation
-// ------------------------------------------------------------
-
-async function touchGas(h: MatrixMasterHarness, method: string, args: any[]) {
-    try {
-        const data = h.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await h.getAddress();
-        const tx = await signer.sendTransaction({ to, data });
-        await tx.wait();
-    } catch {
-        // For revert tests or estimation failures, silently ignore.
-    }
-}
-
-async function estimateGas(h: MatrixMasterHarness, method: string, args: any[]): Promise<string> {
-    try {
-        const anyH = h as any;
-        if (anyH[method]?.estimateGas) {
-            return (await anyH[method].estimateGas(...args)).toString();
-        }
-        const data = h.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await h.getAddress();
-        const gas = await signer.estimateGas({ to, data });
-        return gas.toString();
-    } catch {
-        return "revert / estimation failed";
-    }
-}
-
-// ------------------------------------------------------------
-//  Print Block
-// ------------------------------------------------------------
-
-function printBlock(options: {
-    t: number;
-    method: string;
-    explanation: string;
-    gas: string;
-    shapeIn: string;
-    shapeOut: string;
-    inHex?: string;
-    outHex?: string;
-}) {
-    const { t, method, explanation, gas, shapeIn, shapeOut, inHex, outHex } = options;
-    const sep = "-".repeat(60);
-    console.log(
-        `\n${sep}\nTest ${t}\nMethod: ${method}\nExplanation: ${explanation}\nGas Usage: ${gas}\nInput shape: ${shapeIn}\nOutput shape: ${shapeOut}\nInput (hex): ${inHex ?? "-"}\nOutput (hex): ${outHex ?? "-"}`,
-    );
 }
 
 const fmtHexArr = (arr: string[]) => `[${arr.join(", ")}]`;
@@ -154,7 +101,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 expect(s.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "sliceHarness",
                 explanation: "Extracts an interior sub-block and checks row-major layout is preserved correctly.",
@@ -188,7 +135,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 expect(s.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "sliceHarness",
                 explanation: "Slices a single full row and verifies contiguous row extraction semantics.",
@@ -216,7 +163,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
 
                 await expect(harness.sliceHarness(rows, cols, vals, 1n, 1n, 0n, 2n)).to.be.revertedWith("MatrixMaster: invalid slice range");
 
-                printBlock({
+                printBlockMatrix({
                     t,
                     method: "sliceHarness",
                     explanation: "Ensures start/end row indices must form a strictly positive slice window.",
@@ -234,7 +181,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, 0n, 1n, 2n, 2n]);
                 await expect(harness.sliceHarness(rows, cols, vals, 0n, 1n, 2n, 2n)).to.be.revertedWith("MatrixMaster: invalid slice range");
 
-                printBlock({
+                printBlockMatrix({
                     t,
                     method: "sliceHarness",
                     explanation: "Ensures start/end column indices also must define a non-empty valid range.",
@@ -252,7 +199,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, 0n, 3n, 0n, 2n]);
                 await expect(harness.sliceHarness(rows, cols, vals, 0n, 3n, 0n, 2n)).to.be.revertedWith("MatrixMaster: slice out of bounds");
 
-                printBlock({
+                printBlockMatrix({
                     t,
                     method: "sliceHarness",
                     explanation: "Guards against slice windows that extend beyond the matrix row dimension.",
@@ -270,7 +217,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 const gas = await estimateGas(harness, "sliceHarness", [rows, cols, vals, 0n, 2n, 0n, 4n]);
                 await expect(harness.sliceHarness(rows, cols, vals, 0n, 2n, 0n, 4n)).to.be.revertedWith("MatrixMaster: slice out of bounds");
 
-                printBlock({
+                printBlockMatrix({
                     t,
                     method: "sliceHarness",
                     explanation: "Guards against slice windows that overflow the matrix column dimension.",
@@ -311,7 +258,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 expect(s.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "sliceHarness",
                 explanation: "Selects a single full column and ensures the resulting 3x1 view matches the expected entries.",
@@ -348,7 +295,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 expect(s.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "sliceHarness",
                 explanation: "Slices the entire matrix domain and checks it is bitwise identical to the original layout.",
@@ -386,7 +333,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 expect(s.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "sliceHarness",
                 explanation: "Slices the last row of a 3x3 matrix to ensure upper-bound row indices behave correctly.",
@@ -424,7 +371,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 expect(s.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "sliceHarness",
                 explanation: "Slices the last column of a 3x3 matrix, checking column upper-bounds are handled cleanly.",
@@ -461,7 +408,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 expect(r.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "reshapeHarness",
                 explanation: "Changes matrix shape while reusing the same flat data array and order of entries.",
@@ -490,7 +437,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
             // 2x3 -> area=6; 4x2 -> area=8 => revert
             await expect(harness.reshapeHarness(srcRows, srcCols, vals, dstRows, dstCols)).to.be.revertedWith("MatrixMaster: reshape area mismatch");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "reshapeHarness",
                 explanation: "Prevents reshapes that would change total element count and corrupt matrix data.",
@@ -524,7 +471,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 expect(r.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "reshapeHarness",
                 explanation: "Flattens a 2x3 matrix into a 1x6 row vector, preserving the original row-major order.",
@@ -558,7 +505,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 expect(r.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "reshapeHarness",
                 explanation: "Takes a 1x6 vector and reshapes it back to 2x3 while keeping the flat data untouched.",
@@ -593,7 +540,7 @@ describe("MatrixMaster — Shape & Reshape", function () {
                 expect(r2.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "reshapeHarness",
                 explanation: "Reshapes 2x3→3x2→2x3 and verifies the final matrix is identical to the original.",

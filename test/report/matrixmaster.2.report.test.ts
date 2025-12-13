@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
@@ -58,68 +59,6 @@ function isQuadZero(hex: string): boolean {
 }
 
 // ------------------------------------------------------------
-//  Gas Estimation
-// ------------------------------------------------------------
-
-async function touchGas(harness: MatrixMasterHarness, method: string, args: any[]) {
-    try {
-        const data = harness.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await harness.getAddress();
-        const tx = await signer.sendTransaction({ to, data });
-        await tx.wait();
-    } catch {
-        // Ignored for reverts
-    }
-}
-
-async function estimateGas(harness: MatrixMasterHarness, method: string, args: any[]) {
-    try {
-        const anyH = harness as any;
-        if (anyH[method]?.estimateGas) {
-            return (await anyH[method].estimateGas(...args)).toString();
-        }
-        const data = harness.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await harness.getAddress();
-        const gas = await signer.estimateGas({ to, data });
-        return gas.toString();
-    } catch {
-        return "revert";
-    }
-}
-
-// ------------------------------------------------------------
-//  Print Block
-// ------------------------------------------------------------
-
-function printBlock({
-    t,
-    method,
-    explanation,
-    gas,
-    shapeIn,
-    shapeOut,
-    inHex,
-    outHex,
-}: any) {
-    const sep = "-".repeat(60);
-    console.log(
-        `
-        ${sep}
-        Test ${t}
-        Method: ${method}
-        Explanation: ${explanation}
-        Gas Usage: ${gas}
-        Shape In: ${shapeIn}
-        Shape Out: ${shapeOut}
-        Input: ${inHex || "-"}
-        Output: ${outHex || "-"}
-`.trim(),
-    );
-}
-
-// ------------------------------------------------------------
 //  Test Suite
 // ------------------------------------------------------------
 
@@ -172,7 +111,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "addHarness",
                 explanation: "Performs elementwise addition of two same-shaped matrices and checks sum entries.",
@@ -194,7 +133,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
 
             await expect(harness.addHarness(2n, 2n, a, 1n, 4n, b)).to.be.revertedWith("MatrixMaster: shape mismatch");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "addHarness",
                 explanation: "Rejects addition when operand matrices have incompatible dimension layouts.",
@@ -238,7 +177,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "addHarness",
                 explanation: "Adds matrices containing mixed positive and negative entries and checks signed results.",
@@ -270,7 +209,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
 
             expect(await harness.matricesExactEqual(rows, cols, A, sum.rows, sum.cols, sum.data)).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "addHarness",
                 explanation: "Verifies that adding a zero matrix is a no-op and preserves A exactly (A+0=A).",
@@ -313,7 +252,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "subHarness",
                 explanation: "Performs elementwise subtraction and ensures each entry is A(i,j)−B(i,j).",
@@ -335,7 +274,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
 
             await expect(harness.subHarness(2n, 2n, a, 1n, 4n, b)).to.be.revertedWith("MatrixMaster: shape mismatch");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "subHarness",
                 explanation: "Ensures subtraction requires identical shapes and fails on mismatched sizes.",
@@ -379,7 +318,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "subHarness",
                 explanation: "Subtracts matrices with mixed signs and checks sign-sensitive differences.",
@@ -412,7 +351,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "subHarness",
                 explanation: "Subtracts a matrix from itself and confirms all entries cancel exactly to zero.",
@@ -458,7 +397,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "divScalarHarness",
                 explanation: "Divides each entry by a non-zero scalar and checks the resulting quad ratios.",
@@ -496,7 +435,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulScalarHarness",
                 explanation: "Scales every matrix entry by a quad scalar and validates uniform scaling.",
@@ -530,7 +469,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(isQuadZero(v)).to.equal(true);
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulScalarHarness",
                 explanation: "Confirms multiplying by zero produces a matrix whose entries are quad zeros (+-0).",
@@ -569,7 +508,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulScalarHarness",
                 explanation: "Scales by −1 and checks every entry is sign-flipped while magnitudes are preserved.",
@@ -612,7 +551,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(cBI).to.be.lt(aBI);
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulScalarHarness",
                 explanation: "Constructs a tiny scalar s=1/1000 and verifies that multiplying by s reduces magnitudes.",
@@ -645,7 +584,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
 
             await expect(harness.divScalarHarness(rows, cols, vals, zero)).to.be.revertedWith("MatrixMaster: division by zero");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "divScalarHarness",
                 explanation: "Confirms division by an exact zero scalar is rejected to avoid NaN-like states.",
@@ -685,7 +624,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "divScalarHarness",
                 explanation: "Divides by a negative scalar and checks the resulting entries have flipped signs.",
@@ -728,7 +667,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
                 expect(cBI).to.be.gt(aBI);
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "divScalarHarness",
                 explanation: "Divides by a very small positive scalar and checks that outputs are magnified.",

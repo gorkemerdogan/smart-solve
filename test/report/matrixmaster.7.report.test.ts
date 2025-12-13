@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
@@ -74,63 +74,6 @@ function isQuadZero(hex: string): boolean {
 }
 
 // ------------------------------------------------------------
-//  Gas Estimation
-// ------------------------------------------------------------
-
-async function touchGas(h: MatrixMasterHarness, method: string, args: any[]) {
-    try {
-        const data = h.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await h.getAddress();
-        const tx = await signer.sendTransaction({ to, data });
-        await tx.wait();
-    } catch {
-        // For revert tests or estimation failures, silently ignore.
-    }
-}
-
-async function estimateGas(
-    h: MatrixMasterHarness,
-    method: string,
-    args: any[],
-): Promise<string> {
-    try {
-        const anyH = h as any;
-        if (anyH[method]?.estimateGas) {
-            return (await anyH[method].estimateGas(...args)).toString();
-        }
-        const data = h.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await h.getAddress();
-        const gas = await signer.estimateGas({ to, data });
-        return gas.toString();
-    } catch {
-        return "revert";
-    }
-}
-
-// ------------------------------------------------------------
-//  Print Block
-// ------------------------------------------------------------
-
-function printBlock(options: {
-    t: number;
-    method: string;
-    explanation: string;
-    gas: string;
-    shapeIn: string;
-    shapeOut: string;
-    inHex?: string;
-    outHex?: string;
-}) {
-    const { t, method, explanation, gas, shapeIn, shapeOut, inHex, outHex } = options;
-    const sep = "-".repeat(60);
-    console.log(
-        `\n${sep}\nTest ${t}\nMethod: ${method}\nExplanation: ${explanation}\nGas Usage: ${gas}\nInput shape: ${shapeIn}\nOutput shape: ${shapeOut}\nInput (hex): ${inHex ?? "-"}\nOutput (hex): ${outHex ?? "-"}`,
-    );
-}
-
-// ------------------------------------------------------------
 //  Test Suite
 // ------------------------------------------------------------
 
@@ -169,7 +112,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             const expected = await qInt(5);
             expect(out.toLowerCase()).to.equal(expected.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "euclideanNormHarness",
                 explanation: "Computes Euclidean euclideanNorm ||[3,4]^T||_2 = 5.",
@@ -190,7 +133,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
 
             await expect( harness.euclideanNormHarness(1n, 2n, v)).to.be.revertedWith("MatrixMaster: euclideanNorm requires column vector");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "euclideanNormHarness",
                 explanation: "Rejects row vectors. euclideanNorm requires a column vector (n×1).",
@@ -227,7 +170,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             expect(data[1].toLowerCase()).to.equal(ex1.toLowerCase());
             expect(data[2].toLowerCase()).to.equal(ex2.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "normalizeHarness",
                 explanation: "Normalizes [3,0,4]^T into unit vector (3/5, 0, 4/5) using quad math.",
@@ -248,7 +191,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
 
             await expect(harness.normalizeHarness(2n, 1n, v)).to.be.revertedWith("MatrixMaster: cannot normalize zero vector");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "normalizeHarness",
                 explanation: "Rejects normalization of the zero vector (||v|| = 0).",
@@ -291,7 +234,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             expect(cols2).to.equal(1n);
             expect(data1).to.deep.equal(data2); // deterministic for fixed seed
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "randomVectorHarness",
                 explanation: "Deterministic generation with fixed seed, returns a stable 5x1 vector.",
@@ -321,7 +264,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
 
             expect(dataA).to.not.deep.equal(dataB); // different seed -> different vector
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "randomVectorHarness",
                 explanation: "Different seeds must result different pseudo-random vectors.",
@@ -358,7 +301,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             expect(yes).to.equal(true);
             expect(no).to.equal(false);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "hasConvergedHarness",
                 explanation: "Checks whether ||vNew - vOld||_2 < tol (true: 1 < 2, false: 1 < 1).",
@@ -380,7 +323,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
 
             await expect(harness.hasConvergedHarness(1n, 2n, vRow, 1n, 2n, vRow, tol)).to.be.revertedWith("MatrixMaster: converged requires vectors");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "hasConvergedHarness",
                 explanation: "Rejects row-shaped inputs. Convergence check expects column vectors.",
@@ -426,7 +369,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
 
             expect(diff).to.be.lt(tolBI);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "powerIterationHarness",
                 explanation: "Diagonal matrix diag(5,2) -> dominant eigenvalue ≈ 5.",
@@ -465,7 +408,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
 
             expect(diff).to.be.lt(tolBI);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "powerIterationHarness",
                 explanation: "Symmetric matrix [[3,1],[1,3]] -> dominant eigenvalue ≈ 4.",
@@ -509,7 +452,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
 
             expect(diff).to.be.lt(tolBI);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "powerIterationHarness",
                 explanation: "Upper-triangular 3x3 -> dominant eigenvalue ≈ 3 (largest diagonal entry).",

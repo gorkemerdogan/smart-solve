@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
@@ -68,77 +69,6 @@ function fmtHexArr(arr: string[]) {
 }
 
 // ------------------------------------------------------------
-//  Gas Estimation
-// ------------------------------------------------------------
-
-async function touchGas(harness: MatrixMasterHarness, method: string, args: any[]) {
-    try {
-        const data = harness.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await harness.getAddress();
-        const tx = await signer.sendTransaction({ to, data });
-        await tx.wait();
-    } catch {
-        // Ignored for reverts / estimation failures
-    }
-}
-
-async function estimateGas(harness: MatrixMasterHarness, method: string, args: any[]): Promise<string> {
-    try {
-        const anyH = harness as any;
-        if (anyH[method]?.estimateGas) {
-            return (await anyH[method].estimateGas(...args)).toString();
-        }
-        const data = harness.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await harness.getAddress();
-        const gas = await signer.estimateGas({ to, data });
-        return gas.toString();
-    } catch {
-        return "revert";
-    }
-}
-
-// ------------------------------------------------------------
-//  Print Block
-// ------------------------------------------------------------
-
-function printBlock({
-    t,
-    method,
-    explanation,
-    gas,
-    shapeIn,
-    shapeOut,
-    inHex,
-    outHex,
-}: {
-    t: number;
-    method: string;
-    explanation: string;
-    gas: string;
-    shapeIn: string;
-    shapeOut: string;
-    inHex?: string;
-    outHex?: string;
-}) {
-    const sep = "-".repeat(60);
-    console.log(
-        `
-        ${sep}
-        Test ${t}
-        Method: ${method}
-        Explanation: ${explanation}
-        Gas Usage: ${gas}
-        Shape In: ${shapeIn}
-        Shape Out: ${shapeOut}
-        Input: ${inHex || "-"}
-        Output: ${outHex || "-"}
-`.trim(),
-    );
-}
-
-// ------------------------------------------------------------
 //  Test Suite
 // ------------------------------------------------------------
 
@@ -196,7 +126,7 @@ describe("MatrixMaster — Transpose", function () {
                 expect(tMat.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "transposeHarness",
                 explanation: "Transposes a 2x3 matrix into 3x2 and checks entries follow A(i,j) → AT(j,i).",
@@ -233,7 +163,7 @@ describe("MatrixMaster — Transpose", function () {
                 }
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "transposeHarness",
                 explanation: "Transposes a 10x10 random matrix and checks AT(j,i) = A(i,j) for all entries.",
@@ -269,7 +199,7 @@ describe("MatrixMaster — Transpose", function () {
                 }
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "transposeHarness",
                 explanation: "Runs transpose on a 40x40 random matrix and validates full i,j ↔ j,i mapping.",
@@ -328,7 +258,7 @@ describe("MatrixMaster — Transpose", function () {
                 }
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "transposeHarness",
                 explanation: "Transposes a 100x100 matrix with a single non-zero and confirms (r,c) → (c,r) and zeros elsewhere.",
@@ -367,7 +297,7 @@ describe("MatrixMaster — Transpose", function () {
                 expect(t2.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "transposeHarness",
                 explanation: "Applies transpose twice and confirms the involution property returns the original matrix.",
@@ -401,7 +331,7 @@ describe("MatrixMaster — Transpose", function () {
                 expect(tMat.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "transposeHarness",
                 explanation: "Transposes a 1x4 row vector into a 4x1 column vector while preserving flat order.",
@@ -435,7 +365,7 @@ describe("MatrixMaster — Transpose", function () {
                 expect(tMat.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "transposeHarness",
                 explanation: "Transposes a 4x1 column vector into a 1x4 row vector, keeping the same data sequence.",
@@ -463,7 +393,7 @@ describe("MatrixMaster — Transpose", function () {
             expect(tMat.data.length).to.equal(1);
             expect(tMat.data[0].toLowerCase()).to.equal(vals[0].toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "transposeHarness",
                 explanation: "Checks that a 1x1 matrix is unchanged by transpose (shape and value).",
@@ -489,7 +419,7 @@ describe("MatrixMaster — Transpose", function () {
                 await harness.matricesExactEqual(I.rows, I.cols, I.data, IT.rows, IT.cols, IT.data),
             ).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "transposeHarness",
                 explanation: "Confirms that transposing an identity matrix leaves it unchanged (Iᵀ = I).",

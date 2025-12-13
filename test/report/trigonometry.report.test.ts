@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { ZeroHash, type Contract } from "ethers";
+import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
 
 // ------------------------------------------------------------
 //  Types & Constants
@@ -28,59 +29,6 @@ const SCALE = 1e12;
 
 // ------------------------------------------------------------
 //  Helpers
-// ------------------------------------------------------------
-
-async function touchGas(harness: TrigHarness, method: string, args: any[]) {
-    const data = harness.interface.encodeFunctionData(method, args);
-    const [signer] = await ethers.getSigners();
-    const to = await harness.getAddress();
-    const tx = await signer.sendTransaction({ to, data });
-    await tx.wait();
-}
-
-async function estimateGas(harness: TrigHarness, method: string, args: any[]) {
-    const anyH = harness as any;
-    if (anyH[method]?.estimateGas) {
-        return (await anyH[method].estimateGas(...args)).toString();
-    }
-    const data = harness.interface.encodeFunctionData(method, args);
-    const [signer] = await ethers.getSigners();
-    const to = await harness.getAddress();
-    const gas = await signer.estimateGas({ to, data });
-    return gas.toString();
-}
-
-function printBlock({
-    t,
-    method,
-    explanation,
-    inHex,
-    expectedHex,
-    outHex,
-    expectedDec,
-    outDec,
-    gas,
-}: any) {
-    const sep = "-".repeat(60);
-    const outDecLine =
-        outDec !== undefined && outDec !== null ? `Output (dec): ${outDec}` : "";
-
-    console.log(`
-        ${sep}
-        Test ${t}
-        Method: ${method}
-        Explanation: ${explanation}
-        Input: ${inHex}
-        Expected Output (hex): ${expectedHex}
-        Output (hex): ${outHex}
-        Expected Output (dec): ${expectedDec}
-        Gas Usage: ${gas}
-        ${outDecLine}
-`.trim());
-}
-
-// ------------------------------------------------------------
-//  Math Helpers
 // ------------------------------------------------------------
 
 async function toQuad(h: TrigHarness, x: number): Promise<string> {
@@ -140,7 +88,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const gas = await estimateGas(harness, "sin", [q0]);
         const r = (await harness.sin(q0)).toLowerCase();
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "sin",
             explanation: "sin(0) = 0.0",
@@ -162,7 +110,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const gas = await estimateGas(harness, "cos", [q0]);
         const r = (await harness.cos(q0)).toLowerCase();
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "cos",
             explanation: "cos(0) = +1.0",
@@ -184,7 +132,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const gas = await estimateGas(harness, "sin", [q]);
         const r = (await harness.sin(q)).toLowerCase();
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "sin",
             explanation: "sin(π/2) = +1.0",
@@ -206,7 +154,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const gas = await estimateGas(harness, "cos", [q]);
         const r = (await harness.cos(q)).toLowerCase();
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "cos",
             explanation: "cos(π/2) = 0.0",
@@ -228,7 +176,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const gas = await estimateGas(harness, "sin", [q]);
         const r = (await harness.sin(q)).toLowerCase();
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "sin",
             explanation: "sin(π) = 0",
@@ -251,7 +199,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const r = (await harness.cos(q)).toLowerCase();
 
         const QNEG_ONE = "0xbfff0000000000000000000000000000";
-        printBlock({
+        printBlockRegular({
             t,
             method: "cos",
             explanation: "cos(π) = −1.0",
@@ -286,7 +234,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const expectedNegHex = flipSign(posHex);
         const expectedNegDec = -posDec;
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "sin",
             explanation: "Verifies sin(−x) is bit-wise sign-flipped sin(x), and numerically −sin(x).",
@@ -313,7 +261,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const s = await fromQuad(harness, qs);
         const expected = Math.sin(x * x);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "sin",
             explanation: "Evaluates sin(x²) in quad and compares to JS Math.sin(x*x) in double precision.",
@@ -340,7 +288,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const c = await fromQuad(harness, qc);
         const expected = Math.cos(x * x);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "cos",
             explanation: "Computes cos(x²) in quad and checks closeness to Math.cos(x*x).",
@@ -371,7 +319,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const sumQ = await harness.add(qs2, qc2);
         const sum = await fromQuad(harness, sumQ);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "identity",
             explanation: "Validates sin²(x)+cos²(x)≈1 using quad arithmetic (gas reported for sin).",
@@ -400,7 +348,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const c = await fromQuad(harness, await harness.cos(qx));
         const expected = s / c;
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "tan",
             explanation: "tan(x) from library should numerically match sin(x)/cos(x) in quad.",
@@ -424,7 +372,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const gas = await estimateGas(harness, "asin", [s]);
         const a = await fromQuad(harness, await harness.asin(s));
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "asin",
             explanation: "asin(sin(x)) should return x for |x|≤π/2.",
@@ -450,7 +398,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const tQ = await harness.tan(qa);
         const tDec = await fromQuad(harness, tQ);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "tan∘atan",
             explanation: "tan(atan(x)) should recover x within principal range and numerical tolerance.",
@@ -479,7 +427,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const b = await fromQuad(harness, qb);
         const sum = a + b;
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "identity",
             explanation: "asin(x)+acos(x) should sum to π/2 for |x|≤1.",
@@ -506,7 +454,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const qNeg = await harness.asin(qn);
         const aNeg = await fromQuad(harness, qNeg);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "asin",
             explanation: "asin(−x) should be −asin(x).",
@@ -533,7 +481,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const qNeg = await harness.atan(qn);
         const aNeg = await fromQuad(harness, qNeg);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "atan",
             explanation: "atan(−x) must mirror atan(x) with opposite sign.",
@@ -557,7 +505,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const qa = await harness.atan(q1);
         const a = await fromQuad(harness, qa);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "atan",
             explanation: "atan(1) should yield π/4, a classic sanity check for inverse tangent.",
@@ -590,7 +538,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const gas = await estimateGas(harness, "sin", [qxp]);
         const sp = await fromQuad(harness, await harness.sin(qxp));
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "sin",
             explanation: "Checks sin(x+2πk) remains numerically equal to sin(x) for large integer k.",
@@ -622,7 +570,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const baseAbs = Math.abs(base);
         const cpAbs = Math.abs(cp);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "cos",
             explanation: "|cos(x+2πk)| should match |cos(x)| even for large k.",
@@ -649,7 +597,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const sShift = await fromQuad(harness, await harness.sin(qShift));
         const cBase = await fromQuad(harness, await harness.cos(qx));
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "phase shift",
             explanation: "sin(x+π/2) should align with cos(x).",
@@ -679,7 +627,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const expected = sBase * sBase;
         const actual = cShift * cShift;
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "phase shift",
             explanation: "cos²(x+π/2) should equal sin²(x).",
@@ -705,7 +653,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const qa = await harness.atan(qt);
         const back = await fromQuad(harness, qa);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "atan∘tan",
             explanation: "atan(tan(x)) should recover x as long as x stays within the branch.",
@@ -738,7 +686,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
             await harness.cos(await toQuad(harness, x)),
         );
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "derivative",
             explanation: "Verifies d/dx sin(x) ≈ cos(x) using small symmetric step h.",
@@ -760,7 +708,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const gas = await estimateGas(harness, "tan", [q]);
         const r = await harness.tan(q);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "tan",
             explanation: "tan(π/2) should not produce a finite number but an internal NaN sentinel.",
@@ -782,7 +730,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const gas = await estimateGas(harness, "cot", [q0]);
         const r = await harness.cot(q0);
 
-        printBlock({
+        printBlockRegular({
             t,
             method: "cot",
             explanation: "cot(0)=cos(0)/sin(0) should trigger NaN instead of infinite magnitude.",

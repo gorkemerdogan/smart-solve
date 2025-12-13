@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
@@ -69,63 +69,6 @@ function asMatrix(tuple: [bigint, bigint, string[]]) {
 const fmtHexArr = (arr: string[]) => `[${arr.join(", ")}]`;
 
 // ------------------------------------------------------------
-//  Gas Estimation
-// ------------------------------------------------------------
-
-async function touchGas(h: MatrixMasterHarness, method: string, args: any[]) {
-    try {
-        const data = h.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await h.getAddress();
-        const tx = await signer.sendTransaction({ to, data });
-        await tx.wait();
-    } catch {
-        // For revert tests or estimation failures, silently ignore.
-    }
-}
-
-async function estimateGas(
-    h: MatrixMasterHarness,
-    method: string,
-    args: any[],
-): Promise<string> {
-    try {
-        const anyH = h as any;
-        if (anyH[method]?.estimateGas) {
-            return (await anyH[method].estimateGas(...args)).toString();
-        }
-        const data = h.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await h.getAddress();
-        const gas = await signer.estimateGas({ to, data });
-        return gas.toString();
-    } catch {
-        return "revert";
-    }
-}
-
-// ------------------------------------------------------------
-//  Print Block
-// ------------------------------------------------------------
-
-function printBlock(options: {
-    t: number;
-    method: string;
-    explanation: string;
-    gas: string;
-    shapeIn: string;
-    shapeOut: string;
-    inHex?: string;
-    outHex?: string;
-}) {
-    const { t, method, explanation, gas, shapeIn, shapeOut, inHex, outHex } = options;
-    const sep = "-".repeat(60);
-    console.log(
-        `\n${sep}\nTest ${t}\nMethod: ${method}\nExplanation: ${explanation}\nGas Usage: ${gas}\nInput shape: ${shapeIn}\nOutput shape: ${shapeOut}\nInput (hex): ${inHex ?? "-"}\nOutput (hex): ${outHex ?? "-"}`,
-    );
-}
-
-// ------------------------------------------------------------
 //  Test Suite
 // ------------------------------------------------------------
 
@@ -164,7 +107,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(det.toLowerCase()).to.equal(expected.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "detHarness",
                 explanation: "Runs LU-based determinant on a simple 2x2 matrix with a known closed-form value.",
@@ -193,7 +136,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(det.toLowerCase()).to.equal(zero.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "detHarness",
                 explanation: "Detects linear dependence in rows and returns an exact zero determinant.",
@@ -222,7 +165,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(det.toLowerCase()).to.equal(expected.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "detHarness",
                 explanation: "Forces LU pivoting via row swap and verifies determinant sign tracking.",
@@ -250,7 +193,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             await expect(harness.detHarness(2n, 3n, A)).to.be.revertedWith("MatrixMaster: matrix must be square");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "detHarness",
                 explanation: "Confirms determinant is only defined for n×n matrices and rejects rectangular input.",
@@ -273,7 +216,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(det.toLowerCase()).to.equal(val.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "detHarness",
                 explanation: "Checks 1x1 case where det([a]) = a exactly.",
@@ -297,7 +240,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(det.toLowerCase()).to.equal(one.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "detHarness",
                 explanation: "Computes det(I_n) for n=3 and verifies it equals one as expected.",
@@ -321,7 +264,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(det.toLowerCase()).to.equal(zero.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "detHarness",
                 explanation: "Confirms that a 3x3 zero matrix has a determinant exactly equal to zero.",
@@ -355,7 +298,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(det.toLowerCase()).to.equal(expected.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "detHarness",
                 explanation: "Runs determinant on an upper triangular matrix and checks it equals the product of its diagonal.",
@@ -396,7 +339,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             expect(detBI).to.be.gt(zeroBI);
             expect(detBI).to.be.lt(oneBI);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "detHarness",
                 explanation: "Uses A=[[1,1],[1,1+eps]] with eps<<1 and checks determinant is small but non-zero, exercising tiny pivot handling.",
@@ -443,7 +386,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
                 ),
             ).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "inverseHarness",
                 explanation: "Inverts an upper-triangular matrix and verifies the product yields the identity.",
@@ -490,7 +433,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "inverseHarness",
                 explanation: "Inverts a 3x3 permutation matrix that forces multiple pivot choices and confirms A·A^-1 = I_3.",
@@ -519,7 +462,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             // inverse should equal A exactly
             expect(await harness.matricesExactEqual(2n, 2n, A, inv.rows, inv.cols, inv.data)).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "inverseHarness",
                 explanation: "Gauss–Jordan pivoting on a swap matrix and checks A^-1 equals A itself.",
@@ -546,7 +489,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             await expect(harness.inverseHarness(2n, 2n, A)).to.be.revertedWith("MatrixMaster: singular matrix");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "inverseHarness",
                 explanation: "Attempts to invert a rank-deficient matrix and ensures a singularity revert.",
@@ -574,7 +517,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             await expect(harness.inverseHarness(2n, 3n, A)).to.be.revertedWith("MatrixMaster: matrix must be square");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "inverseHarness",
                 explanation: "Verifies inversion is only allowed for square matrices and rejects 2x3 input.",
@@ -597,7 +540,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(await harness.matricesExactEqual(I.rows, I.cols, I.data, invI.rows, invI.cols, invI.data)).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "inverseHarness",
                 explanation: "Inverts a 3x3 identity matrix and ensures the result is bitwise-identical to I.",
@@ -626,7 +569,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             expect(prod.cols).to.equal(1n);
             expect(prod.data[0].toLowerCase()).to.equal(one.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "inverseHarness",
                 explanation: "Inverts 1x1 matrix [a] and checks [a]·[a]^-1 = [1], matching scalar reciprocal semantics.",
@@ -657,7 +600,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(await harness.matricesExactEqual(prod.rows, prod.cols, prod.data, I.rows, I.cols, I.data)).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "inverseHarness",
                 explanation: "Inverts 2x2 diagonal matrix and verifies via D·D^-1 = I that diagonal entries act as reciprocals.",
@@ -686,7 +629,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
             expect(await harness.matricesExactEqual(2n, 2n, A, invInvA.rows, invInvA.cols, invInvA.data)).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "inverseHarness",
                 explanation: "Applies inverse operator twice to A and verifies inverse(inverse(A)) restores A exactly.",

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
@@ -78,77 +78,6 @@ function fmtHexArr(arr: string[]) {
 }
 
 // ------------------------------------------------------------
-//  Gas Estimation
-// ------------------------------------------------------------
-
-async function touchGas(harness: MatrixMasterHarness, method: string, args: any[]) {
-    try {
-        const data = harness.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await harness.getAddress();
-        const tx = await signer.sendTransaction({ to, data });
-        await tx.wait();
-    } catch {
-        // Ignored for reverts / estimation failures
-    }
-}
-
-async function estimateGas(harness: MatrixMasterHarness, method: string, args: any[]): Promise<string> {
-    try {
-        const anyH = harness as any;
-        if (anyH[method]?.estimateGas) {
-            return (await anyH[method].estimateGas(...args)).toString();
-        }
-        const data = harness.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await harness.getAddress();
-        const gas = await signer.estimateGas({ to, data });
-        return gas.toString();
-    } catch {
-        return "revert";
-    }
-}
-
-// ------------------------------------------------------------
-//  Print Block
-// ------------------------------------------------------------
-
-function printBlock({
-    t,
-    method,
-    explanation,
-    gas,
-    shapeIn,
-    shapeOut,
-    inHex,
-    outHex,
-}: {
-    t: number;
-    method: string;
-    explanation: string;
-    gas: string;
-    shapeIn: string;
-    shapeOut: string;
-    inHex?: string;
-    outHex?: string;
-}) {
-    const sep = "-".repeat(60);
-    console.log(
-        `
-        ${sep}
-        Test ${t}
-        Method: ${method}
-        Explanation: ${explanation}
-        Gas Usage: ${gas}
-        Shape In: ${shapeIn}
-        Shape Out: ${shapeOut}
-        Input: ${inHex || "-"}
-        Output: ${outHex || "-"}
-`.trim(),
-    );
-}
-
-// ------------------------------------------------------------
 //  Test Suite
 // ------------------------------------------------------------
 
@@ -210,7 +139,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
                 expect(C.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Computes a standard 2x3·3x2 product and validates dense triple-loop multiplication.",
@@ -234,7 +163,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
                 harness.mulMatrixHarness(1n, 4n, A, 2n, 2n, B),
             ).to.be.revertedWith("MatrixMaster: mulMatrix dims a.cols != b.rows");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Ensures multiplication enforces a.cols == b.rows and fails on incompatible shapes.",
@@ -292,7 +221,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
 
             expect(await harness.matricesExactEqual(left.rows, left.cols, left.data, right.rows, right.cols, right.data)).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Verifies full 10x10 bilinearity with small integer entries where quad arithmetic is exact: (A+B)·C = A·C + B·C bit-for-bit.",
@@ -328,7 +257,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             expect(await harness.matricesExactEqual(2n, 2n, A, AI.rows, AI.cols, AI.data)).to.equal(true);
             expect(await harness.matricesExactEqual(2n, 2n, A, IA.rows, IA.cols, IA.data)).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Multiplies a 2x2 matrix by the identity on both sides and confirms invariance of A.",
@@ -367,7 +296,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Multiplies A by a zero matrix on the right and confirms the result is all zeros.",
@@ -396,7 +325,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Multiplies a zero matrix on the left by A and ensures the result is still all zeros.",
@@ -458,7 +387,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
                 expect(C.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Multiplies a 2x3 matrix by a 3x4 matrix and validates each of the 8 output entries.",
@@ -489,7 +418,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             const expectedDot = await qInt(32); // 1*4 + 2*5 + 3*6 = 32
             expect(result.data[0].toLowerCase()).to.equal(expectedDot.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Performs a 1x3 · 3x1 inner product and checks the resulting 1x1 scalar equals the dot product.",
@@ -535,7 +464,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
                 );
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Computes the outer product of a 3x1 and 1x3 vector and verifies the resulting 3x3 rank-1 matrix.",
@@ -575,7 +504,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
                 expect(cBI).to.be.lt(tinyBI);
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Multiplies two tiny-valued 2x2 matrices and checks outputs remain small, positive, and non-zero (no underflow).",
@@ -638,7 +567,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixHarness",
                 explanation: "Uses a 3x4 matrix with a fully zero last row and checks the corresponding row of A·B remains exactly zero.",
@@ -686,7 +615,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             expect(out.data[1]).to.equal(e1);
             expect(out.data[2]).to.equal(e2);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixVectorHarness",
                 explanation: "Multiplies a 3x3 dense quad matrix with a 3x1 column vector and validates row-wise dot-products.",
@@ -716,7 +645,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
                 harness.mulMatrixVectorHarness(3n, 3n, A, 2n, 1n, xBad),
             ).to.be.revertedWith("MatrixMaster: mulMatrix dims a.cols != b.rows");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixVectorHarness",
                 explanation: "Ensures A.cols == x.rows is required for matrix–vector multiplication; mismatched dims revert.",
@@ -750,7 +679,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             expect(out.cols).to.equal(1n);
             expect(out.data.every((v) => v.toLowerCase() === zero.toLowerCase())).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "mulMatrixVectorHarness",
                 explanation: "Verifies that A·0 = 0 holds for quad-precision matrices: multiplying any 4x4 matrix by a zero vector returns a zero column vector.",
@@ -782,7 +711,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
 
             expect(out.toLowerCase()).to.equal(expected.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "dotHarness",
                 explanation: "Computes the dot product of two 3x1 vectors and confirms the scalar result matches Sum(aᵢbᵢ).",
@@ -808,7 +737,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
 
             expect(out.toLowerCase()).to.equal(expected.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "dotHarness",
                 explanation: "Uses 2x1 vectors with mixed signs and checks the dot product correctly accumulates signed contributions.",
@@ -833,7 +762,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
                 harness.dotHarness(2n, 1n, a, 1n, 1n, b),
             ).to.be.revertedWith("MatrixMaster: dot length mismatch");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "dotHarness",
                 explanation: "Rejects mismatched vector lengths for the dot product and reverts with an explicit error.",

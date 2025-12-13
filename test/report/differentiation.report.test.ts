@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
 
 // ------------------------------------------------------------
 //  Types & Constants
@@ -57,44 +58,6 @@ function formatScaledInt(v: bigint): string {
     const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
 
     return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`;
-}
-
-async function touchGas(harness: DifferentiationHarness, method: string, args: any[]) {
-    const data = harness.interface.encodeFunctionData(method, args);
-    const [signer] = await ethers.getSigners();
-    const to = await harness.getAddress();
-    const tx = await signer.sendTransaction({ to, data });
-    await tx.wait();
-}
-
-async function estimateGas(harness: DifferentiationHarness, method: string, args: any[]) {
-    const anyH = harness as any;
-    if (anyH[method]?.estimateGas) {
-        return (await anyH[method].estimateGas(...args)).toString();
-    }
-    const data = harness.interface.encodeFunctionData(method, args);
-    const [signer] = await ethers.getSigners();
-    const to = await harness.getAddress();
-    const gas = await signer.estimateGas({ to, data });
-    return gas.toString();
-}
-
-function printBlock({ t, method, explanation, gas, inHex, expectedHex, outHex, expectedDec, outDec }: any) {
-    const sep = "-".repeat(60);
-    const decLine = outDec ? `Output: ${outDec}` : "";
-    
-    console.log(`
-        ${sep}
-        Test ${t}
-        Method: ${method}
-        Explanation: ${explanation}
-        Gas Usage: ${gas}
-        Input (x): ${inHex}
-        Expected Output (hex): ${expectedHex}
-        Output (hex): ${outHex}
-        Expected Output (dec): ${expectedDec}
-        ${decLine}
-`.trim());
 }
 
 // ------------------------------------------------------------
@@ -153,7 +116,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff of x^2 at x=3, derivative 2x gives expected slope 6.",
@@ -179,7 +142,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff of x^2 at x=-10, analytical derivative 2x gives slope -20.",
@@ -205,7 +168,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expect(out).to.equal(expected);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff of constant f(x)=5, derivative should be exactly zero everywhere.",
@@ -232,7 +195,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expectedDistorted, TOL_EXACT);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff with explicit h=1 for x^2 at x=4, finite-diff slope is 9 (2x+h).",
@@ -258,7 +221,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_EXACT);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff of linear f(x)=3x+1, constant analytical slope 3 should be matched.",
@@ -275,7 +238,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             t++;
             const x = await qInt(1);
             await expect(harness.forwardDiffHarness(target, "0x12345678", x, QZERO)).to.be.reverted;
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff with invalid function selector should revert staticcall to target.",
@@ -308,7 +271,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff of x^2 at x=4, derivative 2x gives expected slope 8.",
@@ -334,7 +297,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff of x^2 at x=0, expects tiny negative slope ≈-h from (f(0)-f(-h))/h.",
@@ -360,7 +323,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff of x^3 at x=-5, analytical derivative 3x^2 gives slope 75.",
@@ -386,7 +349,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff of |x| at x=-1, left-sided derivative around kink is expected to be -1.",
@@ -413,7 +376,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expectedDistorted, TOL_EXACT);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff with h=1 for x^2 at x=4, finite-diff slope 7 from (f(4)-f(3))/1.",
@@ -430,7 +393,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             t++;
             const x = await qInt(1);
             await expect(harness.backwardDiffHarness(ethers.ZeroAddress, selSquare, x, QZERO)).to.be.reverted;
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff with zero target address should revert due to invalid staticcall target.",
@@ -463,7 +426,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_EXACT);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff of x^2 at x=10, symmetric stencil should match exact 2x=20.",
@@ -489,7 +452,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_EXACT);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff of x^2 at x=-10, symmetric stencil should recover exact 2x=-20.",
@@ -515,7 +478,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expect(out).to.equal(expected);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff of |x| at x=0, symmetric limit around kink averages to zero.",
@@ -541,7 +504,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_APPROX);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff of x^3 at x=2, derivative 3x^2=12 with small higher-order error.",
@@ -568,7 +531,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const outDec = formatScaledInt(outInt);
 
             expectClose(out, expected, TOL_EXACT);
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff with h=1 for x^2 at x=123, (f(x+h)-f(x-h))/(2h) gives 2x=246.",
@@ -585,7 +548,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             t++;
             const x = await qInt(5);
             await expect(harness.centeredDiffHarness(target, "0xdeadbeef", x, QZERO)).to.be.reverted;
-            printBlock({
+            printBlockRegular({
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff with bogus selector should revert, covering staticcall failure path.",

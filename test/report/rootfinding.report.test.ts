@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
 
 // ------------------------------------------------------------
 //  Types & Constants
@@ -93,54 +94,6 @@ function trim(n: number) {
   return n.toFixed(12).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-async function touchGas(contract: Contract, method: string, args: any[]) {
-  const data = contract.interface.encodeFunctionData(method, args);
-  const [signer] = await ethers.getSigners();
-  const to = await contract.getAddress();
-  const tx = await signer.sendTransaction({ to, data });
-  await tx.wait();
-}
-
-async function estimateGas(contract: Contract, method: string, args: any[]) {
-  const anyC = contract as any;
-  if (anyC[method]?.estimateGas) {
-    return (await anyC[method].estimateGas(...args)).toString();
-  }
-  const data = contract.interface.encodeFunctionData(method, args);
-  const [signer] = await ethers.getSigners();
-  const to = await contract.getAddress();
-  const gas = await signer.estimateGas({ to, data });
-  return gas.toString();
-}
-
-function printBlock({
-  t,
-  method,
-  explanation,
-  inHex,
-  expectedHex,
-  outHex,
-  expectedDec,
-  outDec,
-  gas,
-}: any) {
-  const sep = "-".repeat(60);
-  const decLine = outDec ? `Output: ${outDec}` : "";
-
-  console.log(`
-        ${sep}
-        Test ${t}
-        Method: ${method}
-        Explanation: ${explanation}
-        Input: ${inHex}
-        Expected Output (hex): ${expectedHex}
-        Output (hex): ${outHex}
-        Expected Output (dec): ${expectedDec}
-        Gas Usage: ${gas}
-        ${decLine}
-`.trim());
-}
-
 // ------------------------------------------------------------
 //  Test Suite
 // ------------------------------------------------------------
@@ -203,7 +156,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "bisection",
         explanation: "Classic bracketing of root for x^2-4 on [1,3]. Bisection should converge to ≈2 using sign-change intervals.",
@@ -229,7 +182,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "bisection",
         explanation: "Bisection with reversed bounds [3,1]. Implementation should auto-swap endpoints and still converge to root ≈2.",
@@ -255,7 +208,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "bisection",
         explanation: "Endpoint a is an exact root (x=2). Bisection should terminate immediately without further subdivision.",
@@ -276,7 +229,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       await expect(root.rootFindingBisection(target, sel_fx2m4, a, b)).to.be.reverted;
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "bisection",
         explanation: "Interval [3,4] has no sign change for x^2-4. Method must revert to signal invalid bracketing.",
@@ -302,7 +255,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "bisection",
         explanation: "Bisection on cubic x^3-x-2 over [1,2]. Should converge to the real root ≈1.521 with guaranteed bracketing.",
@@ -334,7 +287,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "newton",
         explanation: "Standard Newton-Raphson on x^2-4, starting at x0=3; expects fast quadratic convergence to ≈2.",
@@ -359,7 +312,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "newton",
         explanation: "Newton-Raphson on cubic x^3-x-2 with derivative 3x^2-1, starting at x0=1, should converge to the real root near 1.52.",
@@ -384,7 +337,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "newton",
         explanation: "Starting exactly at the root x0=2, Newton should detect convergence in zero iterations or a single trivial step.",
@@ -404,7 +357,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       await expect(root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0)).to.be.reverted;
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "newton",
         explanation: "At x0=0 derivative df=2x becomes zero, so Newton must revert to avoid division by zero in the update step.",
@@ -429,7 +382,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "newton",
         explanation: "Repeat of quadratic case to inspect stop conditions (|f| and |Δx|) under a tight tolerance regime.",
@@ -462,7 +415,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "secant",
         explanation: "Derivative-free secant method on x^2-4 with [1,3] seeds. should converge superlinearly to root ≈2.",
@@ -488,7 +441,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "secant",
         explanation: "Secant method on cubic x^3-x-2 with initial guesses 1 and 2. Tests behavior near the unique real root.",
@@ -514,7 +467,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       expect(ok).to.eq(true);
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "secant",
         explanation: "One of the initial guesses x1=2 is already the exact root, so secant should converge in essentially one check.",
@@ -535,7 +488,7 @@ describe("RootFinding — Report (values + gas)", function () {
 
       await expect(root.rootFindingSecant(target, sel_fx2m4, x0, x1)).to.be.reverted;
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "secant",
         explanation: "For x0=1 and x1=-1, secant would get zero denominator (f(x1)-f(x0)=0). Implementation must revert on zero slope.",
@@ -560,7 +513,7 @@ describe("RootFinding — Report (values + gas)", function () {
       const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fcubic, x0, x1);
 
       const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "secant",
         explanation: "Stress case with very wide initial guesses [-10,10]. Examines max-iteration behavior and convergence flag.",

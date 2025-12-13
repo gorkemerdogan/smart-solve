@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
 
 // ------------------------------------------------------------
 //  Types & Constants
@@ -49,7 +50,7 @@ function syntheticDivideNum(c: number[], r: number) { const n = c.length; if (n 
 function evalHornerMonicNum(lower: number[], x: number) { let acc = 1; for (let i = lower.length - 1; i >= 0; i--)acc = acc * x + lower[i]; return acc; }
 
 // ------------------------------------------------------------
-//  Formatting Helpers
+// Helpers
 // ------------------------------------------------------------
 
 function headTail(arr: any[], limit = 3) {
@@ -61,48 +62,6 @@ function headTail(arr: any[], limit = 3) {
 
 const fmtHexArr = (arr: string[]) => `[${arr.join(", ")}]`;
 const fmtDecArr = (arr: (number | string)[]) => `[${arr.join(", ")}]`;
-
-// ------------------------------------------------------------
-//  Helpers
-// ------------------------------------------------------------
-
-async function touchGas(harness: PolynomialHarness, method: string, args: any[]) {
-  const data = harness.interface.encodeFunctionData(method, args);
-  const [signer] = await ethers.getSigners();
-  const to = await harness.getAddress();
-  const tx = await signer.sendTransaction({ to, data });
-  await tx.wait();
-}
-
-async function estimateGas(harness: PolynomialHarness, method: string, args: any[]) {
-  const anyH = harness as any;
-  if (anyH[method]?.estimateGas) {
-    return (await anyH[method].estimateGas(...args)).toString();
-  }
-  const data = harness.interface.encodeFunctionData(method, args);
-  const [signer] = await ethers.getSigners();
-  const to = await harness.getAddress();
-  const gas = await signer.estimateGas({ to, data });
-  return gas.toString();
-}
-
-function printBlock({ t, method, explanation, gas, inHex, expectedHex, outHex, expectedDec, outDec }: any) {
-  const sep = "-".repeat(60);
-  const decLine = outDec ? `Output: ${outDec}` : "";
-
-  console.log(`
-        ${sep}
-        Test ${t}
-        Method: ${method}
-        Explanation: ${explanation}
-        Gas Usage: ${gas}
-        Input: ${inHex}
-        Expected Output (hex): ${expectedHex}
-        Output (hex): ${outHex}
-        Expected Output (dec): ${expectedDec}
-        ${decLine}
-`.trim()); // trim to clean up leading/trailing newline from template literal
-}
 
 // ------------------------------------------------------------
 //  Test Suite
@@ -145,15 +104,15 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
       const out = await harness.evaluateHorners(coeffs, x);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "evaluateHorners",
         explanation: "Horner evaluation of 3x^2 + 2x + 5 at x=5. Verifies basic polynomial pipeline against JS numeric mirror.",
         inHex: "f=[5,2,3], x=5",
         expectedHex: "N/A (analytic double result)",
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: expectedDec,
+        expectedDec: `${expectedDec}`,
+        outDec: `${expectedDec}`,
         gas,
       });
     });
@@ -168,7 +127,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateWithDerivative", [coeffs, x]);
       const { px, dpx } = await harness.evaluateWithDerivative(coeffs, x);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "evaluateWithDerivative",
         explanation: "One-pass Horner evaluation and derivative for 3x^2 + 2x + 5 at x=1.2. Checks coupled (p, p') output.",
@@ -191,15 +150,15 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evalHornerMonic", [lower, x]);
       const out = await harness.evalHornerMonic(lower, x);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "evalHornerMonic",
         explanation: "Horner evaluation with implicit leading coefficient 1 (monic) using lower=[2,0.5,4] at x=5.",
         inHex: "lower=[2, 0.5, 4], x=5",
         expectedHex: "N/A (monic analytic result)",
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: expectedDec,
+        expectedDec: `${expectedDec}`,
+        outDec: `${expectedDec}`,
         gas,
       });
     });
@@ -221,7 +180,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "add", [p1, p2]);
       const out = await harness.add(p1, p2);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "add",
         explanation: "Coefficient-wise polynomial addition: (x+2)+(3x+4) → (4x+6) in coefficient form.",
@@ -244,7 +203,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "sub", [p1, p2]);
       const out = await harness.sub(p1, p2);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "sub",
         explanation: "Coefficient-wise subtraction: (x+2)-(3x+4) → (-2x-2) with proper length handling.",
@@ -267,7 +226,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mulScalar", [p, k]);
       const out = await harness.mulScalar(p, k);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "mulScalar",
         explanation: "Scalar multiplication of coefficient vector by 2, checking each entry is doubled.",
@@ -290,7 +249,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mul", [p1, p2]);
       const out = await harness.mul(p1, p2);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "mul",
         explanation: "Polynomial convolution for (x+1)^2; ensures classic [1,2,1] coefficient pattern.",
@@ -319,7 +278,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "derivative", [coeffs]);
       const out = await harness.derivative(coeffs);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "derivative",
         explanation: "Coefficient-wise derivative using power rule on 3x^2+2x+5 → 6x+2.",
@@ -342,7 +301,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "integral", [p, C]);
       const out = await harness.integral(p, C);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "integral",
         explanation: "Indefinite integral of 6x+12 with constant C=5 to verify term-by-term integration.",
@@ -366,7 +325,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const [qHex, rHex] = await harness.syntheticDivide(coeffs, root);
 
       const expectedDec = `Q=${fmtDecArr(rQ)}, R=${rR}`;
-      printBlock({
+      printBlockRegular({
         t,
         method: "syntheticDivide",
         explanation: "Ruffini-style synthetic division of P=[5,2,3] by (x-1.5). Checks quotient and remainder pair.",
@@ -388,15 +347,15 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "degree", [p]);
       const out = await harness.degree(p);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "degree",
         explanation: "Degree computation: highest non-zero index of [5,2,0,0] should be 1.",
         inHex: "[5,2,0,0]",
         expectedHex: "N/A (scalar degree)",
         outHex: out.toString(),
-        expectedDec: expected,
-        outDec: expected,
+        expectedDec: `${expected}`,
+        outDec: `${out}`,
         gas,
       });
     });
@@ -410,7 +369,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "trimTrailingZeros", [p]);
       const out = await harness.trimTrailingZeros(p);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "trimTrailingZeros",
         explanation: "Trims superfluous high-degree zeros to canonicalize polynomial representation.",
@@ -418,7 +377,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (canonical form in quad)",
         outHex: fmtHexArr(out),
         expectedDec: expected,
-        outDec: expected,
+        outDec: `${out}`,
         gas,
       });
     });
@@ -439,7 +398,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
       const out = await harness.evaluateHorners(coeffs, x);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "evaluateHorners",
         explanation: "Evaluating an empty coefficient array should behave like polynomial 0 and return 0.",
@@ -461,7 +420,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
       const out = await harness.evaluateHorners(coeffs, x);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "evaluateHorners",
         explanation: "Evaluating constant polynomial [7] at any x must return the same constant value.",
@@ -483,7 +442,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateWithDerivative", [coeffs, x]);
       const { dpx } = await harness.evaluateWithDerivative(coeffs, x);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "evaluateWithDerivative",
         explanation: "Derivative of a constant polynomial is identically 0; checks dpx output only.",
@@ -505,7 +464,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mulScalar", [p, k]);
       const out = await harness.mulScalar(p, k);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "mulScalar",
         explanation: "Scaling any polynomial by 0 should yield the all-zero polynomial.",
@@ -527,7 +486,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mul", [a, b]);
       const out = await harness.mul(a, b);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "mul",
         explanation: "Multiplication where one operand is empty should behave as multiplying by 0.",
@@ -549,7 +508,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "integral", [a, C]);
       const out = await harness.integral(a, C);
 
-      printBlock({
+      printBlockRegular({
         t,
         method: "integral",
         explanation: "Integrating an empty polynomial should yield pure constant C in the result.",
@@ -590,15 +549,15 @@ describe("Polynomial Library - Operations & Calculus", function () {
         const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
         const out = await harness.evaluateHorners(coeffs, x);
 
-        printBlock({
+        printBlockRegular({
           t,
           method: `evaluateHorners (n=${n})`,
           explanation: "Horner evaluation on growing degree n, used to observe linear scaling and gas trends.",
           inHex: `a=[1..${n}], x=1.25`,
           expectedHex: "N/A (large-n analytic double)",
           outHex: out,
-          expectedDec: expected,
-          outDec: expected,
+          expectedDec: `${expected}`,
+          outDec: `${out}`,
           gas,
         });
       }
@@ -618,7 +577,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         const gas = await estimateGas(harness, "add", [a, b]);
         const out = await harness.add(a, b);
 
-        printBlock({
+        printBlockRegular({
           t,
           method: `add (n=${n})`,
           explanation: "Wide-vector addition for length-n polynomials; tests linear complexity in coefficient count.",
@@ -646,7 +605,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         const gas = await estimateGas(harness, "mul", [a, b]);
         const out = await harness.mul(a, b);
 
-        printBlock({
+        printBlockRegular({
           t,
           method: `mul (n=${n})`,
           explanation: "Stress test for O(n^2) polynomial multiplication with increasing degrees.",

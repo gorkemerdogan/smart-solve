@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
 
 // ------------------------------------------------------------
 //  Types & Constants
@@ -46,44 +47,6 @@ function formatScaledInt(v: bigint): string {
     const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
 
     return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`;
-}
-
-async function touchGas(harness: IntegrationHarness, method: string, args: any[]) {
-  const data = harness.interface.encodeFunctionData(method, args);
-  const [signer] = await ethers.getSigners();
-  const to = await harness.getAddress();
-  const tx = await signer.sendTransaction({ to, data });
-  await tx.wait();
-}
-
-async function estimateGas(harness: IntegrationHarness, method: string, args: any[]) {
-  const anyH = harness as any;
-  if (anyH[method]?.estimateGas) {
-    return (await anyH[method].estimateGas(...args)).toString();
-  }
-  const data = harness.interface.encodeFunctionData(method, args);
-  const [signer] = await ethers.getSigners();
-  const to = await harness.getAddress();
-  const gas = await signer.estimateGas({ to, data });
-  return gas.toString();
-}
-
-function printBlock({ t, method, explanation, inHex, expectedHex, outHex, expectedDec, outDec, gas}: any) {
-  const sep = "-".repeat(60);
-  const decLine = outDec ? `Output: ${outDec}` : "";
-
-  console.log(`
-        ${sep}
-        Test ${t}
-        Method: ${method}
-        Explanation: ${explanation}
-        Input: ${inHex}
-        Expected Output (hex): ${expectedHex}
-        Output (hex): ${outHex}
-        Expected Output (dec): ${expectedDec}
-        ${decLine},
-        Gas Usage: ${gas}
-`.trim()); // trim to clean up leading/trailing newline from template literal
 }
 
 // ------------------------------------------------------------
@@ -154,7 +117,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(typeof out).to.equal("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "trapezoidal",
         explanation: "Trapezoidal rule on linear f(x)=x over [0,1]. Analytic integral is 1/2 so result should be very close to 0.5.",
@@ -179,7 +142,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "trapezoidal",
         explanation: "Trapezoidal rule on smooth quadratic f(x)=x^2 over [0,1]. With n=300, it should approximate 1/3 with high accuracy.",
@@ -205,7 +168,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "trapezoidal",
         explanation: "Trapezoidal rule on constant f(x)=5 over [0,10]. Constant integrand should give exactly 5x10 = 50.",
@@ -230,7 +193,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "trapezoidal",
         explanation: "Trapezoidal integration of sin(x) over [0,π]. Analytic value is 2 so the numeric result should cluster near 2.",
@@ -255,7 +218,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.equal(q0);
-      printBlock({
+      printBlockRegular({
         t,
         method: "trapezoidal",
         explanation: "Trapezoidal rule on zero-length interval [0,0]. Regardless of f(x), the integral must evaluate to exactly 0.",
@@ -280,7 +243,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "trapezoidal",
         explanation: "Trapezoidal integration of x^2 on [0,1] with n=50. Esed mainly for gas and Java reference comparison.",
@@ -312,7 +275,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson13",
         explanation: "Simpson 1/3 rule on quadratic f(x)=x^2 over [0,1]. Even n=10 should give a value extremely close to 1/3.",
@@ -337,7 +300,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson13",
         explanation: "Simpson 1/3 rule on cubic f(x)=x^3 over [0,1]. Method is exact for cubics so the value should be exactly 1/4.",
@@ -362,7 +325,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson13",
         explanation: "Simpson 1/3 on linear proxy (placeholder for exp-like curve) mainly to compare behavior and gas usage.",
@@ -387,7 +350,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson13",
         explanation: "Simpson 1/3 integration of 1/x over [1,2]. Analytic value is ln(2) ≈ 0.693, smooth non-polynomial.",
@@ -403,7 +366,7 @@ describe("Integration Library - Numerical Methods", function () {
     it("Test 11: Revert on Invalid N (Odd)", async function () {
       t++;
       await expect(harness.simpson13(target, selSquare, q0, q1, 7)).to.be.revertedWith("Integration: Simpson 1/3 requires even n");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson13",
         explanation: "Simpson 1/3 called with odd n=7 should revert, enforcing even-subinterval constraint.",
@@ -435,7 +398,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson38",
         explanation: "Simpson 3/8 rule on quadratic f(x)=x^2 over [0,1]. Higher-order accuracy should give integral near 1/3.",
@@ -460,7 +423,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson38",
         explanation: "Simpson 3/8 rule on cubic f(x)=x^3 over [0,1]. Expecting integral 1/4.",
@@ -485,7 +448,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson38",
         explanation: "Simpson 3/8 integration of 1/x over [1,2]. Should approximate ln(2) ≈ 0.693 similarly to 1/3 rule.",
@@ -511,7 +474,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.equal(q0);
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson38",
         explanation: "Simpson 3/8 rule on zero-length interval [5,5]. Tntegral must be exactly zero, confirming bounds handling.",
@@ -527,7 +490,7 @@ describe("Integration Library - Numerical Methods", function () {
     it("Test 16: Revert on Invalid N (Not Multiple of 3)", async function () {
       t++;
       await expect(harness.simpson38(target, selSquare, q0, q1, 10)).to.be.revertedWith("Integration: Simpson 3/8 requires n % 3 == 0");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson38",
         explanation: "Simpson 3/8 called with n=10 where n%3!=0. Should revert enforcing multiple-of-3 requirement.",
@@ -559,7 +522,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "trapezoidal",
         explanation: "Trapezoidal rule on extremely small-magnitude function 1e-30·x over [0,1]. Stress underflow and precision.",
@@ -584,7 +547,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "trapezoidal",
         explanation: "Trapezoidal rule on very large-magnitude function 1e20·x over [0,1]. Checks overflow resilience and scaling.",
@@ -609,7 +572,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson13",
         explanation: "Simpson 1/3 on piecewise-discontinuous f(x) over [0,2]. Tests robustness around internal jump from 1 to 3.",
@@ -635,7 +598,7 @@ describe("Integration Library - Numerical Methods", function () {
       const outDec = formatScaledInt(outInt);
 
       expect(out).to.be.a("string");
-      printBlock({
+      printBlockRegular({
         t,
         method: "simpson38",
         explanation: "Simpson 3/8 rule for x^2 over ultra-narrow interval [0,1e-12]. Validates tiny-domain integration stability.",
@@ -651,7 +614,7 @@ describe("Integration Library - Numerical Methods", function () {
     it("Test 21: Revert on Reversed Bounds", async function () {
       t++;
       await expect(harness.trapezoidal(target, selSquare, q1, q0, 10)).to.be.revertedWith("Integration: upper bound b must be >= a");
-      printBlock({
+      printBlockRegular({
         t,
         method: "trapezoidal",
         explanation: "Trapezoidal call with reversed bounds [1,0]. Library must revert, enforcing b >= a precondition.",

@@ -2,7 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
-
+import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
  * @notice Provides comprehensive utilities for matrix operations using the ABDK bytes16/quad fixed-point math type.
@@ -46,68 +46,6 @@ function fmtHexArr(arr: string[]) {
             .join(", ")}] (len=${arr.length})`;
     }
     return `[${arr.join(", ")}]`;
-}
-
-// ------------------------------------------------------------
-//  Gas Estimation
-// ------------------------------------------------------------
-
-async function touchGas(harness: MatrixMasterHarness, method: string, args: any[]) {
-    try {
-        const data = harness.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await harness.getAddress();
-        const tx = await signer.sendTransaction({ to, data });
-        await tx.wait();
-    } catch {
-        // Ignored for reverts (we only care about side-effectful gas touching)
-    }
-}
-
-async function estimateGas(harness: MatrixMasterHarness, method: string, args: any[]) {
-    try {
-        const anyH = harness as any;
-        if (anyH[method]?.estimateGas) {
-            return (await anyH[method].estimateGas(...args)).toString();
-        }
-        const data = harness.interface.encodeFunctionData(method, args);
-        const [signer] = await ethers.getSigners();
-        const to = await harness.getAddress();
-        const gas = await signer.estimateGas({ to, data });
-        return gas.toString();
-    } catch {
-        return "revert";
-    }
-}
-
-// ------------------------------------------------------------
-//  Print Block
-// ------------------------------------------------------------
-
-function printBlock({
-    t,
-    method,
-    explanation,
-    gas,
-    shapeIn,
-    shapeOut,
-    inHex,
-    outHex,
-}: any) {
-    const sep = "-".repeat(60);
-    console.log(
-        `
-        ${sep}
-        Test ${t}
-        Method: ${method}
-        Explanation: ${explanation}
-        Gas Usage: ${gas}
-        Shape In: ${shapeIn}
-        Shape Out: ${shapeOut}
-        Input: ${inHex || "-"}
-        Output: ${outHex || "-"}
-`.trim(),
-    );
 }
 
 // ------------------------------------------------------------
@@ -160,7 +98,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "zerosHarness",
                 explanation: "Creates a 2×3 dense matrix fully initialized with quad-precision zeros.",
@@ -190,7 +128,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "zerosHarness",
                 explanation: "Stress-allocates a 100×100 dense matrix and verifies every entry is an exact quad zero.",
@@ -220,7 +158,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 expect(v.toLowerCase()).to.equal(one.toLowerCase());
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "onesHarness",
                 explanation: "Allocates a 2×2 matrix filled with quad-precision ones for baseline sanity checks.",
@@ -258,7 +196,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 }
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "createIdentityMatrixHarness",
                 explanation: "Builds a 3×3 identity matrix with ones on the diagonal and strict zeros elsewhere.",
@@ -281,7 +219,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 "MatrixMaster: n must be > 0",
             );
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "createIdentityMatrixHarness",
                 explanation: "Ensures identity construction rejects zero-sized matrices via dimension guard.",
@@ -320,7 +258,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 }
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "fromDiagonalHarness",
                 explanation: "Lifts a 3-element quad vector into a 3×3 diagonal matrix with zeros off the diagonal.",
@@ -343,7 +281,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 "MatrixMaster: empty diagonal",
             );
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "fromDiagonalHarness",
                 explanation: "Checks that constructing a diagonal matrix from an empty vector is rejected.",
@@ -383,7 +321,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 }
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "fromDiagonalHarness",
                 explanation: "Builds a 4×4 diagonal matrix with mixed negative, zero, and large-magnitude quad entries.",
@@ -418,7 +356,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 expect(m1.data[i]).to.equal(m2.data[i]);
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "randomMatrixHarness",
                 explanation: "Generates pseudo-random quad entries in [0,1) and verifies deterministic seeding.",
@@ -449,7 +387,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             const same = m1.data.every((v, i) => v === m2.data[i]);
             expect(same).to.equal(false);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "randomMatrixHarness",
                 explanation: "Uses two different seeds and checks that generated patterns diverge as expected.",
@@ -482,7 +420,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 expect(bi).to.be.lt(oneBI);
             }
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "randomMatrixHarness",
                 explanation: "Samples a 3×3 random matrix and enforces every encoded quad lies in [0,1).",
@@ -509,7 +447,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             expect(m.cols).to.equal(cols);
             expect(m.data.length).to.equal(Number(rows * cols));
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "randomMatrixHarness",
                 explanation: "Generates a 1×N random row vector for use as simple quad noise or weights.",
@@ -536,7 +474,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             expect(m.cols).to.equal(cols);
             expect(m.data.length).to.equal(Number(rows * cols));
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "randomMatrixHarness",
                 explanation: "Generates an N×1 random column vector suitable for stochastic gradient toy examples.",
@@ -568,7 +506,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             expect(distinct.size).to.be.greaterThan(1);
             expect(hasNonZero).to.equal(true);
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "randomMatrixHarness",
                 explanation: "Samples a 4×4 random matrix and verifies it exhibits non-trivial value diversity.",
@@ -608,7 +546,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             const v = await harness.getHarness(rows, cols, vals, row, col); // row=1,col=2 -> 6
             expect(v.toLowerCase()).to.equal(vals[5].toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "getHarness",
                 explanation: "Fetches a single quad entry by row/col indices from a flat row-major matrix.",
@@ -639,7 +577,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 harness.getHarness(rows, cols, vals, 2n, 0n),
             ).to.be.revertedWith("MatrixMaster: index out of bounds");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "getHarness",
                 explanation: "Checks that reading with an out-of-range row index triggers bounds protection.",
@@ -658,7 +596,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 harness.getHarness(rows, cols, vals, 0n, 2n),
             ).to.be.revertedWith("MatrixMaster: index out of bounds");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "getHarness",
                 explanation: "Checks that reading with an out-of-range column index reverts via bounds check.",
@@ -686,7 +624,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             const topLeft = await harness.getHarness(rows, cols, vals, 0n, 0n);
             expect(topLeft.toLowerCase()).to.equal(vals[0].toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "getHarness",
                 explanation: "Accesses the top-left corner element (0,0) in a 3×3 matrix and checks correct decoding.",
@@ -710,7 +648,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 vals[expectedIdx].toLowerCase(),
             );
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "getHarness",
                 explanation: "Accesses the bottom-right corner element (rows-1, cols-1) and verifies flat-index mapping.",
@@ -743,7 +681,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
 
             expect(v.toLowerCase()).to.equal(expectedVal.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "getHarness",
                 explanation: "Indexes an interior element of a 10×10 matrix and validates large-grid index arithmetic.",
@@ -781,7 +719,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             expect(out.data[2].toLowerCase()).to.equal(one.toLowerCase()); // row1,col0
             expect(out.data[3].toLowerCase()).to.equal(zero.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "setHarness",
                 explanation: "Mutates a single matrix cell and verifies only that entry is modified.",
@@ -808,7 +746,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 harness.setHarness(rows, cols, init, 2n, 0n, zero),
             ).to.be.revertedWith("MatrixMaster: index out of bounds");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "setHarness",
                 explanation: "Verifies that assigning outside valid row indices reverts with an explicit error.",
@@ -827,7 +765,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 harness.setHarness(rows, cols, init, 0n, 2n, zero),
             ).to.be.revertedWith("MatrixMaster: index out of bounds");
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "setHarness",
                 explanation: "Verifies that assigning outside valid column indices also reverts safely.",
@@ -859,7 +797,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             const readBack = await harness.getHarness(out.rows, out.cols, out.data, row, col);
             expect(readBack.toLowerCase()).to.equal(one.toLowerCase());
 
-            printBlock({
+            printBlockMatrix({
                 t,
                 method: "setHarness",
                 explanation: "Writes a single cell using set() and immediately reads it back via get() to confirm persistence.",
