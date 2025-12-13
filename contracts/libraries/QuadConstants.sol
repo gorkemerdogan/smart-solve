@@ -83,7 +83,7 @@ library QuadConstants {
     /**
      * @notice Returns 1e-6 as a quadruple-precision constant.
      *         Useful as a "small-angle" threshold in trigonometric approximations.
-     * @return bytes16 1 × 10⁻⁶
+     * @return bytes16 1 x 10^-6
      */
     function EPS_1e6() internal pure returns (bytes16) {
         return fromFrac(1, 1_000_000);
@@ -92,7 +92,7 @@ library QuadConstants {
     /**
      * @notice Returns 1e-9 as a quadruple-precision constant.
      *         Good for mid-range error bounds.
-     * @return bytes16 1 × 10⁻⁹
+     * @return bytes16 1 x 10^-9
      */
     function EPS_1e9() internal pure returns (bytes16) {
         return fromFrac(1, 1_000_000_000);
@@ -101,7 +101,7 @@ library QuadConstants {
     /**
      * @notice Returns 1e-12 as a quadruple-precision constant.
      *         Default tolerance used in SmartSolve numeric routines.
-     * @return bytes16 1 × 10⁻¹²
+     * @return bytes16 1 x 10^-12
      */
     function EPS_1e12() internal pure returns (bytes16) {
         return fromFrac(1, 1_000_000_000_000);
@@ -111,7 +111,7 @@ library QuadConstants {
      * @notice Returns 1e-15 as a quadruple-precision constant.
      *         Recommended minimum tolerance (`minTol`) for root-finding algorithms.
      *
-     * @return bytes16 1 × 10⁻¹⁵
+     * @return bytes16 1 x 10^-15
      */
     function EPS_1e15() internal pure returns (bytes16) {
         return fromFrac(1, 1_000_000_000_000_000);
@@ -121,7 +121,7 @@ library QuadConstants {
      * @notice Returns 1e-18 as a quadruple-precision constant.
      *         Mainly useful for testing clamping logic (too strict tolerances).
      *
-     * @return bytes16 1 × 10⁻¹⁸
+     * @return bytes16 1 x 10^-18
      */
     function EPS_1e18() internal pure returns (bytes16) {
         return fromFrac(1, 1_000_000_000_000_000_000);
@@ -131,7 +131,7 @@ library QuadConstants {
      * @notice Returns 1e-30 as a quadruple-precision constant.
      *         Very small epsilon, stored as a precomputed hex literal for accuracy.
      *
-     * @return bytes16 1 × 10⁻³⁰
+     * @return bytes16 1 x 10^-30
      */
     function EPS_1e30() internal pure returns (bytes16) {
         return 0x3cd203af9ee756159b00000000000000;
@@ -145,7 +145,7 @@ library QuadConstants {
      * @notice Returns the default numerical tolerance for SmartSolve.
      *         Alias for EPS_1e12(), used by root-finding and integration routines.
      *
-     * @return bytes16 1 × 10⁻¹²
+     * @return bytes16 1 x 10^-12
      */
     function DEFAULT_TOL() internal pure returns (bytes16) {
         return EPS_1e12();
@@ -155,7 +155,7 @@ library QuadConstants {
      * @notice Returns the default minimum tolerance for SmartSolve.
      *         Alias for EPS_1e15(), used as a floor when clamping tolerance.
      *
-     * @return bytes16 1 × 10⁻¹⁵
+     * @return bytes16 1 x 10^-15
      */
     function DEFAULT_MIN_TOL() internal pure returns (bytes16) {
         return EPS_1e15();
