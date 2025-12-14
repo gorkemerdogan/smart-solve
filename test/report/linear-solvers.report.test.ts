@@ -48,12 +48,26 @@ function multiplyMatrices(n: number, A: bigint[], B: bigint[]): bigint[] {
         for (let j = 0; j < n; ++j) {
             let sum = 0n;
             for (let k = 0; k < n; ++k) {
-                sum += A[i * n + k] * B[k * n + j];
+                sum += (A[i * n + k] * B[k * n + j]) / SCALE;
             }
             C[i * n + j] = sum;
         }
     }
     return C;
+}
+
+/// Helper to check two matrices numerically the same within a tolerance
+function expectMatrixSimilar(
+    n: number,
+    A: bigint[],
+    B: bigint[],
+    tol: bigint
+) {
+    for (let i = 0; i < n * n; i++) {
+        const diff = A[i] - B[i];
+        const abs = diff < 0n ? -diff : diff;
+        expect(abs).to.be.lessThan(tol, `Matrix mismatch at index ${i}`);
+    }
 }
 
 /// Helper to assert vector equality.
@@ -67,6 +81,7 @@ function expectVecEq(actual: bigint[], expected: number[]) {
 
 const SCALE_DECIMALS = 12n;
 const SCALE = 10n ** SCALE_DECIMALS;
+const MAT_TOL = 5n * SCALE; // matrix reconstruction tolerance
 
 function formatScaledInt(v: bigint): string {
     const neg = v < 0n;
@@ -1058,6 +1073,172 @@ describe("LinearSolversHarness", function () {
                 outDec: `[${formatScaledInt(x0)}, ${formatScaledInt(x1)}]`,
                 gas,
             });
+        });
+    });
+
+    describe("Method 5: LU Decomposition", function () {
+
+        // ------------------------------------------------------------
+        //  Regular Cases
+        // ------------------------------------------------------------
+
+        it("Test 25: 2×2 simple matrix", async function () {
+            t++;
+
+            const n = 2n;
+
+            // A = [[4,3],[6,3]]
+            const A = [
+                await harness.qFromInt(4), await harness.qFromInt(3),
+                await harness.qFromInt(6), await harness.qFromInt(3),
+            ];
+
+            const args = [n, A];
+
+            await touchGas(harness, "luDecomposition", args);
+            const gas = await estimateGas(harness, "luDecomposition", args);
+
+            const [L, U] = await harness.luDecomposition(n, A);
+
+            const Ls = await Promise.all(L.map(v => harness.toFloat(v)));
+            const Us = await Promise.all(U.map(v => harness.toFloat(v)));
+
+            const LU = multiplyMatrices(2, Ls, Us);
+            const Aint = await Promise.all(A.map(v => harness.toFloat(v)));
+
+            expectMatrixSimilar(2, LU, Aint, MAT_TOL);
+
+            printBlockRegular({
+                t,
+                method: "LU Decomposition",
+                explanation: "2×2 matrix, exact LU reconstruction.",
+                inHex: "A=[[4,3],[6,3]]",
+                expectedHex: "L·U ≈ A",
+                outHex: `[L=${L.join(", ")}, U=${U.join(", ")}]`,
+                expectedDec: "A ≈ L·U",
+                outDec: "Reconstruction OK",
+                gas,
+            });
+        });
+
+        it("Test 26: 3×3 diagonally dominant matrix", async function () {
+            t++;
+
+            const n = 3n;
+
+            const A = [
+                await harness.qFromInt(10), await harness.qFromInt(2), await harness.qFromInt(1),
+                await harness.qFromInt(2), await harness.qFromInt(8), await harness.qFromInt(1),
+                await harness.qFromInt(1), await harness.qFromInt(1), await harness.qFromInt(5),
+            ];
+
+            const args = [n, A];
+
+            await touchGas(harness, "luDecomposition", args);
+            const gas = await estimateGas(harness, "luDecomposition", args);
+
+            const [L, U] = await harness.luDecomposition(n, A);
+
+            const LU = multiplyMatrices(
+                3,
+                await Promise.all(L.map(v => harness.toFloat(v))),
+                await Promise.all(U.map(v => harness.toFloat(v)))
+            );
+
+            const Aint = await Promise.all(A.map(v => harness.toFloat(v)));
+
+            expectMatrixSimilar(3, LU, Aint, MAT_TOL);
+
+            printBlockRegular({
+                t,
+                method: "LU Decomposition",
+                explanation: "3×3 diagonally dominant matrix.",
+                inHex: "Diagonal dominant A",
+                expectedHex: "L·U ≈ A",
+                outHex: "OK",
+                expectedDec: "Reconstruction",
+                outDec: "Pass",
+                gas,
+            });
+        });
+
+        it("Test 27: Upper triangular matrix", async function () {
+            t++;
+
+            const n = 3n;
+
+            const A = [
+                await harness.qFromInt(2), await harness.qFromInt(3), await harness.qFromInt(4),
+                await harness.qFromInt(0), await harness.qFromInt(5), await harness.qFromInt(6),
+                await harness.qFromInt(0), await harness.qFromInt(0), await harness.qFromInt(7),
+            ];
+
+            const [L, U] = await harness.luDecomposition(n, A);
+
+            const LU = multiplyMatrices(
+                3,
+                await Promise.all(L.map(v => harness.toFloat(v))),
+                await Promise.all(U.map(v => harness.toFloat(v)))
+            );
+
+            const Aint = await Promise.all(A.map(v => harness.toFloat(v)));
+
+            expectMatrixSimilar(3, LU, Aint, MAT_TOL);
+        });
+
+        it("Test 28: Identity matrix", async function () {
+            t++;
+
+            const n = 3n;
+
+            const A = [
+                await harness.qFromInt(1), await harness.qFromInt(0), await harness.qFromInt(0),
+                await harness.qFromInt(0), await harness.qFromInt(1), await harness.qFromInt(0),
+                await harness.qFromInt(0), await harness.qFromInt(0), await harness.qFromInt(1),
+            ];
+
+            const [L, U] = await harness.luDecomposition(n, A);
+
+            const LU = multiplyMatrices(
+                3,
+                await Promise.all(L.map(v => harness.toFloat(v))),
+                await Promise.all(U.map(v => harness.toFloat(v)))
+            );
+
+            const Aint = await Promise.all(A.map(v => harness.toFloat(v)));
+
+            expectMatrixSimilar(3, LU, Aint, MAT_TOL);
+        });
+
+        it("Test 29: Singular matrix (zero pivot)", async function () {
+            t++;
+
+            const n = 2n;
+
+            // Second row is multiple of first
+            const A = [
+                await harness.qFromInt(2), await harness.qFromInt(4),
+                await harness.qFromInt(1), await harness.qFromInt(2),
+            ];
+
+            await expect(
+                harness.luDecomposition(n, A)
+            ).to.be.reverted;
+        });
+
+        it("Test 30: Zero matrix", async function () {
+            t++;
+
+            const n = 2n;
+
+            const A = [
+                await harness.qFromInt(0), await harness.qFromInt(0),
+                await harness.qFromInt(0), await harness.qFromInt(0),
+            ];
+
+            await expect(
+                harness.luDecomposition(n, A)
+            ).to.be.reverted;
         });
     });
 });
