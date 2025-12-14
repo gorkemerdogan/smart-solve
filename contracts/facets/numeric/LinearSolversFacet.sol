@@ -1,105 +1,123 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { LinearSolvers } from "../libraries/LinearSolvers.sol";
+import { LinearSolvers } from "../libraries/numeric/LinearSolvers.sol";
+import { MatrixMaster } from "../libraries/numeric/MatrixMaster.sol";
+import { MathLib } from "../libraries/MathLib.sol";
 
 /**
- * @title LinearSolversFacet
- * @notice Diamond facet exposing linear solver utilities externally.
- * @dev
- *  - This facet is stateless; all methods are pure.
- *  - Plug into your Diamond via standard facet deployment and selector registration.
+ * @title  LinearSolversFacet
+ * @notice Diamond facet exposing linear system solvers and decompositions
+ *         (Gradient Descent Least Squares, Jacobi Iteration, Gauss-Siedel,
+ *          Gaussian Elimination, LU Decomposition are implemented with ABDK quad precision)
+ *
+ *         All matrices are passed as row-major bytes16 arrays.
+ *         Vectors are represented as (n × 1) matrices.
  */
 contract LinearSolversFacet {
-    /**
-     * @notice Public gradient descent solver.
-     * @param n System dimension.
-     * @param A Row-major n×n coefficient matrix.
-     * @param b RHS vector.
-     * @param x0 Initial guess.
-     * @param alpha Step size (integer).
-     * @param maxIter Maximum number of iterations.
-     * @param tol Squared residual tolerance.
-     */
-    function gradientDescent(
+
+    // ------------------------------------------------------------
+    // Gradient Descent (Least Squares)
+    // ------------------------------------------------------------
+
+    function gradientDescentLeastSquares(
+        uint256 m,
         uint256 n,
-        int256[] calldata A,
-        int256[] calldata b,
-        int256[] calldata x0,
-        int256 alpha,
+        bytes16[] calldata Adata,   // m × n
+        bytes16[] calldata bdata,   // m × 1
+        bytes16[] calldata x0data,  // n × 1
+        bytes16 alpha,
         uint256 maxIter,
-        int256 tol
-    ) external pure returns (int256[] memory x, uint256 iters) {
-        int256[] memory Am = new int256[](A.length);
-        int256[] memory bm = new int256[](b.length);
-        int256[] memory x0m = new int256[](x0.length);
+        bytes16 tol
+    ) external pure returns (bytes16[] memory x, uint256 iters) {
+        MatrixMaster.Matrix memory A =
+            MatrixMaster.Matrix(m, n, _copy(Adata));
+        MatrixMaster.Matrix memory b =
+            MatrixMaster.Matrix(m, 1, _copy(bdata));
+        MatrixMaster.Matrix memory x0 =
+            MatrixMaster.Matrix(n, 1, _copy(x0data));
 
-        for (uint256 i = 0; i < A.length; ++i) Am[i] = A[i];
-        for (uint256 i = 0; i < b.length; ++i) bm[i] = b[i];
-        for (uint256 i = 0; i < x0.length; ++i) x0m[i] = x0[i];
+        MatrixMaster.Matrix memory out;
+        (out, iters) =
+            LinearSolvers.gradientDescentLeastSquares(A, b, x0, alpha, maxIter, tol);
 
-        return LinearSolvers.gradientDescent(n, Am, bm, x0m, alpha, maxIter, tol);
+        return (out.data, iters);
     }
 
-    /**
-     * @notice Public Jacobi solver.
-     */
-    function jacobi(
-        uint256 n,
-        int256[] calldata A,
-        int256[] calldata b,
-        int256[] calldata x0,
-        uint256 maxIter,
-        int256 tol
-    ) external pure returns (int256[] memory x, uint256 iters) {
-        int256[] memory Am = new int256[](A.length);
-        int256[] memory bm = new int256[](b.length);
-        int256[] memory x0m = new int256[](x0.length);
+    // ------------------------------------------------------------
+    // Jacobi Iteration
+    // ------------------------------------------------------------
 
-        for (uint256 i = 0; i < A.length; ++i) Am[i] = A[i];
-        for (uint256 i = 0; i < b.length; ++i) bm[i] = b[i];
-        for (uint256 i = 0; i < x0.length; ++i) x0m[i] = x0[i];
+    function jacobi(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata, bytes16[] calldata x0data, uint256 maxIter, bytes16 tolDiff)
+        external pure returns (bytes16[] memory x, uint256 iters) {
+        
+        MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
+        MatrixMaster.Matrix memory b = MatrixMaster.Matrix(n, 1, _copy(bdata));
+        MatrixMaster.Matrix memory x0 = MatrixMaster.Matrix(n, 1, _copy(x0data));
 
-        return LinearSolvers.jacobi(n, Am, bm, x0m, maxIter, tol);
+        MatrixMaster.Matrix memory out;
+        (out, iters) = LinearSolvers.jacobi(A, b, x0, maxIter, tolDiff);
+
+        return (out.data, iters);
     }
 
-    /**
-     * @notice Public Gauss-Seidel solver.
-     */
-    function gaussSeidel(uint256 n, int256[] calldata A, int256[] calldata b, int256[] calldata x0, uint256 maxIter, int256 tol)
-        external pure returns (int256[] memory x, uint256 iters) {
+    // ------------------------------------------------------------
+    // Gauss–Seidel Iteration
+    // ------------------------------------------------------------
 
-        int256[] memory Am = new int256[](A.length);
-        int256[] memory bm = new int256[](b.length);
-        int256[] memory x0m = new int256[](x0.length);
+    function gaussSeidel(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata, bytes16[] calldata x0data, uint256 maxIter, bytes16 tolDiff)
+        external pure returns (bytes16[] memory x, uint256 iters) {
+        
+        MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
+        MatrixMaster.Matrix memory b = MatrixMaster.Matrix(n, 1, _copy(bdata));
+        MatrixMaster.Matrix memory x0 = MatrixMaster.Matrix(n, 1, _copy(x0data));
 
-        for (uint256 i = 0; i < A.length; ++i) Am[i] = A[i];
-        for (uint256 i = 0; i < b.length; ++i) bm[i] = b[i];
-        for (uint256 i = 0; i < x0.length; ++i) x0m[i] = x0[i];
+        MatrixMaster.Matrix memory out;
+        (out, iters) = LinearSolvers.gaussSeidel(A, b, x0, maxIter, tolDiff);
 
-        return LinearSolvers.gaussSeidel(n, Am, bm, x0m, maxIter, tol);
+        return (out.data, iters);
     }
 
-    /**
-     * @notice Public Gaussian elimination solver.
-     */
-    function gaussianElimination(uint256 n, int256[] calldata A, int256[] calldata b) external pure returns (int256[] memory x) {
-        int256[] memory Am = new int256[](A.length);
-        int256[] memory bm = new int256[](b.length);
+    // ------------------------------------------------------------
+    // Gaussian Elimination
+    // ------------------------------------------------------------
 
-        for (uint256 i = 0; i < A.length; ++i) Am[i] = A[i];
-        for (uint256 i = 0; i < b.length; ++i) bm[i] = b[i];
+    function gaussianElimination(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata)
+        external pure returns (bytes16[] memory x) {
+        
+        MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
+        MatrixMaster.Matrix memory b = MatrixMaster.Matrix(n, 1, _copy(bdata));
 
-        return LinearSolvers.gaussianElimination(n, Am, bm);
+        MatrixMaster.Matrix memory out = LinearSolvers.gaussianElimination(A, b);
+
+        return out.data;
     }
 
-    /**
-     * @notice Public LU decomposition.
-     */
-    function luDecomposition(uint256 n, int256[] calldata A) external pure returns (int256[] memory L, int256[] memory U) {
-        int256[] memory Am = new int256[](A.length);
-        for (uint256 i = 0; i < A.length; ++i) Am[i] = A[i];
+    // ------------------------------------------------------------
+    // LU Decomposition
+    // ------------------------------------------------------------
 
-        return LinearSolvers.luDecomposition(n, Am);
+    function luDecomposition(uint256 n, bytes16[] calldata Adata)
+        external pure returns (bytes16[] memory L, bytes16[] memory U) {
+        
+        MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
+
+        MatrixMaster.Matrix memory Lm;
+        MatrixMaster.Matrix memory Um;
+        (Lm, Um) = LinearSolvers.luDecomposition(A);
+
+        return (Lm.data, Um.data);
+    }
+
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
+    function _copy(bytes16[] calldata src)
+        internal pure returns (bytes16[] memory dst) {
+        dst = new bytes16[](src.length);
+        for (uint256 i = 0; i < src.length; ++i) {
+            dst[i] = src[i];
+        }
     }
 }
