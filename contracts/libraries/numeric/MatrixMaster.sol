@@ -23,9 +23,9 @@ library MatrixMaster {
 
     bytes16 private constant QZERO = bytes16(0x00000000000000000000000000000000);
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Core type
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     struct Matrix {
         uint256 rows;
@@ -33,9 +33,9 @@ library MatrixMaster {
         bytes16[] data; // row-major, length = rows * cols
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Modifiers
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     modifier validDims(uint256 r, uint256 c) {
         require(r > 0 && c > 0, "MatrixMaster: dims must be > 0");
@@ -73,7 +73,7 @@ library MatrixMaster {
     }
 
     /**
-     * @notice Require that `a.cols == b.rows` for matrix multiplication.
+     * @notice Require that 'a.cols == b.rows' for matrix multiplication.
      * @param a Left operand
      * @param b Right operand
      */
@@ -82,12 +82,12 @@ library MatrixMaster {
         _;
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Helpers
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     /**
-     * @notice Compute row-major index into `data` array.
+     * @notice Compute row-major index into 'data' array.
      * @param  cols Number of columns in the matrix
      * @param  row  Zero-based row index
      * @param  col  Zero-based column index
@@ -97,9 +97,9 @@ library MatrixMaster {
         unchecked { return row * cols + col; }
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Creation
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     /**
      * @notice Create a rowsxcols matrix filled with zeros.
@@ -195,9 +195,9 @@ library MatrixMaster {
         m = Matrix({ rows: rows, cols: cols, data: data });
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Element access
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     /**
      * @notice Get element at (row, col).
@@ -211,7 +211,7 @@ library MatrixMaster {
     }
 
     /**
-     * @notice Set element at (row, col) to `val`.
+     * @notice Set element at (row, col) to 'val'.
      *         Mutates the matrix in-place (in memory).
      * @param m     Matrix to modify
      * @param row   Zero-based row index
@@ -222,9 +222,9 @@ library MatrixMaster {
         m.data[_idx(m.cols, row, col)] = val;
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Slicing & reshape
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     /**
      * @notice Extract a contiguous submatrix [rowStart:rowEnd, colStart:colEnd).
@@ -257,7 +257,7 @@ library MatrixMaster {
     /**
      * @notice Reshape matrix to newRowsxnewCols without changing data order.
      *         Requires newRows * newCols == rows * cols.
-     *         Reuses the same `data` array (no copy).
+     *         Reuses the same 'data' array (no copy).
      * @param m        Input matrix
      * @param newRows  New number of rows
      * @param newCols  New number of columns
@@ -272,12 +272,12 @@ library MatrixMaster {
         reshaped = Matrix({ rows: newRows, cols: newCols, data: m.data });
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Transpose
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     /**
-     * @notice   Compute the transpose Aᵀ.
+     * @notice Compute the transpose Aᵀ.
      * @param  a Input matrix A (rowsxcols)
      * @return t Transposed matrix (colsxrows)
      */
@@ -296,9 +296,9 @@ library MatrixMaster {
         t = Matrix({ rows: outRows, cols: outCols, data: data });
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Elementwise arithmetic
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     /**
      * @notice   Elementwise addition C = A + B.
@@ -370,9 +370,9 @@ library MatrixMaster {
         c = Matrix({ rows: a.rows, cols: a.cols, data: data });
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Matrix multiplication
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     /**
      * @notice Matrix-matrix multiplication C = A · B.
@@ -404,9 +404,9 @@ library MatrixMaster {
         c = Matrix({ rows: m, cols: n, data: data });
     }
 
-    // ──────────────────────────────────────────────────────────
-    // Matrix x Vector multiplication (A is mxn, x is nx1)
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
+    // Matrix x Vector multiplication
+    // ------------------------------------------------------------
 
     /**
      * @notice Multiply matrix A (mxn) by vector x (nx1). Result is (mx1).
@@ -439,56 +439,9 @@ library MatrixMaster {
         y = Matrix({ rows: m, cols: 1, data: out });
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Vector utilities (dot, norm, normalization, random vector)
-    // ──────────────────────────────────────────────────────────
-
-    /**
-     * @notice Compute dot product of two column vectors (nx1).
-     *         Requires both vectors to be column vectors with identical lengths.
-     * @param  a First vector (nx1)
-     * @param  b Second vector (nx1)
-     * @return s Scalar dot product = Σ_i a[i] * b[i]
-     */
-    function dot(Matrix memory a, Matrix memory b) internal pure returns (bytes16 s) {
-        require(a.cols == 1 && b.cols == 1, "MatrixMaster: dot requires column vectors");
-        require(a.rows == b.rows, "MatrixMaster: dot length mismatch");
-
-        bytes16 acc = QZERO;
-
-        for (uint256 i = 0; i < a.rows; ++i) {
-            acc = acc.add(a.data[i].mul(b.data[i]));
-        }
-
-        s = acc;
-    }
-
-    /**
-     * @notice Compute Euclidean 2-norm ||v||₂ of a column vector (nx1).
-     * @param  v   Input vector (nx1)
-     * @return nrm Vector norm = sqrt(dot(v, v))
-     */
-    function euclideanNorm(Matrix memory v) internal pure returns (bytes16 nrm) {
-        require(v.cols == 1, "MatrixMaster: euclideanNorm requires column vector");
-
-        bytes16 d = dot(v, v);
-        nrm = MathLib.sqrt(d);
-    }
-
-    /**
-     * @notice Normalize a column vector v into v / ||v||₂.
-     * @dev    Reverts if vector has zero norm.
-     * @param  v   Input vector (nx1)
-     * @return out Normalized vector with unit Euclidean norm
-     */
-    function normalize(Matrix memory v) internal pure returns (Matrix memory out) {
-        require(v.cols == 1, "MatrixMaster: normalize requires column vector");
-
-        bytes16 nrm = euclideanNorm(v);
-        require(MathLib.cmp(nrm, QZERO) != 0, "MatrixMaster: cannot normalize zero vector");
-
-        out = divScalar(v, nrm); // v / ||v||
-    }
+    // ------------------------------------------------------------
 
     /**
      * @notice Create a pseudo-random column vector (nx1) with entries in [0,1).
@@ -517,8 +470,55 @@ library MatrixMaster {
     }
 
     /**
+     * @notice Compute dot product of two column vectors (nx1).
+     *         Requires both vectors to be column vectors with identical lengths.
+     * @param  a First vector (nx1)
+     * @param  b Second vector (nx1)
+     * @return s Scalar dot product = Σ_i a[i] * b[i]
+     */
+    function dot(Matrix memory a, Matrix memory b) internal pure returns (bytes16 s) {
+        require(a.cols == 1 && b.cols == 1, "MatrixMaster: dot requires column vectors");
+        require(a.rows == b.rows, "MatrixMaster: dot length mismatch");
+
+        bytes16 acc = QZERO;
+
+        for (uint256 i = 0; i < a.rows; ++i) {
+            acc = acc.add(a.data[i].mul(b.data[i]));
+        }
+
+        s = acc;
+    }
+
+    /**
+     * @notice Compute Euclidean 2-norm ||v||_2 of a column vector (nx1).
+     * @param  v   Input vector (nx1)
+     * @return nrm Vector norm = sqrt(dot(v, v))
+     */
+    function euclideanNorm(Matrix memory v) internal pure returns (bytes16 nrm) {
+        require(v.cols == 1, "MatrixMaster: euclideanNorm requires column vector");
+
+        bytes16 d = dot(v, v);
+        nrm = MathLib.sqrt(d);
+    }
+
+    /**
+     * @notice Normalize a column vector v into v / ||v||_2.
+     * @dev    Reverts if vector has zero norm.
+     * @param  v   Input vector (nx1)
+     * @return out Normalized vector with unit Euclidean norm
+     */
+    function normalize(Matrix memory v) internal pure returns (Matrix memory out) {
+        require(v.cols == 1, "MatrixMaster: normalize requires column vector");
+
+        bytes16 nrm = euclideanNorm(v);
+        require(MathLib.cmp(nrm, QZERO) != 0, "MatrixMaster: cannot normalize zero vector");
+
+        out = divScalar(v, nrm); // v / ||v||
+    }
+
+    /**
      * @notice Check approximate convergence between two vectors via L2 tolerance.
-     *         Computes ||vNew - vOld||_2 and compares to `tol`.
+     *         Computes ||vNew - vOld||_2 and compares to 'tol'.
      * @param  vNew New iterate (nx1)
      * @param  vOld Previous iterate (nx1)
      * @param  tol  Convergence tolerance (positive scalar)
@@ -542,9 +542,9 @@ library MatrixMaster {
         return false;
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Determinant via LU decomposition with partial pivoting
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     /**
      * @notice Compute determinant det(A) of a square matrix using LU decomposition.
@@ -623,9 +623,9 @@ library MatrixMaster {
         detA = detVal;
     }
 
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
     // Inversion via Gauss–Jordan elimination
-    // ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------
 
     /**
      * @notice Compute A⁻¹ using Gauss–Jordan elimination on [A | I].
@@ -711,6 +711,10 @@ library MatrixMaster {
 
         invA = Matrix({ rows: n, cols: n, data: invData });
     }
+
+    // ------------------------------------------------------------
+    // Eigenvalues
+    // ------------------------------------------------------------
 
     /**
      * @notice Approximate the dominant eigenvalue/eigenvector of a square matrix A using power iteration.
