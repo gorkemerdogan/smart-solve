@@ -147,3 +147,28 @@ export function printBlockRegular({t, method, explanation, gas, inHex = "-", exp
 
     console.log(logLines.join("\n"));
 }
+
+/**
+ * @notice Formats a fixed-point BigInt into a human-readable decimal string.
+ * @dev    Splits the value into integer and fractional parts. If the scale input is 0, 
+ *         it defaults to 10^12. Uses padStart to preserve leading zeros in decimals.
+ *         Example: 
+ *          Input: 1050000000000n (with SCALE = 10**12)
+ *          Output: "1.050000000000"
+ * @param  v The BigInt value to be formatted (supports positive and negative).
+ * @param s The SCALE/denominator to use. If 0, defaults to 10**12.
+ * @return Formatted decimal string with 12 decimal places.
+ */
+export function fmt(v: bigint, s?: bigint): string {
+    const SCALE = !s || s === 0n ? 10n ** 12n : s; // default -> 10^12
+    // Determine the number of decimal places for padding based on the SCALE
+    const decimals = SCALE.toString().length - 1;
+
+    const neg = v < 0n;
+    const a = neg ? -v : v;
+
+    const integerPart = a / SCALE;
+    const fractionalPart = a % SCALE;
+
+    return `${neg ? "-" : ""}${integerPart}.${fractionalPart.toString().padStart(decimals, "0")}`;
+}
