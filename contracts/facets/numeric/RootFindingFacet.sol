@@ -48,7 +48,7 @@ contract RootFindingFacet {
      * @param  fSelector  Selector for f(bytes16)
      * @param  a          First endpoint of the interval
      * @param  b          Second endpoint of the interval
-     * @return RootResult Struct containing root approximation and metadata
+     * @return result Struct containing root approximation and metadata
      */
     function rootFindingBisection(address target,
         bytes4 fSelector,
@@ -69,7 +69,7 @@ contract RootFindingFacet {
      * @param  dfTarget   Contract exposing f'(bytes16)
      * @param  dfSelector Selector for f'(bytes16)
      * @param  x0         Initial guess
-     * @return RootResult Struct with the final iterate, iteration count, and convergence flag
+     * @return result Struct with the final iterate, iteration count, and convergence flag
      */
     function rootFindingNewton(
         address target,
@@ -92,7 +92,7 @@ contract RootFindingFacet {
      * @param  fSelector  Selector for f(bytes16)
      * @param  x0         First initial point
      * @param  x1         Second initial point
-     * @return RootResult Struct containing the resulting approximation
+     * @return result Struct containing the resulting approximation
      */
     function rootFindingSecant(
         address target,
