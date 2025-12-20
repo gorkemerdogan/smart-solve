@@ -61,37 +61,31 @@ contract IntegrationFacet {
     // ------------------------------------------------------------
 
     /**
-     * @notice Trapezoidal rule using n from LibNumericConfig.maxIter.
-     * @param target    Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector of f in `target`
-     * @param a         Lower integration bound (bytes16)
-     * @param b         Upper integration bound (bytes16)
+     * @notice Computes the composite trapezoidal rule on a uniform grid with default N.
+     *         All computation is done in memory; no storage access occurs.
+     * @param  target Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector Selector of f(bytes16) in 'target'
+     * @param  a Lower integration bound (bytes16)
+     * @param  b Upper integration bound (bytes16)
+     * @return I Approximate integral value encoded as bytes16
      */
-    function integrateTrapezoidal(
-        address target,
-        bytes4 fSelector,
-        bytes16 a,
-        bytes16 b
-    ) external view returns (bytes16 I) {
+    function integrateTrapezoidal(address target, bytes4 fSelector, bytes16 a, bytes16 b) external view returns (bytes16 I) {
         uint256 n = _defaultN();
         return Integration.trapezoidal(target, fSelector, a, b, n);
     }
 
     /**
-     * @notice Trapezoidal rule with an explicit grid size n.
-     * @param target    Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector of f in `target`
-     * @param a         Lower integration bound (bytes16)
-     * @param b         Upper integration bound (bytes16)
-     * @param n         Number of sub-intervals; must be > 0.
+     * @notice Computes the composite trapezoidal rule on a uniform grid.
+     *         Requires n > 0 and b >= a. Performs O(n) staticcalls to the integrand.
+     *         All computation is done in memory; no storage access occurs.
+     * @param  target Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector Selector of f(bytes16) in 'target'
+     * @param  a Lower integration bound (bytes16)
+     * @param  b Upper integration bound (bytes16)
+     * @param  n Number of subintervals (must be > 0)
+     * @return I Approximate integral value encoded as bytes16
      */
-    function integrateTrapezoidalWithN(
-        address target,
-        bytes4 fSelector,
-        bytes16 a,
-        bytes16 b,
-        uint256 n
-    ) external view returns (bytes16 I) {
+    function integrateTrapezoidalWithN(address target, bytes4 fSelector, bytes16 a, bytes16 b, uint256 n) external view returns (bytes16 I) {
         return Integration.trapezoidal(target, fSelector, a, b, n);
     }
 
@@ -100,7 +94,13 @@ contract IntegrationFacet {
     // ------------------------------------------------------------
 
     /**
-     * @notice Simpson’s 1/3 rule using n from LibNumericConfig.maxIter.
+     * @notice Computes the composite Simpson’s 1/3 rule on a uniform grid with default N.
+     *         All computation occurs in memory; no storage is modified.
+     * @param  target Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector Selector of f(bytes16) in 'target'
+     * @param  a Lower integration bound (bytes16)
+     * @param  b Upper integration bound (bytes16)
+     * @return I Approximate integral value encoded as bytes16
      */
     function integrateSimpson13(
         address target,
@@ -113,12 +113,15 @@ contract IntegrationFacet {
     }
 
     /**
-     * @notice Simpson’s 1/3 rule with an explicit even n.
-     * @param target    Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector of f in `target`
-     * @param a         Lower integration bound (bytes16)
-     * @param b         Upper integration bound (bytes16)
-     * @param n         Number of sub-intervals; must be > 0 and even.
+     * @notice Computes the composite Simpson’s 1/3 rule on a uniform grid.
+     *         Requires n > 0, n even, and b >= a. Performs O(n) staticcalls to the integrand.
+     *         All computation occurs in memory; no storage is modified.
+     * @param  target Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector Selector of f(bytes16) in 'target'
+     * @param  a Lower integration bound (bytes16)
+     * @param  b Upper integration bound (bytes16)
+     * @param  n Number of subintervals (must be even and > 0)
+     * @return I Approximate integral value encoded as bytes16
      */
     function integrateSimpson13WithN(
         address target,
@@ -135,8 +138,13 @@ contract IntegrationFacet {
     // ------------------------------------------------------------
 
     /**
-     * @notice Simpson’s 3/8 rule using n from LibNumericConfig.maxIter.
-     * @dev n must be a multiple of 3; Integration.simpson38 is expected to revert if not.
+     * @notice Computes the composite Simpson’s 3/8 rule on a uniform grid with default N.
+     *         to the integrand. All arithmetic is performed in memory.
+     * @param  target Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector Selector of f(bytes16) in 'target'
+     * @param  a Lower integration bound (bytes16)
+     * @param  b Upper integration bound (bytes16)
+     * @return I Approximate integral value encoded as bytes16
      */
     function integrateSimpson38(
         address target,
@@ -149,12 +157,15 @@ contract IntegrationFacet {
     }
 
     /**
-     * @notice Simpson’s 3/8 rule with an explicit n.
-     * @param target    Contract exposing f(bytes16) -> bytes16
-     * @param fSelector Selector of f in `target`
-     * @param a         Lower integration bound (bytes16)
-     * @param b         Upper integration bound (bytes16)
-     * @param n         Number of sub-intervals; must be > 0 and divisible by 3.
+     * @notice Computes the composite Simpson’s 3/8 rule on a uniform grid.
+     *         Requires n > 0, n divisible by 3, and b >= a. Performs O(n) staticcalls
+     *         to the integrand. All arithmetic is performed in memory.
+     * @param  target Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector Selector of f(bytes16) in 'target'
+     * @param  a Lower integration bound (bytes16)
+     * @param  b Upper integration bound (bytes16)
+     * @param  n Number of subintervals (must be > 0 and divisible by 3)
+     * @return I Approximate integral value encoded as bytes16
      */
     function integrateSimpson38WithN(
         address target,

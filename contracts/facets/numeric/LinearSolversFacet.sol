@@ -20,6 +20,28 @@ contract LinearSolversFacet {
     // Gradient Descent (Least Squares)
     // ------------------------------------------------------------
 
+    /**
+     * @notice Solve min_x 1/2 ||A x - b||^2 via gradient descent (least squares).
+     *         Convergence is guaranteed only if 0 < alpha < 2 / λ_max(A^T A).
+     *
+     *         This implementation:
+     *          - Does NOT perform line search
+     *          - Does NOT adapt alpha during iterations
+     *          - Does NOT estimate spectral bounds on-chain
+     *
+     *         Choosing alpha too small leads to slow convergence.
+     *         Choosing alpha too large leads to divergence.
+     *
+     * @param A       Coefficient matrix (m x n).
+     * @param b       Right-hand side column vector (m x 1).
+     * @param x0      Initial guess (n x 1).
+     * @param alpha   Step size (bytes16).
+     * @param maxIter Maximum number of iterations.
+     * @param tol     Tolerance on squared gradient norm; stop when ||∇f||^2 <= tol.
+     *
+     * @return x      Approximate minimizer (n x 1).
+     * @return iters  Number of gradient descent steps fully executed before termination.
+     */
     function gradientDescentLeastSquares(
         uint256 m,
         uint256 n,
@@ -48,6 +70,20 @@ contract LinearSolversFacet {
     // Jacobi Iteration
     // ------------------------------------------------------------
 
+    /**
+     * @notice Solve A x ≈ b using Jacobi iteration.
+     *         Requires non-zero diagonal and (ideally) diagonal dominance for convergence.
+     *
+     * @param A        Coefficient matrix (nxn).
+     * @param b        RHS column vector (nx1).
+     * @param x0       Initial guess (nx1).
+     * @param maxIter  Maximum iterations.
+     * @param tolDiff  Tolerance on squared difference between consecutive iterates.
+     *
+     * @return x       Approximate solution.
+     * @return iters   Number of iterations executed, where the initial guess x0
+     *                 is considered iteration 0 and the first update produces x1.
+     */
     function jacobi(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata, bytes16[] calldata x0data, uint256 maxIter, bytes16 tolDiff)
         external pure returns (bytes16[] memory x, uint256 iters) {
         
@@ -65,6 +101,21 @@ contract LinearSolversFacet {
     // Gauss–Seidel Iteration
     // ------------------------------------------------------------
 
+    /**
+     * @notice Solve A x ≈ b using Gauss–Seidel iteration.
+     *         Uses updated values within the same iteration (in-place).
+     *         Requires non-zero diagonal.
+     *
+     * @param A        Coefficient matrix (nxn).
+     * @param b        RHS column vector (nx1).
+     * @param x0       Initial guess (nx1).
+     * @param maxIter  Maximum iterations.
+     * @param tolDiff  Tolerance on squared difference between consecutive iterates.
+     *
+     * @return x       Approximate solution.
+     * @return iters   Number of iterations executed, where the initial guess x0
+     *                 is considered iteration 0 and the first update produces x1.
+     */
     function gaussSeidel(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata, bytes16[] calldata x0data, uint256 maxIter, bytes16 tolDiff)
         external pure returns (bytes16[] memory x, uint256 iters) {
         
@@ -82,6 +133,14 @@ contract LinearSolversFacet {
     // Gaussian Elimination
     // ------------------------------------------------------------
 
+    /**
+     * @notice Solve A x = b using Gaussian elimination with partial pivoting.
+     *         Operates directly on matrix buffers without forming augmented matrices.
+     *
+     * @param  A Coefficient matrix (n × n)
+     * @param  b Right-hand side column vector (n × 1)
+     * @return x Solution vector (n × 1)
+     */
     function gaussianElimination(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata)
         external pure returns (bytes16[] memory x) {
         
@@ -97,6 +156,15 @@ contract LinearSolversFacet {
     // LU Decomposition
     // ------------------------------------------------------------
 
+    /**
+     * @notice Compute LU factorization A = L*U using Doolittle's method (no pivoting).
+     *         This implementation does NOT perform pivoting.
+     *         Zero or near-zero pivots will cause failure even if A is invertible.
+     *
+     * @param  A Matrix (nxn).
+     * @return L Unit-lower-triangular factor (nxn).
+     * @return U Upper-triangular factor (nxn).
+     */
     function luDecomposition(uint256 n, bytes16[] calldata Adata)
         external pure returns (bytes16[] memory L, bytes16[] memory U) {
         

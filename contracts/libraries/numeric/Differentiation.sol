@@ -7,7 +7,7 @@ import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
 /**
  * @title Numerical Differentiation Library
  * @notice High-precision numerical differentiation using IEEE-754 binary128 (bytes16) scalars.
- * All operations are stateless and use `staticcall` to evaluate the target function `f(x)`.
+ * All operations are stateless and use 'staticcall' to evaluate the target function 'f(x)'.
  */
 library Differentiation {
     using MathLib for bytes16;
@@ -19,17 +19,10 @@ library Differentiation {
     // Internal Helpers
     // ------------------------------------------------------------
 
-    // @notice 
-    // @dev Resolution Logic:
-    //      
-    //      
-    //      
-    // 
-    // 
     /**
-     * @notice Resolves the differentiation step size `h` based on precedence rules.
-     *          1. If `hInput` != 0, use `hInput`.
-     *          2. Else if `LibNumericConfig.getDiffStep()` != 0, use that.
+     * @notice Resolves the differentiation step size 'h' based on precedence rules.
+     *          1. If 'hInput' != 0, use 'hInput'.
+     *          2. Else if 'LibNumericConfig.getDiffStep()' != 0, use that.
      *          3. Else, use hardcoded default (1e-8).
      * @param  hInput The user-provided step size (can be 0).
      * @return step   The final resolved step size to be used in calculations.
@@ -53,14 +46,13 @@ library Differentiation {
 
     /**
      * @notice Evaluates the external function f(x) via staticcall.
-     *         Expects the target function to have signature `function name(bytes16) external pure returns (bytes16)`.
+     *         Expects the target function to have signature 'function name(bytes16) external pure returns (bytes16)'.
      *
      * @param target   The address of the contract hosting the function.
      * @param selector The 4-byte function selector of f(x).
      * @param x        The point at which to evaluate f.
      * @return y       The result f(x).
      */
-
     function evalFunc(address target, bytes4 selector, bytes16 x) internal view returns (bytes16 y) {
         require(target != address(0), "Differentiation: target is zero address");
 
@@ -101,15 +93,15 @@ library Differentiation {
 
 
     /**
-    * @notice Approximates the derivative f'(x) using the Backward Difference method.
-    *         Formula: f'(x) ≈ (f(x) - f(x - h)) / h
-    *         Accuracy: First-order O(h).
-    *
-    * @param target   The address of the contract hosting f.
-    * @param selector The function selector for f.
-    * @param x        The point at which to differentiate.
-    * @param h        The step size. Pass 0 (QZERO) to use defaults/config.
-    * @return dfdx    The approximate derivative.
+     * @notice Approximates the derivative f'(x) using the Backward Difference method.
+     *         Formula: f'(x) ≈ (f(x) - f(x - h)) / h
+     *         Accuracy: First-order O(h).
+     *
+     * @param target   The address of the contract hosting f.
+     * @param selector The function selector for f.
+     * @param x        The point at which to differentiate.
+     * @param h        The step size. Pass 0 (QZERO) to use defaults/config.
+     * @return dfdx    The approximate derivative.
      */
     function backwardDiff(address target, bytes4 selector, bytes16 x, bytes16 h) internal view returns (bytes16 dfdx) {
         bytes16 step = _getStep(h);

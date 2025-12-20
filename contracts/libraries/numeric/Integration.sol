@@ -22,7 +22,7 @@ library Integration {
 
     /**
      * @notice Evaluates the integrand at a given point by staticcalling the target contract.
-     *         Performs a staticcall to `target` using selector `sel` with argument `x`.
+     *         Performs a staticcall to 'target' using selector 'sel' with argument 'x'.
      *         Reverts if the call fails or returns insufficient data.
      *
      * @param  target Address of the contract exposing f(bytes16) -> bytes16
@@ -65,9 +65,8 @@ library Integration {
      * @notice Computes the composite trapezoidal rule on a uniform grid.
      *         Requires n > 0 and b >= a. Performs O(n) staticcalls to the integrand.
      *         All computation is done in memory; no storage access occurs.
-     *
      * @param  target Contract exposing f(bytes16) -> bytes16
-     * @param  fSelector Selector of f(bytes16) in `target`
+     * @param  fSelector Selector of f(bytes16) in 'target'
      * @param  a Lower integration bound (bytes16)
      * @param  b Upper integration bound (bytes16)
      * @param  n Number of subintervals (must be > 0)
@@ -107,7 +106,7 @@ library Integration {
      *         Requires n > 0, n even, and b >= a. Performs O(n) staticcalls to the integrand.
      *         All computation occurs in memory; no storage is modified.
      * @param  target Contract exposing f(bytes16) -> bytes16
-     * @param  fSelector Selector of f(bytes16) in `target`
+     * @param  fSelector Selector of f(bytes16) in 'target'
      * @param  a Lower integration bound (bytes16)
      * @param  b Upper integration bound (bytes16)
      * @param  n Number of subintervals (must be even and > 0)
@@ -156,7 +155,7 @@ library Integration {
      *         Requires n > 0, n divisible by 3, and b >= a. Performs O(n) staticcalls
      *         to the integrand. All arithmetic is performed in memory.
      * @param  target Contract exposing f(bytes16) -> bytes16
-     * @param  fSelector Selector of f(bytes16) in `target`
+     * @param  fSelector Selector of f(bytes16) in 'target'
      * @param  a Lower integration bound (bytes16)
      * @param  b Upper integration bound (bytes16)
      * @param  n Number of subintervals (must be > 0 and divisible by 3)

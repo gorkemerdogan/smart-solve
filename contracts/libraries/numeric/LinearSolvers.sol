@@ -305,8 +305,8 @@ library LinearSolvers {
     // ------------------------------------------------------------
 
     /**
-     * @notice   Solve A x = b using Gaussian elimination with partial pivoting.
-     *           Operates directly on matrix buffers without forming augmented matrices.
+     * @notice Solve A x = b using Gaussian elimination with partial pivoting.
+     *         Operates directly on matrix buffers without forming augmented matrices.
      *
      * @param  A Coefficient matrix (n × n)
      * @param  b Right-hand side column vector (n × 1)
@@ -389,7 +389,7 @@ library LinearSolvers {
 
     /**
      * @notice Swap two rows of a matrix in-place.
-     *         Exchanges all elements of row `r1` with row `r2`.
+     *         Exchanges all elements of row 'r1' with row 'r2'.
      *
      * @param M  Matrix whose rows are to be swapped
      * @param r1 Index of the first row
@@ -408,7 +408,7 @@ library LinearSolvers {
 
     /**
      * @notice Swap two entries of a right-hand-side column vector.
-     *         Swaps elements `rhs[i]` and `rhs[j]` in-place.
+     *         Swaps elements 'rhs[i]' and 'rhs[j]' in-place.
      *         Used to keep the right-hand side vector consistent
      *         with row swaps applied to the coefficient matrix
      *         during Gaussian elimination.
