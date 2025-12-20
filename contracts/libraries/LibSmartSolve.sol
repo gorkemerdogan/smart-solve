@@ -76,7 +76,7 @@ library LibSmartSolve {
 
     /**
      * @notice Returns the diamond’s storage struct at the fixed EIP-2535 storage slot.
-     *         Uses inline assembly to bind `DiamondStorage` to the constant slot
+     *         Uses inline assembly to bind 'DiamondStorage' to the constant slot
      *         defined by DIAMOND_STORAGE_POSITION.
      * @return ds Pointer to the diamond storage layout
      */
@@ -257,7 +257,7 @@ library LibSmartSolve {
 
     /**
      * @notice Executes the optional initialization delegatecall after a diamond cut.
-     *         Reverts if `_init` is zero but calldata is non-empty. Propagates
+     *         Reverts if '_init' is zero but calldata is non-empty. Propagates
      *         revert data from failed delegatecalls.
      *
      * @param _init Target contract to execute initialization logic

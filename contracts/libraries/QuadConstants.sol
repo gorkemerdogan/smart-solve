@@ -109,7 +109,7 @@ library QuadConstants {
 
     /**
      * @notice Returns 1e-15 as a quadruple-precision constant.
-     *         Recommended minimum tolerance (`minTol`) for root-finding algorithms.
+     *         Recommended minimum tolerance ('minTol') for root-finding algorithms.
      *
      * @return bytes16 1 x 10^-15
      */

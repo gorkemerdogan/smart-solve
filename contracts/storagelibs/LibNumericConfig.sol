@@ -66,7 +66,7 @@ library LibNumericConfig {
     }
 
     /**
-     * @notice Set the step size `h` for numerical differentiation.
+     * @notice Set the step size 'h' for numerical differentiation.
      * @param _h The step size in IEEE-754 binary128 (bytes16).
      */
     function setDiffStep(bytes16 _h) internal {

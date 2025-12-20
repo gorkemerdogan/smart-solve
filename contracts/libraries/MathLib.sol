@@ -49,7 +49,7 @@ library MathLib {
 
     /**
      * @notice Divides two quadruple-precision numbers.
-     *         Reverts if `b == 0`.
+     *         Reverts if 'b == 0'.
      * @param a Numerator
      * @param b Denominator
      * @return bytes16 a / b
@@ -179,7 +179,7 @@ library MathLib {
     }
 
     /**
-    * @notice Returns true if `x` is exactly zero in IEEE-754 quad format.
+    * @notice Returns true if 'x' is exactly zero in IEEE-754 quad format.
     *         Uses cmp(x, 0) to correctly treat +0 and -0 as zero.
     *
     * @param x  Quadruple-precision value (bytes16)

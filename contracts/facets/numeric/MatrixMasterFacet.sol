@@ -8,7 +8,7 @@ import { MatrixMaster } from "../../libraries/numeric/MatrixMaster.sol";
  * @notice External Diamond Facet exposing all MatrixMaster utilities.
  *          - All return values follow the format: (rows, cols, data[]).
  *          - For matrix inputs, calldata → memory conversion is required
- *            because MatrixMaster expects `bytes16[] memory`.
+ *            because MatrixMaster expects 'bytes16[] memory'.
  *          - For vectors: treat them as matrices with shape (n×1) or (1×n).
  */
 contract MatrixFacet {
