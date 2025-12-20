@@ -51,7 +51,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
     let selLinear: string;
     let selSquare: string;
 
-    const q = async (x: number | bigint) => h.qFromInt(x);
+    const qi = async (x: number | bigint) => h.qFromInt(x);
+    const qf = async (n: number | bigint, d: number | bigint) => h.qFromFrac(n, d);
 
     before(async () => {
         
@@ -86,8 +87,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 1: Constant ODE y' = 5", async function () {
             t++;
-            const y0 = await q(2);
-            const expected = await q(2.5);
+            const y0 = await qi(2);
+            const expected = await qf(5, 2); // 2.5
 
             await touchGas(h, "euler", [target, selConst5, QZERO, y0, H]);
             const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, H]);
@@ -110,8 +111,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 2: Linear ODE y' = y", async function () {
             t++;
-            const y0 = await q(10);
-            const expected = await q(11);
+            const y0 = await qi(10);
+            const expected = await qi(11);
 
             await touchGas(h, "euler", [target, selLinear, QZERO, y0, H]);
             const gas = await estimateGas(h, "euler", [target, selLinear, QZERO, y0, H]);
@@ -134,9 +135,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 3: Quadratic slope y'=x²", async function () {
             t++;
-            const x = await q(2);
-            const y0 = await q(1);
-            const expected = await q(1.4);
+            const x = await qi(2);
+            const y0 = await qi(1);
+            const expected = await qf(7, 5); // 1.4
 
             await touchGas(h, "euler", [target, selSquare, x, y0, H]);
             const gas = await estimateGas(h, "euler", [target, selSquare, x, y0, H]);
@@ -159,7 +160,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 4: Zero step size", async function () {
             t++;
-            const y0 = await q(7);
+            const y0 = await qi(7);
 
             await touchGas(h, "euler", [target, selConst5, QZERO, y0, QZERO]);
             const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, QZERO]);
@@ -182,8 +183,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 5: Negative step", async function () {
             t++;
-            const y0 = await q(10);
-            const expected = await q(9.5);
+            const y0 = await qi(10);
+            const expected = await qf(19, 2); // 9.5
 
             await touchGas(h, "euler", [target, selConst5, QZERO, y0, HNEG]);
             const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, HNEG]);
@@ -206,7 +207,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 6: Zero slope", async function () {
             t++;
-            const y0 = await q(3);
+            const y0 = await qi(3);
 
             await touchGas(h, "euler", [target, selConst5, QZERO, y0, QZERO]);
             const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, QZERO]);
@@ -230,7 +231,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 7: Invalid selector reverts", async function () {
             t++;
             await expect(
-                h.euler(target, "0xdeadbeef", QZERO, await q(1), H)
+                h.euler(target, "0xdeadbeef", QZERO, await qi(1), H)
             ).to.be.reverted;
 
             printBlockRegular({
@@ -254,8 +255,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 8: Constant ODE y' = 5 (exact)", async function () {
             t++;
-            const y0 = await q(2);
-            const expected = await q(2.5);
+            const y0 = await qi(2);
+            const expected = await qf(5, 2); // 2.5;
 
             await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, H]);
             const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, H]);
@@ -278,8 +279,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 9: Linear ODE y' = y", async function () {
             t++;
-            const y0 = await q(10);
-            const expected = await q(11.05);
+            const y0 = await qi(10);
+            const expected = await qf(221, 20); // 11.05
 
             await touchGas(h, "rk2Midpoint", [target, selLinear, QZERO, y0, H]);
             const gas = await estimateGas(h, "rk2Midpoint", [target, selLinear, QZERO, y0, H]);
@@ -302,9 +303,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 10: Quadratic slope y'=x²", async function () {
             t++;
-            const x = await q(2);
-            const y0 = await q(1);
-            const expected = await q(1.45);
+            const x = await qi(2);
+            const y0 = await qi(1);
+            const expected = await qf(29, 20); // 1.45
 
             await touchGas(h, "rk2Midpoint", [target, selSquare, x, y0, H]);
             const gas = await estimateGas(h, "rk2Midpoint", [target, selSquare, x, y0, H]);
@@ -327,7 +328,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 11: Zero step size", async function () {
             t++;
-            const y0 = await q(7);
+            const y0 = await qi(7);
 
             await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, QZERO]);
             const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, QZERO]);
@@ -350,8 +351,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 12: Negative step", async function () {
             t++;
-            const y0 = await q(10);
-            const expected = await q(9.5);
+            const y0 = await qi(10);
+            const expected = await qf(19, 2);  // 9.5
 
             await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, HNEG]);
             const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, HNEG]);
@@ -374,7 +375,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 13: Zero slope", async function () {
             t++;
-            const y0 = await q(3);
+            const y0 = await qi(3);
 
             await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, QZERO]);
             const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, QZERO]);
@@ -398,7 +399,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 14: Invalid selector reverts", async function () {
             t++;
             await expect(
-                h.rk2Midpoint(target, "0xdeadbeef", QZERO, await q(1), H)
+                h.rk2Midpoint(target, "0xdeadbeef", QZERO, await qi(1), H)
             ).to.be.reverted;
 
             printBlockRegular({
@@ -422,8 +423,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 15: Constant ODE exact", async function () {
             t++;
-            const y0 = await q(2);
-            const expected = await q(2.5);
+            const y0 = await qi(2);
+            const expected = await qf(5, 2); // 2.5;
 
             await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, H]);
             const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, H]);
@@ -446,8 +447,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 16: Linear ODE y'=y", async function () {
             t++;
-            const y0 = await q(10);
-            const expected = await q(11.05);
+            const y0 = await qi(10);
+            const expected = await qf(11051709, 1_000_000); // 11.051709
 
             await touchGas(h, "rk2Heun", [target, selLinear, QZERO, y0, H]);
             const gas = await estimateGas(h, "rk2Heun", [target, selLinear, QZERO, y0, H]);
@@ -463,16 +464,16 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "11.05",
+                expectedDec: "11.051709",
                 outDec: fmt(await h.toFloat(out)),
             });
         });
 
         it("Test 17: Quadratic slope y'=x²", async function () {
             t++;
-            const x = await q(2);
-            const y0 = await q(1);
-            const expected = await q(1.4);
+            const x = await qi(2);
+            const y0 = await qi(1);
+            const expected = await qf(7, 5); // 1.4
 
             await touchGas(h, "rk2Heun", [target, selSquare, x, y0, H]);
             const gas = await estimateGas(h, "rk2Heun", [target, selSquare, x, y0, H]);
@@ -495,7 +496,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 18: Zero step", async function () {
             t++;
-            const y0 = await q(6);
+            const y0 = await qi(6);
 
             await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, QZERO]);
             const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, QZERO]);
@@ -518,8 +519,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 19: Negative step", async function () {
             t++;
-            const y0 = await q(10);
-            const expected = await q(9.5);
+            const y0 = await qi(10);
+            const expected = await qf(19, 2); // 9.5
 
             await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, HNEG]);
             const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, HNEG]);
@@ -542,7 +543,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 20: Zero slope", async function () {
             t++;
-            const y0 = await q(4);
+            const y0 = await qi(4);
 
             await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, QZERO]);
             const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, QZERO]);
@@ -566,7 +567,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 21: Invalid selector reverts", async function () {
             t++;
             await expect(
-                h.rk2Heun(target, "0xdeadbeef", QZERO, await q(1), H)
+                h.rk2Heun(target, "0xdeadbeef", QZERO, await qi(1), H)
             ).to.be.reverted;
 
             printBlockRegular({
@@ -590,8 +591,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 22: Constant ODE exact", async function () {
             t++;
-            const y0 = await q(2);
-            const expected = await q(2.5);
+            const y0 = await qi(2);
+            const expected = await qf(5, 2); // 2.5;
 
             await touchGas(h, "rk4", [target, selConst5, QZERO, y0, H]);
             const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, H]);
@@ -614,8 +615,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 23: Linear ODE y'=y", async function () {
             t++;
-            const y0 = await q(10);
-            const expected = await q(11.051709);
+            const y0 = await qi(10);
+            const expected = await qf(11051709, 1_000_000); // 11.051709
 
             await touchGas(h, "rk4", [target, selLinear, QZERO, y0, H]);
             const gas = await estimateGas(h, "rk4", [target, selLinear, QZERO, y0, H]);
@@ -638,9 +639,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 24: Quadratic slope y'=x²", async function () {
             t++;
-            const x = await q(2);
-            const y0 = await q(1);
-            const expected = await q(1.4);
+            const x = await qi(2);
+            const y0 = await qi(1);
+            const expected = await qf(7, 5); // 1.4
 
             await touchGas(h, "rk4", [target, selSquare, x, y0, H]);
             const gas = await estimateGas(h, "rk4", [target, selSquare, x, y0, H]);
@@ -663,7 +664,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 25: Zero step", async function () {
             t++;
-            const y0 = await q(5);
+            const y0 = await qi(5);
 
             await touchGas(h, "rk4", [target, selConst5, QZERO, y0, QZERO]);
             const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, QZERO]);
@@ -686,8 +687,8 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 26: Negative step", async function () {
             t++;
-            const y0 = await q(10);
-            const expected = await q(9.5);
+            const y0 = await qi(10);
+            const expected = await qf(19, 2);  // 9.5
 
             await touchGas(h, "rk4", [target, selConst5, QZERO, y0, HNEG]);
             const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, HNEG]);
@@ -710,7 +711,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
         it("Test 27: Zero slope", async function () {
             t++;
-            const y0 = await q(3);
+            const y0 = await qi(3);
 
             await touchGas(h, "rk4", [target, selConst5, QZERO, y0, QZERO]);
             const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, QZERO]);
@@ -734,7 +735,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 28: Invalid selector reverts", async function () {
             t++;
             await expect(
-                h.rk4(target, "0xdeadbeef", QZERO, await q(1), H)
+                h.rk4(target, "0xdeadbeef", QZERO, await qi(1), H)
             ).to.be.reverted;
 
             printBlockRegular({
