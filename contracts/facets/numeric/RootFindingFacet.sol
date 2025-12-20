@@ -48,12 +48,9 @@ contract RootFindingFacet {
      * @param  fSelector  Selector for f(bytes16)
      * @param  a          First endpoint of the interval
      * @param  b          Second endpoint of the interval
-     * @param  tol        Requested tolerance (clamped to configured minimum)
-     * @param  maxIter    Maximum number of iterations
      * @return RootResult Struct containing root approximation and metadata
      */
-    function rootFindingBisection(
-        address target,
+    function rootFindingBisection(address target,
         bytes4 fSelector,
         bytes16 a,
         bytes16 b
@@ -72,8 +69,6 @@ contract RootFindingFacet {
      * @param  dfTarget   Contract exposing f'(bytes16)
      * @param  dfSelector Selector for f'(bytes16)
      * @param  x0         Initial guess
-     * @param  tol        Requested tolerance (clamped to configured minimum)
-     * @param  maxIter    Maximum number of iterations
      * @return RootResult Struct with the final iterate, iteration count, and convergence flag
      */
     function rootFindingNewton(
@@ -97,8 +92,6 @@ contract RootFindingFacet {
      * @param  fSelector  Selector for f(bytes16)
      * @param  x0         First initial point
      * @param  x1         Second initial point
-     * @param  tol        Requested tolerance (clamped to configured minimum)
-     * @param  maxIter    Maximum number of iterations
      * @return RootResult Struct containing the resulting approximation
      */
     function rootFindingSecant(
