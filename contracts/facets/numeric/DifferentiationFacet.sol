@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { Differentiation } from "../libraries/numeric/Differentiation.sol";
+import { Differentiation } from "../../libraries/numeric/Differentiation.sol";
 
 /**
  * @title  DifferentiationFacet

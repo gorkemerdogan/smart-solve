@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { LinearSolvers } from "../libraries/numeric/LinearSolvers.sol";
-import { MatrixMaster } from "../libraries/numeric/MatrixMaster.sol";
-import { MathLib } from "../libraries/MathLib.sol";
+import { LinearSolvers } from "../../libraries/numeric/LinearSolvers.sol";
+import { MatrixMaster } from "../../libraries/numeric/MatrixMaster.sol";
+import { MathLib } from "../../libraries/MathLib.sol";
 
 /**
  * @title  LinearSolversFacet
