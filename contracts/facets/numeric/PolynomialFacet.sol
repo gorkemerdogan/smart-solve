@@ -167,6 +167,6 @@ contract PolynomialFacet {
     // Copy coeffs calldata bytes16[] into memory (library expects memory).
     function _toMemory(bytes16[] calldata coeffs) internal pure returns (bytes16[] memory m) {
         m = new bytes16[](coeffs.length);
-        for (uint256 i = 0; i < a.length; ++i) m[i] = a[i];
+        for (uint256 i = 0; i < coeffs.length; ++i) m[i] = coeffs[i];
     }
 }
