@@ -54,8 +54,8 @@ contract PolynomialFacet {
      *
      * @custom:gas iterates once over coeffs, O(n), no storage.
      */
-    function polyEvalHornerMonic(bytes16[] calldata lowerCoeffs, bytes16 x) external pure returns (bytes16 y) {
-        return Polynomial.evalHornerMonic(_toMemory(lowerCoeffs), x);
+    function polyEvalHornerMonic(bytes16[] calldata coeffs, bytes16 x) external pure returns (bytes16 y) {
+        return Polynomial.evalHornerMonic(_toMemory(coeffs), x);
     }
 
     /**
@@ -81,8 +81,8 @@ contract PolynomialFacet {
      * @param  C      Constant of integration encoded as bytes16.
      * @return out    Coefficients of the integral polynomial.
      */
-    function polyIntegral(bytes16[] calldata a, bytes16 C) external pure returns (bytes16[] memory out) {
-        return Polynomial.integral(_toMemory(a), C);
+    function polyIntegral(bytes16[] calldata coeffs, bytes16 C) external pure returns (bytes16[] memory out) {
+        return Polynomial.integral(_toMemory(coeffs), C);
     }
 
     // ------------------------------------------------------------
@@ -96,8 +96,8 @@ contract PolynomialFacet {
      * @param  coeffs_b Coefficients of the second polynomial.
      * @return out      Coefficient array representing coeffs_a + coeffs_b.
      */
-    function polyAdd(bytes16[] calldata a, bytes16[] calldata b) external pure returns (bytes16[] memory out) {
-        return Polynomial.add(_toMemory(a), _toMemory(b));
+    function polyAdd(bytes16[] calldata coeffs_a, bytes16[] calldata coeffs_b) external pure returns (bytes16[] memory out) {
+        return Polynomial.add(_toMemory(coeffs_a), _toMemory(coeffs_b));
     }
 
     /**
@@ -107,8 +107,8 @@ contract PolynomialFacet {
      * @param  coeffs_b Subtrahend polynomial coefficients.
      * @return out      Resulting coefficients representing coeffs_a - coeffs_b.
      */
-    function polySub(bytes16[] calldata a, bytes16[] calldata b) external pure returns (bytes16[] memory out) {
-        return Polynomial.sub(_toMemory(a), _toMemory(b));
+    function polySub(bytes16[] calldata coeffs_a, bytes16[] calldata coeffs_b) external pure returns (bytes16[] memory out) {
+        return Polynomial.sub(_toMemory(coeffs_a), _toMemory(coeffs_b));
     }
 
     /**
@@ -118,8 +118,8 @@ contract PolynomialFacet {
      * @param  k      Scalar multiplier encoded as bytes16.
      * @return out    Coefficients after scalar multiplication.
      */
-    function polyMulScalar(bytes16[] calldata a, bytes16 k) external pure returns (bytes16[] memory out) {
-        return Polynomial.mulScalar(_toMemory(a), k);
+    function polyMulScalar(bytes16[] calldata coeffs, bytes16 k) external pure returns (bytes16[] memory out) {
+        return Polynomial.mulScalar(_toMemory(coeffs), k);
     }
 
     /**
@@ -129,8 +129,8 @@ contract PolynomialFacet {
      * @param  coeffs_b Second polynomial coefficients.
      * @return out      Resulting coefficients representing the convolution product.
      */
-    function polyMul(bytes16[] calldata a, bytes16[] calldata b) external pure returns (bytes16[] memory out) {
-        return Polynomial.mul(_toMemory(a), _toMemory(b));
+    function polyMul(bytes16[] calldata coeffs_a, bytes16[] calldata coeffs_b) external pure returns (bytes16[] memory out) {
+        return Polynomial.mul(_toMemory(coeffs_a), _toMemory(coeffs_b));
     }
 
     /**
@@ -151,22 +151,22 @@ contract PolynomialFacet {
     // ------------------------------------------------------------
 
     /// @notice Degree of the polynomial (highest i with non-zero coeff). Zero poly -> 0.
-    function polyDegree(bytes16[] calldata a) external pure returns (uint256) {
-        return Polynomial.degree(_toMemory(a));
+    function polyDegree(bytes16[] calldata coeffs) external pure returns (uint256) {
+        return Polynomial.degree(_toMemory(coeffs));
     }
 
     /// @notice Trim trailing zeros to canonical length.
-    function polyTrim(bytes16[] calldata a) external pure returns (bytes16[] memory out) {
-        return Polynomial.trimTrailingZeros(_toMemory(a));
+    function polyTrim(bytes16[] calldata coeffs) external pure returns (bytes16[] memory out) {
+        return Polynomial.trimTrailingZeros(_toMemory(coeffs));
     }
 
     // ------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------
 
-    // Copy a calldata bytes16[] into memory (library expects memory).
-    function _toMemory(bytes16[] calldata a) internal pure returns (bytes16[] memory m) {
-        m = new bytes16[](a.length);
+    // Copy coeffs calldata bytes16[] into memory (library expects memory).
+    function _toMemory(bytes16[] calldata coeffs) internal pure returns (bytes16[] memory m) {
+        m = new bytes16[](coeffs.length);
         for (uint256 i = 0; i < a.length; ++i) m[i] = a[i];
     }
 }
