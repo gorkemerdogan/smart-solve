@@ -51,7 +51,7 @@ library Polynomial {
      *
      * @custom:gas iterates once over coeffs, O(n), no storage.
      */
-    function eval'onic(bytes16[] memory coeffs, bytes16 x) internal pure returns (bytes16 y) {
+    function evalHornerMonic(bytes16[] memory coeffs, bytes16 x) internal pure returns (bytes16 y) {
         // Degree-1 monic: p(x) = x
         if (coeffs.length == 0) {
             return MathLib.fromInt(1);
