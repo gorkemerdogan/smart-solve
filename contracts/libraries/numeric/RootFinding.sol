@@ -83,12 +83,12 @@ library RootFinding {
     }
 
     // ------------------------------------------------------------
-    // Internal helpers
+    // Helpers
     // ------------------------------------------------------------
 
     /**
      * @notice Evaluates the integrand or function via staticcall.
-     *         Calls `target.selector(x)` and decodes a bytes16 return value.
+     *         Calls 'target.selector(x)' and decodes a bytes16 return value.
      *         Reverts on failure or insufficient return data.
      * @param  target Address exposing f(bytes16) -> bytes16
      * @param  sel    Function selector for f
@@ -147,7 +147,7 @@ library RootFinding {
     }
 
     // ------------------------------------------------------------
-    // Bisection (internal)
+    // Bisection
     // ------------------------------------------------------------
 
     /**
@@ -221,7 +221,7 @@ library RootFinding {
     }
 
     // ------------------------------------------------------------
-    // Newton–Raphson (internal)
+    // Newton–Raphson
     // ------------------------------------------------------------
 
     /**
@@ -279,7 +279,7 @@ library RootFinding {
     }
 
     // ------------------------------------------------------------
-    // Secant (internal)
+    // Secant
     // ------------------------------------------------------------
 
     /**

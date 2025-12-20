@@ -15,7 +15,7 @@ import { MathLib } from "../../libraries/MathLib.sol";
 contract RootFindingFacet {
     using RootFinding for *;
 
-    // Loads configuration values, applying fallback defaults if unset.
+    /// Loads configuration values, applying fallback defaults if unset.
     function _readCfg() internal view returns (bytes16 tol, uint256 maxIter) {
         LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
 
@@ -39,11 +39,18 @@ contract RootFindingFacet {
     }
 
     /**
-     * @notice Bisection on [a,b] for target f(x).
-     * @param target Address exposing f(bytes16) -> bytes16
-     * @param fSelector Function selector for f
-     * @param a Left endpoint
-     * @param b Right endpoint
+     * @notice Computes a root using the bisection method on [a, b].
+     *         Requires f(a) and f(b) to have opposite signs. Endpoints are normalized
+     *         to ensure left ≤ right. Convergence is triggered when either:
+     *           - |f(mid)| ≤ tol, or
+     *           - interval width / 2 ≤ tol.
+     * @param  target     Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector  Selector for f(bytes16)
+     * @param  a          First endpoint of the interval
+     * @param  b          Second endpoint of the interval
+     * @param  tol        Requested tolerance (clamped to configured minimum)
+     * @param  maxIter    Maximum number of iterations
+     * @return RootResult Struct containing root approximation and metadata
      */
     function rootFindingBisection(
         address target,
@@ -56,12 +63,18 @@ contract RootFindingFacet {
     }
 
     /**
-     * @notice Newton–Raphson with analytic derivative.
-     * @param target Address exposing f(bytes16) -> bytes16
-     * @param fSelector Function selector for f
-     * @param dfTarget Address exposing f'(bytes16) -> bytes16
-     * @param dfSelector Function selector for f'
-     * @param x0 Initial guess
+     * @notice Computes a root using the Newton–Raphson method with analytic derivative.
+     *         Requires non-zero derivative at each iterate. Convergence is based on:
+     *           - |f(xNext)| ≤ tol, or
+     *           - |xNext − x| ≤ tol.
+     * @param  target     Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector  Selector for f(bytes16)
+     * @param  dfTarget   Contract exposing f'(bytes16)
+     * @param  dfSelector Selector for f'(bytes16)
+     * @param  x0         Initial guess
+     * @param  tol        Requested tolerance (clamped to configured minimum)
+     * @param  maxIter    Maximum number of iterations
+     * @return RootResult Struct with the final iterate, iteration count, and convergence flag
      */
     function rootFindingNewton(
         address target,
@@ -75,11 +88,18 @@ contract RootFindingFacet {
     }
 
     /**
-     * @notice Secant method (derivative-free) with two initial points.
-     * @param target Address exposing f(bytes16) -> bytes16
-     * @param fSelector Function selector for f
-     * @param x0 First starting point
-     * @param x1 Second starting point
+     * @notice Computes a root using the secant method (derivative-free).
+     *         Uses two initial values and updates via the secant update formula.
+     *         Reverts if consecutive function values yield zero slope. Converges when:
+     *           - |f(xNext)| ≤ tol, or
+     *           - |xNext − x| ≤ tol.
+     * @param  target     Contract exposing f(bytes16) -> bytes16
+     * @param  fSelector  Selector for f(bytes16)
+     * @param  x0         First initial point
+     * @param  x1         Second initial point
+     * @param  tol        Requested tolerance (clamped to configured minimum)
+     * @param  maxIter    Maximum number of iterations
+     * @return RootResult Struct containing the resulting approximation
      */
     function rootFindingSecant(
         address target,
