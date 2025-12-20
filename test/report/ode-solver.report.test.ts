@@ -54,7 +54,19 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
     const q = async (x: number | bigint) => h.qFromInt(x);
 
     before(async () => {
-        const HF = await ethers.getContractFactory("ODESolverHarness");
+        
+        // Deploy MathLib
+        const MathLibFactory = await ethers.getContractFactory("MathLib");
+        const mathLib = await MathLibFactory.deploy();
+        await mathLib.waitForDeployment();
+
+        // Deploy ODESolverHarness with linked MathLib
+        const HF = await ethers.getContractFactory("ODESolverHarness", {
+            libraries: {
+                MathLib: await mathLib.getAddress(),
+            },
+        });
+
         h = (await HF.deploy()) as unknown as ODESolverHarness;
         target = await h.getAddress();
 
