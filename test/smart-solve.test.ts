@@ -2,12 +2,20 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { FunctionFragment } from "ethers";
 
-/*
- * =============== smart-solve.test.ts ===============
+/**
+ * @title  SmartSolve Diamond Initialization Test
+ * @notice Verifies correct deployment, initialization, and basic functionality
+ *         of the SmartSolve Diamond contract and its core facets.
  *
- * Verify deployment of SmartSolve (diamond).
- * Ensure OwnershipFacet + DiamondLoupeFacet are attached.
- * Test basic functionality: owner, facet discovery.
+ * @dev    This test deploys the DiamondCutFacet, the SmartSolve diamond proxy, and the
+ *         OwnershipFacet and DiamondLoupeFacet, then wires them together using
+ *         'diamondCut'. Function selectors are derived dynamically from facet ABIs.
+ *         The test validates ownership initialization, ownership transfer, and correct
+ *         facet registration via the Diamond Loupe interface.
+ * 
+ *         Limitations:
+ *          - Covers only core Diamond mechanics; does not test application-specific facets.
+ *          - Assumes compliant implementations of IERC173, IDiamondCut, and IDiamondLoupe.
  */
 
 // Helper enum for readability

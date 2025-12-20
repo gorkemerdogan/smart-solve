@@ -76,10 +76,12 @@ contract MatrixFacet {
 
     /**
      * @notice Get element at (row, col).
-     * @param  m     Matrix to read
+     * @param  rows  Number of rows of the matrix
+     * @param  cols  Number of columns of the matrix
+     * @param  data  Flattened matrix data (row-major)
      * @param  row   Zero-based row index
      * @param  col   Zero-based column index
-     * @return value Element m[row, col]
+     * @return value Element at (row, col)
      */
     function get(uint256 rows, uint256 cols, bytes16[] calldata data, uint256 row, uint256 col) external pure returns (bytes16) {
         MatrixMaster.Matrix memory m = _buildMatrix(rows, cols, data);
@@ -89,10 +91,15 @@ contract MatrixFacet {
     /**
      * @notice Set element at (row, col) to 'val'.
      *         Mutates the matrix in-place (in memory).
-     * @param m     Matrix to modify
-     * @param row   Zero-based row index
-     * @param col   Zero-based column index
-     * @param val   New value to write
+     * @param  rows Number of rows of the matrix
+     * @param  cols Number of columns of the matrix
+     * @param  data Flattened matrix data (row-major)
+     * @param  row  Zero-based row index
+     * @param  col  Zero-based column index
+     * @param  val  New value to write
+     * @return rowsOut Number of rows of the updated matrix
+     * @return colsOut Number of columns of the updated matrix
+     * @return dataOut Flattened updated matrix data
      */
     function set(uint256 rows, uint256 cols, bytes16[] calldata data, uint256 row, uint256 col, bytes16 val)
         external pure returns (uint256, uint256, bytes16[] memory) {
@@ -109,12 +116,14 @@ contract MatrixFacet {
     /**
      * @notice Extract a contiguous submatrix [rowStart:rowEnd, colStart:colEnd).
      *         Requires 0 <= rowStart < rowEnd <= rows, same for columns.
-     * @param  m         Source matrix
-     * @param  rowStart  Inclusive starting row
-     * @param  rowEnd    Exclusive ending row
-     * @param  colStart  Inclusive starting column
-     * @param  colEnd    Exclusive ending column
-     * @return out       New matrix with shape (rowEnd-rowStart) x (colEnd-colStart)
+     * @param  rows     Number of rows of the source matrix
+     * @param  cols     Number of columns of the source matrix
+     * @param  data     Flattened source matrix data (row-major)
+     * @param  rowStart Inclusive starting row
+     * @param  rowEnd   Exclusive ending row
+     * @param  colStart Inclusive starting column
+     * @param  colEnd   Exclusive ending column
+     * @return out      New sliced matrix
      */
     function sliceMatrix(uint256 rows, uint256 cols, bytes16[] calldata data, uint256 rowStart, uint256 rowEnd, uint256 colStart, uint256 colEnd)
         external pure returns (uint256, uint256, bytes16[] memory) {
@@ -129,10 +138,12 @@ contract MatrixFacet {
      * @notice Reshape matrix to newRowsxnewCols without changing data order.
      *         Requires newRows * newCols == rows * cols.
      *         Reuses the same 'data' array (no copy).
-     * @param m        Input matrix
-     * @param newRows  New number of rows
-     * @param newCols  New number of columns
-     * @return reshaped Matrix view with updated shape over same data
+     * @param  rows      Original number of rows
+     * @param  cols      Original number of columns
+     * @param  data      Flattened matrix data (row-major)
+     * @param  newRows   New number of rows
+     * @param  newCols   New number of columns
+     * @return reshaped  Reshaped matrix view
      */
     function reshape(uint256 rows, uint256 cols, bytes16[] calldata data, uint256 newRows, uint256 newCols)
         external pure returns (uint256, uint256, bytes16[] memory) {
@@ -146,9 +157,11 @@ contract MatrixFacet {
     // ------------------------------------------------------------
 
     /**
-     * @notice Compute the transpose Aᵀ.
-     * @param  a Input matrix A (rowsxcols)
-     * @return t Transposed matrix (colsxrows)
+     * @notice Compute the transpose A^T.
+     * @param  rows Number of rows of matrix A
+     * @param  cols Number of columns of matrix A
+     * @param  data Flattened matrix data (row-major)
+     * @return t    Transposed matrix
      */
     function transpose(uint256 rows, uint256 cols, bytes16[] calldata data) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = _buildMatrix(rows, cols, data);
@@ -160,10 +173,14 @@ contract MatrixFacet {
     // ------------------------------------------------------------
 
     /**
-     * @notice   Elementwise addition C = A + B.
-     * @param  a Left operand
-     * @param  b Right operand
-     * @return c Result matrix with same shape
+     * @notice Elementwise addition C = A + B.
+     * @param  aRows Number of rows of matrix A
+     * @param  aCols Number of columns of matrix A
+     * @param  aData Flattened matrix A data
+     * @param  bRows Number of rows of matrix B
+     * @param  bCols Number of columns of matrix B
+     * @param  bData Flattened matrix B data
+     * @return c     Result matrix A + B
      */
     function add(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 bRows, uint256 bCols, bytes16[] calldata bData)
         external pure returns (uint256, uint256, bytes16[] memory) {
@@ -174,10 +191,14 @@ contract MatrixFacet {
     }
 
     /**
-     * @notice   Elementwise subtraction C = A − B.
-     * @param  a Left operand
-     * @param  b Right operand
-     * @return c Result matrix with same shape
+     * @notice Elementwise subtraction C = A − B.
+     * @param  aRows Number of rows of matrix A
+     * @param  aCols Number of columns of matrix A
+     * @param  aData Flattened matrix A data
+     * @param  bRows Number of rows of matrix B
+     * @param  bCols Number of columns of matrix B
+     * @param  bData Flattened matrix B data
+     * @return c     Result matrix A − B
      */
     function sub(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 bRows, uint256 bCols, bytes16[] calldata bData)
         external pure returns (uint256, uint256, bytes16[] memory) {
@@ -188,10 +209,12 @@ contract MatrixFacet {
     }
 
     /**
-     * @notice   Scalar multiplication C = k · A.
-     * @param  a Input matrix
-     * @param  k Scalar multiplier
-     * @return c Result matrix
+     * @notice Scalar multiplication C = k · A.
+     * @param  rows Number of rows of the matrix
+     * @param  cols Number of columns of the matrix
+     * @param  data Flattened matrix data
+     * @param  k    Scalar multiplier
+     * @return c    Result matrix
      */
     function mulScalar(uint256 rows, uint256 cols, bytes16[] calldata data, bytes16 k) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = _buildMatrix(rows, cols, data);
@@ -200,9 +223,11 @@ contract MatrixFacet {
 
     /**
      * @notice   Scalar division C = A / k.
-     * @param  a Input matrix
-     * @param  k Scalar divisor (must be non-zero)
-     * @return c Result matrix
+     * @param  rows Number of rows of the matrix
+     * @param  cols Number of columns of the matrix
+     * @param  data Flattened matrix data
+     * @param  k    Scalar divisor
+     * @return c    Result matrix
      */
     function divScalar(uint256 rows, uint256 cols, bytes16[] calldata data, bytes16 k) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = _buildMatrix(rows, cols, data);
@@ -217,9 +242,13 @@ contract MatrixFacet {
      * @notice Matrix-matrix multiplication C = A · B.
      *         A is (mxk), B is (kxn), result is (mxn).
      *         Uses straightforward O(m·k·n) triple loop.
-     * @param  a Left operand matrix
-     * @param  b Right operand matrix
-     * @return c Product matrix
+     * @param  aRows Number of rows of matrix A
+     * @param  aCols Number of columns of matrix A
+     * @param  aData Flattened matrix A data
+     * @param  bRows Number of rows of matrix B
+     * @param  bCols Number of columns of matrix B
+     * @param  bData Flattened matrix B data
+     * @return c     Product matrix A · B
      */
     function mulMatrix(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 bRows, uint256 bCols, bytes16[] calldata bData)
         external pure returns (uint256, uint256, bytes16[] memory) {
@@ -236,10 +265,13 @@ contract MatrixFacet {
     /**
      * @notice Multiply matrix A (mxn) by vector x (nx1). Result is (mx1).
      *         Much faster than full matrixxmatrix mulMatrix for power iteration.
-     *
-     * @param  A Matrix (mxn)
-     * @param  x Vector as matrix (nx1)
-     * @return y = A * x (mx1 column vector)
+     * @param  aRows Number of rows of matrix A
+     * @param  aCols Number of columns of matrix A
+     * @param  aData Flattened matrix A data
+     * @param  xRows Number of rows of vector x
+     * @param  xCols Number of columns of vector x
+     * @param  xData Flattened vector x data
+     * @return y     Result vector A · x
      */
     function mulMatrixVector(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 xRows, uint256 xCols, bytes16[] calldata xData)
         external pure returns (uint256, uint256, bytes16[] memory) {
@@ -269,9 +301,13 @@ contract MatrixFacet {
     /**
      * @notice Compute dot product of two column vectors (nx1).
      *         Requires both vectors to be column vectors with identical lengths.
-     * @param  a First vector (nx1)
-     * @param  b Second vector (nx1)
-     * @return s Scalar dot product = Σ_i a[i] * b[i]
+     * @param  v1Rows Number of rows of first vector
+     * @param  v1Cols Number of columns of first vector
+     * @param  v1Data Flattened first vector data
+     * @param  v2Rows Number of rows of second vector
+     * @param  v2Cols Number of columns of second vector
+     * @param  v2Data Flattened second vector data
+     * @return s      Scalar dot product
      */
     function dot(uint256 v1Rows, uint256 v1Cols, bytes16[] calldata v1Data, uint256 v2Rows, uint256 v2Cols, bytes16[] calldata v2Data)
         external pure returns (bytes16) {
@@ -283,8 +319,10 @@ contract MatrixFacet {
 
     /**
      * @notice Compute Euclidean 2-norm ||v||_2 of a column vector (nx1).
-     * @param  v   Input vector (nx1)
-     * @return nrm Vector norm = sqrt(dot(v, v))
+     * @param  rows Number of rows of the vector
+     * @param  cols Number of columns of the vector
+     * @param  data Flattened vector data
+     * @return nrm  Euclidean 2-norm of the vector
      */
     function euclideanNorm(uint256 rows, uint256 cols, bytes16[] calldata data) external pure returns (bytes16) {
         MatrixMaster.Matrix memory v = _buildMatrix(rows, cols, data);
@@ -294,8 +332,10 @@ contract MatrixFacet {
     /**
      * @notice Normalize a column vector v into v / ||v||_2.
      * @dev    Reverts if vector has zero norm.
-     * @param  v   Input vector (nx1)
-     * @return out Normalized vector with unit Euclidean norm
+     * @param  rows Number of rows of the vector
+     * @param  cols Number of columns of the vector
+     * @param  data Flattened vector data
+     * @return out  Normalized vector with unit norm
      */
     function normalize(uint256 rows, uint256 cols, bytes16[] calldata data) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory v = _buildMatrix(rows, cols, data);
@@ -305,10 +345,14 @@ contract MatrixFacet {
     /**
      * @notice Check approximate convergence between two vectors via L2 tolerance.
      *         Computes ||vNew - vOld||_2 and compares to 'tol'.
-     * @param  vNew New iterate (nx1)
-     * @param  vOld Previous iterate (nx1)
-     * @param  tol  Convergence tolerance (positive scalar)
-     * @return ok   True if ||vNew - vOld|| < tol
+     * @param  xRows Number of rows of vNew
+     * @param  xCols Number of columns of vNew
+     * @param  xData Flattened vNew data
+     * @param  yRows Number of rows of vOld
+     * @param  yCols Number of columns of vOld
+     * @param  yData Flattened vOld data
+     * @param  tol   Convergence tolerance
+     * @return ok    True if converged
      */
     function hasConverged(uint256 xRows, uint256 xCols, bytes16[] calldata xData, uint256 yRows, uint256 yCols, bytes16[] calldata yData, bytes16 tol)
         external pure returns (bool) {
@@ -326,8 +370,10 @@ contract MatrixFacet {
      * @notice Compute determinant det(A) of a square matrix using LU decomposition.
      *         Performs in-place LU on a working copy of A (Doolittle-style).
      *         Uses partial pivoting; sign of permutation affects determinant sign.
-     * @param  a    Input square matrix
-     * @return detA Determinant as bytes16
+     * @param rows  Number of rows of the square matrix
+     * @param cols  Number of columns of the square matrix
+     * @param data  Flattened matrix data
+     * @return detA Determinant of the matrix
      */
     function det(uint256 rows, uint256 cols, bytes16[] calldata data) external pure returns (bytes16) {
         MatrixMaster.Matrix memory A = _buildMatrix(rows, cols, data);
@@ -342,8 +388,10 @@ contract MatrixFacet {
      * @notice Compute A⁻¹ using Gauss–Jordan elimination on [A | I].
      *         Reverts if matrix is singular (no pivot above a small threshold).
      *         This is O(n^3) and intended for small/moderate n in off-chain-style usage.
-     * @param  a    Input square matrix A
-     * @return invA Inverse matrix A⁻¹
+     * @param  rows Number of rows of the square matrix
+     * @param  cols Number of columns of the square matrix
+     * @param  data Flattened matrix data
+     * @return invA Inverse matrix
      */
     function inverse(uint256 rows, uint256 cols, bytes16[] calldata data) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory A = _buildMatrix(rows, cols, data);
@@ -368,12 +416,15 @@ contract MatrixFacet {
      *     - Uses cfg().maxIter from LibNumericConfig
      *     - tol must be > 0
      *
-     * @param A     Input square matrix
-     * @param seed  Seed for deterministic initial vector
-     * @param tol   Convergence tolerance
-     *
-     * @return lambda    Dominant eigenvalue approximation
-     * @return x         Dominant eigenvector (nx1 unit vector)
+     * @param  rows   Number of rows of matrix A
+     * @param  cols   Number of columns of matrix A
+     * @param  data   Flattened matrix A data
+     * @param  seed   Seed for deterministic initial vector
+     * @param  tol    Convergence tolerance
+     * @return lambda Dominant eigenvalue approximation
+     * @return vecRows Number of rows of the eigenvector
+     * @return vecCols Number of columns of the eigenvector
+     * @return vecData Flattened eigenvector data
      */
     function powerIteration(uint256 rows, uint256 cols, bytes16[] calldata data, bytes32 seed, bytes16 tol)
         external view returns (bytes16 lambda, uint256 vecRows, uint256 vecCols, bytes16[] memory vecData) {

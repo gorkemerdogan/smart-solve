@@ -32,9 +32,11 @@ contract LinearSolversFacet {
      *         Choosing alpha too small leads to slow convergence.
      *         Choosing alpha too large leads to divergence.
      *
-     * @param A       Coefficient matrix (m x n).
-     * @param b       Right-hand side column vector (m x 1).
-     * @param x0      Initial guess (n x 1).
+     * @param m Number of rows of matrix A
+     * @param n Number of columns of matrix A
+     * @param Adata   Flattened m×n coefficient matrix A (row-major)
+     * @param bdata   Flattened m×1 target vector b
+     * @param x0data  Flattened n×1 initial guess vector x_0
      * @param alpha   Step size (bytes16).
      * @param maxIter Maximum number of iterations.
      * @param tol     Tolerance on squared gradient norm; stop when ||∇f||^2 <= tol.
@@ -74,9 +76,10 @@ contract LinearSolversFacet {
      * @notice Solve A x ≈ b using Jacobi iteration.
      *         Requires non-zero diagonal and (ideally) diagonal dominance for convergence.
      *
-     * @param A        Coefficient matrix (nxn).
-     * @param b        RHS column vector (nx1).
-     * @param x0       Initial guess (nx1).
+     * @param n Dimension of the square coefficient matrix A (n×n)
+     * @param Adata    Flattened n×n coefficient matrix A (row-major)
+     * @param bdata    Flattened n×1 right-hand side vector b
+     * @param x0data   Flattened n×1 initial guess vector x_0
      * @param maxIter  Maximum iterations.
      * @param tolDiff  Tolerance on squared difference between consecutive iterates.
      *
@@ -106,9 +109,10 @@ contract LinearSolversFacet {
      *         Uses updated values within the same iteration (in-place).
      *         Requires non-zero diagonal.
      *
-     * @param A        Coefficient matrix (nxn).
-     * @param b        RHS column vector (nx1).
-     * @param x0       Initial guess (nx1).
+     * @param n Dimension of the square coefficient matrix A (n×n)
+     * @param Adata    Flattened n×n coefficient matrix A (row-major)
+     * @param bdata    Flattened n×1 right-hand side vector b
+     * @param x0data   Flattened n×1 initial guess vector x_0
      * @param maxIter  Maximum iterations.
      * @param tolDiff  Tolerance on squared difference between consecutive iterates.
      *
@@ -137,8 +141,9 @@ contract LinearSolversFacet {
      * @notice Solve A x = b using Gaussian elimination with partial pivoting.
      *         Operates directly on matrix buffers without forming augmented matrices.
      *
-     * @param  A Coefficient matrix (n × n)
-     * @param  b Right-hand side column vector (n × 1)
+     * @param n Dimension of the square coefficient matrix A (n×n)
+     * @param Adata Flattened n×n coefficient matrix A (row-major)
+     * @param bdata Flattened n×1 right-hand side vector b
      * @return x Solution vector (n × 1)
      */
     function gaussianElimination(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata)
@@ -161,7 +166,8 @@ contract LinearSolversFacet {
      *         This implementation does NOT perform pivoting.
      *         Zero or near-zero pivots will cause failure even if A is invertible.
      *
-     * @param  A Matrix (nxn).
+     * @param n Dimension of the square input matrix A (n×n)
+     * @param Adata Flattened n×n input matrix A (row-major)
      * @return L Unit-lower-triangular factor (nxn).
      * @return U Upper-triangular factor (nxn).
      */

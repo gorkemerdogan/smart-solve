@@ -336,9 +336,9 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
         });
     });
 
-    // =========================================================
+    // ---------------------------------------------------------
     //  Section 3: Power Iteration
-    // =========================================================
+    // ---------------------------------------------------------
 
     describe("Section 3: PowerIteration", function () {
         it("Test 9: diagonal 2x2 matrix – dominant eigenvalue 5", async function () {
