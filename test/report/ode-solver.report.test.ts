@@ -47,7 +47,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
     let H: string;
     let HNEG: string;
 
-    let selConst: string;
+    let selConst5: string;
     let selLinear: string;
     let selSquare: string;
 
@@ -58,7 +58,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         h = (await HF.deploy()) as unknown as ODESolverHarness;
         target = await h.getAddress();
 
-        selConst = h.interface.getFunction("f_const5")!.selector;
+        selConst5 = h.interface.getFunction("f_const5")!.selector;
         selLinear = h.interface.getFunction("f_linear")!.selector;
         selSquare = h.interface.getFunction("f_square")!.selector;
 
@@ -77,9 +77,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             const y0 = await q(2);
             const expected = await q(2.5);
 
-            await touchGas(h, "euler", [target, selConst, QZERO, y0, H]);
-            const gas = await estimateGas(h, "euler", [target, selConst, QZERO, y0, H]);
-            const out = await h.euler(target, selConst, QZERO, y0, H);
+            await touchGas(h, "euler", [target, selConst5, QZERO, y0, H]);
+            const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, H]);
+            const out = await h.euler(target, selConst5, QZERO, y0, H);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -149,9 +149,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const y0 = await q(7);
 
-            await touchGas(h, "euler", [target, selConst, QZERO, y0, QZERO]);
-            const gas = await estimateGas(h, "euler", [target, selConst, QZERO, y0, QZERO]);
-            const out = await h.euler(target, selConst, QZERO, y0, QZERO);
+            await touchGas(h, "euler", [target, selConst5, QZERO, y0, QZERO]);
+            const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, QZERO]);
+            const out = await h.euler(target, selConst5, QZERO, y0, QZERO);
 
             expect(out).to.equal(y0);
 
@@ -173,9 +173,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             const y0 = await q(10);
             const expected = await q(9.5);
 
-            await touchGas(h, "euler", [target, selConst, QZERO, y0, HNEG]);
-            const gas = await estimateGas(h, "euler", [target, selConst, QZERO, y0, HNEG]);
-            const out = await h.euler(target, selConst, QZERO, y0, HNEG);
+            await touchGas(h, "euler", [target, selConst5, QZERO, y0, HNEG]);
+            const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, HNEG]);
+            const out = await h.euler(target, selConst5, QZERO, y0, HNEG);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -196,9 +196,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const y0 = await q(3);
 
-            await touchGas(h, "euler", [target, selConst, QZERO, y0, QZERO]);
-            const gas = await estimateGas(h, "euler", [target, selConst, QZERO, y0, QZERO]);
-            const out = await h.euler(target, selConst, QZERO, y0, QZERO);
+            await touchGas(h, "euler", [target, selConst5, QZERO, y0, QZERO]);
+            const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, QZERO]);
+            const out = await h.euler(target, selConst5, QZERO, y0, QZERO);
 
             expect(out).to.equal(y0);
 
@@ -245,9 +245,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             const y0 = await q(2);
             const expected = await q(2.5);
 
-            await touchGas(h, "rk2Midpoint", [target, selConst, QZERO, y0, H]);
-            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst, QZERO, y0, H]);
-            const out = await h.rk2Midpoint(target, selConst, QZERO, y0, H);
+            await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, H]);
+            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, H]);
+            const out = await h.rk2Midpoint(target, selConst5, QZERO, y0, H);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -317,9 +317,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const y0 = await q(7);
 
-            await touchGas(h, "rk2Midpoint", [target, selConst, QZERO, y0, QZERO]);
-            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst, QZERO, y0, QZERO]);
-            const out = await h.rk2Midpoint(target, selConst, QZERO, y0, QZERO);
+            await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, QZERO]);
+            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, QZERO]);
+            const out = await h.rk2Midpoint(target, selConst5, QZERO, y0, QZERO);
 
             expect(out).to.equal(y0);
 
@@ -341,9 +341,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             const y0 = await q(10);
             const expected = await q(9.5);
 
-            await touchGas(h, "rk2Midpoint", [target, selConst, QZERO, y0, HNEG]);
-            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst, QZERO, y0, HNEG]);
-            const out = await h.rk2Midpoint(target, selConst, QZERO, y0, HNEG);
+            await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, HNEG]);
+            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, HNEG]);
+            const out = await h.rk2Midpoint(target, selConst5, QZERO, y0, HNEG);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -364,9 +364,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const y0 = await q(3);
 
-            await touchGas(h, "rk2Midpoint", [target, selConst, QZERO, y0, QZERO]);
-            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst, QZERO, y0, QZERO]);
-            const out = await h.rk2Midpoint(target, selConst, QZERO, y0, QZERO);
+            await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, QZERO]);
+            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, QZERO]);
+            const out = await h.rk2Midpoint(target, selConst5, QZERO, y0, QZERO);
 
             expect(out).to.equal(y0);
 
@@ -413,9 +413,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             const y0 = await q(2);
             const expected = await q(2.5);
 
-            await touchGas(h, "rk2Heun", [target, selConst, QZERO, y0, H]);
-            const gas = await estimateGas(h, "rk2Heun", [target, selConst, QZERO, y0, H]);
-            const out = await h.rk2Heun(target, selConst, QZERO, y0, H);
+            await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, H]);
+            const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, H]);
+            const out = await h.rk2Heun(target, selConst5, QZERO, y0, H);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -485,9 +485,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const y0 = await q(6);
 
-            await touchGas(h, "rk2Heun", [target, selConst, QZERO, y0, QZERO]);
-            const gas = await estimateGas(h, "rk2Heun", [target, selConst, QZERO, y0, QZERO]);
-            const out = await h.rk2Heun(target, selConst, QZERO, y0, QZERO);
+            await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, QZERO]);
+            const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, QZERO]);
+            const out = await h.rk2Heun(target, selConst5, QZERO, y0, QZERO);
 
             expect(out).to.equal(y0);
 
@@ -509,9 +509,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             const y0 = await q(10);
             const expected = await q(9.5);
 
-            await touchGas(h, "rk2Heun", [target, selConst, QZERO, y0, HNEG]);
-            const gas = await estimateGas(h, "rk2Heun", [target, selConst, QZERO, y0, HNEG]);
-            const out = await h.rk2Heun(target, selConst, QZERO, y0, HNEG);
+            await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, HNEG]);
+            const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, HNEG]);
+            const out = await h.rk2Heun(target, selConst5, QZERO, y0, HNEG);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -532,9 +532,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const y0 = await q(4);
 
-            await touchGas(h, "rk2Heun", [target, selConst, QZERO, y0, QZERO]);
-            const gas = await estimateGas(h, "rk2Heun", [target, selConst, QZERO, y0, QZERO]);
-            const out = await h.rk2Heun(target, selConst, QZERO, y0, QZERO);
+            await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, QZERO]);
+            const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, QZERO]);
+            const out = await h.rk2Heun(target, selConst5, QZERO, y0, QZERO);
 
             expect(out).to.equal(y0);
 
@@ -581,9 +581,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             const y0 = await q(2);
             const expected = await q(2.5);
 
-            await touchGas(h, "rk4", [target, selConst, QZERO, y0, H]);
-            const gas = await estimateGas(h, "rk4", [target, selConst, QZERO, y0, H]);
-            const out = await h.rk4(target, selConst, QZERO, y0, H);
+            await touchGas(h, "rk4", [target, selConst5, QZERO, y0, H]);
+            const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, H]);
+            const out = await h.rk4(target, selConst5, QZERO, y0, H);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -653,9 +653,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const y0 = await q(5);
 
-            await touchGas(h, "rk4", [target, selConst, QZERO, y0, QZERO]);
-            const gas = await estimateGas(h, "rk4", [target, selConst, QZERO, y0, QZERO]);
-            const out = await h.rk4(target, selConst, QZERO, y0, QZERO);
+            await touchGas(h, "rk4", [target, selConst5, QZERO, y0, QZERO]);
+            const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, QZERO]);
+            const out = await h.rk4(target, selConst5, QZERO, y0, QZERO);
 
             expect(out).to.equal(y0);
 
@@ -677,9 +677,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             const y0 = await q(10);
             const expected = await q(9.5);
 
-            await touchGas(h, "rk4", [target, selConst, QZERO, y0, HNEG]);
-            const gas = await estimateGas(h, "rk4", [target, selConst, QZERO, y0, HNEG]);
-            const out = await h.rk4(target, selConst, QZERO, y0, HNEG);
+            await touchGas(h, "rk4", [target, selConst5, QZERO, y0, HNEG]);
+            const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, HNEG]);
+            const out = await h.rk4(target, selConst5, QZERO, y0, HNEG);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -700,9 +700,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const y0 = await q(3);
 
-            await touchGas(h, "rk4", [target, selConst, QZERO, y0, QZERO]);
-            const gas = await estimateGas(h, "rk4", [target, selConst, QZERO, y0, QZERO]);
-            const out = await h.rk4(target, selConst, QZERO, y0, QZERO);
+            await touchGas(h, "rk4", [target, selConst5, QZERO, y0, QZERO]);
+            const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, QZERO]);
+            const out = await h.rk4(target, selConst5, QZERO, y0, QZERO);
 
             expect(out).to.equal(y0);
 
