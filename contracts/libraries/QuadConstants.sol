@@ -37,6 +37,14 @@ library QuadConstants {
         return fromFrac(1, 2);
     }
 
+    /**
+     * @notice Returns 1.1666... as a quadruple-precision number.
+     * @return bytes16 1/6 in quad format
+     */
+    function ONESIXTH() internal pure returns (bytes16) {
+        return fromFrac(1, 6);
+    }
+
     // -------------------------------------------------------------
     // π
     // -------------------------------------------------------------
