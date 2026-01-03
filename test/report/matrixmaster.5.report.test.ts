@@ -99,7 +99,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
     // ------------------------------------------------------------
 
     describe("Section 1: Matrix multiplication", function () {
-        it("Test 1: mulMatrix valid 2x3 · 3x2 multiplication", async function () {
+        it("Test 1: multiplyMatrices valid 2x3 · 3x2 multiplication", async function () {
             t++;
             // A (2x3): [[1,2,3],[4,5,6]]
             const A = [
@@ -151,7 +151,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 2: mulMatrix shape mismatch reverts", async function () {
+        it("Test 2: multiplyMatrices shape mismatch reverts", async function () {
             t++;
             const A = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)]; // 2x2
             const B = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)]; // 2x2
@@ -161,7 +161,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
 
             await expect(
                 harness.mulMatrixHarness(1n, 4n, A, 2n, 2n, B),
-            ).to.be.revertedWith("MatrixMaster: mulMatrix dims a.cols != b.rows");
+            ).to.be.revertedWith("MatrixMaster: multiplyMatrices dims a.cols != b.rows");
 
             printBlockMatrix({
                 t,
@@ -175,7 +175,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 3: mulMatrix 10x10 bilinearity (A+B)·C == A·C + B·C", async function () {
+        it("Test 3: multiplyMatrices 10x10 bilinearity (A+B)·C == A·C + B·C", async function () {
             t++;
             const n = 10n;
             const size = Number(n);
@@ -233,7 +233,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 4: mulMatrix identity property A·I == A and I·A == A", async function () {
+        it("Test 4: multiplyMatrices identity property A·I == A and I·A == A", async function () {
             t++;
             // A 2x2
             const A = [
@@ -269,7 +269,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 5: mulMatrix A·0 = 0 and 0·A = 0", async function () {
+        it("Test 5: multiplyMatrices A·0 = 0 and 0·A = 0", async function () {
             t++;
             const A = [
                 await qInt(1),
@@ -337,7 +337,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 6: mulMatrix non-square 2x3 · 3x4 multiplication", async function () {
+        it("Test 6: multiplyMatrices non-square 2x3 · 3x4 multiplication", async function () {
             t++;
             // A (2x3): [[1,2,3],[4,5,6]]
             const A = [
@@ -399,7 +399,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 7: mulMatrix vector inner product (1xN · Nx1)", async function () {
+        it("Test 7: multiplyMatrices vector inner product (1xN · Nx1)", async function () {
             t++;
 
             const row = [await qInt(1), await qInt(2), await qInt(3)]; // row: [1,2,3] as 1x3
@@ -430,7 +430,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 8: mulMatrix vector outer product (Nx1 · 1xN)", async function () {
+        it("Test 8: multiplyMatrices vector outer product (Nx1 · 1xN)", async function () {
             t++;
 
             const col = [await qInt(1), await qInt(2), await qInt(3)]; // col: [1,2,3] as 3x1
@@ -476,7 +476,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 9: mulMatrix stability with tiny entries (no underflow, non-zero result)", async function () {
+        it("Test 9: multiplyMatrices stability with tiny entries (no underflow, non-zero result)", async function () {
             t++;
             const rows = 2n;
             const cols = 2n;
@@ -516,7 +516,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 10: mulMatrix zero row in A produces zero row in A·B", async function () {
+        it("Test 10: multiplyMatrices zero row in A produces zero row in A·B", async function () {
             t++;
             const rowsA = 3n;
             const colsA = 4n;
@@ -585,7 +585,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
     // ------------------------------------------------------------
 
     describe("Section 2: Matrix–vector multiplication", function () {
-        it("Test 11: mulMatrixVector 3x3 · 3x1 produces correct 3x1", async function () {
+        it("Test 11: multiplyMatrixVector 3x3 · 3x1 produces correct 3x1", async function () {
             t++;
 
             const A = [
@@ -627,7 +627,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 12: mulMatrixVector shape mismatch reverts", async function () {
+        it("Test 12: multiplyMatrixVector shape mismatch reverts", async function () {
             t++;
 
             const A = [
@@ -643,7 +643,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
 
             await expect(
                 harness.mulMatrixVectorHarness(3n, 3n, A, 2n, 1n, xBad),
-            ).to.be.revertedWith("MatrixMaster: mulMatrix dims a.cols != b.rows");
+            ).to.be.revertedWith("MatrixMaster: A.cols != x.rows");
 
             printBlockMatrix({
                 t,
@@ -657,7 +657,7 @@ describe("MatrixMaster — Matrix multiplication, mat-vec, dot", function () {
             });
         });
 
-        it("Test 13: mulMatrixVector multiplying by zero vector yields zero output", async function () {
+        it("Test 13: multiplyMatrixVector multiplying by zero vector yields zero output", async function () {
             t++;
 
             const A = [

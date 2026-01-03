@@ -23,8 +23,8 @@ contract MatrixFacet {
      * @param  cols Number of columns
      * @return m    New zero matrix
      */
-    function zeros(uint256 rows, uint256 cols) external pure returns (uint256, uint256, bytes16[] memory) {
-        return _flatten(MatrixMaster.zeros(rows, cols));
+    function createZerosMatrix(uint256 rows, uint256 cols) external pure returns (uint256, uint256, bytes16[] memory) {
+        return _flatten(MatrixMaster.createZerosMatrix(rows, cols));
     }
 
     /**
@@ -33,8 +33,8 @@ contract MatrixFacet {
      * @param  cols Number of columns
      * @return m    New matrix with all entries = 1.0
      */
-    function ones(uint256 rows, uint256 cols) external pure returns (uint256, uint256, bytes16[] memory) {
-        return _flatten(MatrixMaster.ones(rows, cols));
+    function createOnesMatrix(uint256 rows, uint256 cols) external pure returns (uint256, uint256, bytes16[] memory) {
+        return _flatten(MatrixMaster.createOnesMatrix(rows, cols));
     }
 
     /**
@@ -51,9 +51,9 @@ contract MatrixFacet {
      * @param  diag Array of diagonal entries, length = n
      * @return m    nxn matrix with diag[i] on (i,i), zeros elsewhere
      */
-    function fromDiagonal(bytes16[] calldata diag) external pure returns (uint256, uint256, bytes16[] memory) {
+    function createDiagonalMatrix(bytes16[] calldata diag) external pure returns (uint256, uint256, bytes16[] memory) {
         bytes16[] memory d = _toMemory(diag);
-        return _flatten(MatrixMaster.fromDiagonal(d));
+        return _flatten(MatrixMaster.createDiagonalMatrix(d));
     }
 
     /**
@@ -66,8 +66,8 @@ contract MatrixFacet {
      * @param  seed Arbitrary seed for deterministic generation
      * @return m    New matrix with pseudo-random contents
      */
-    function randomMatrix(uint256 rows, uint256 cols, bytes32 seed) external pure returns (uint256, uint256, bytes16[] memory) {
-        return _flatten(MatrixMaster.randomMatrix(rows, cols, seed));
+    function createRandomMatrix(uint256 rows, uint256 cols, bytes32 seed) external pure returns (uint256, uint256, bytes16[] memory) {
+        return _flatten(MatrixMaster.createRandomMatrix(rows, cols, seed));
     }
 
     // ------------------------------------------------------------
@@ -83,9 +83,9 @@ contract MatrixFacet {
      * @param  col   Zero-based column index
      * @return value Element at (row, col)
      */
-    function get(uint256 rows, uint256 cols, bytes16[] calldata data, uint256 row, uint256 col) external pure returns (bytes16) {
+    function getElement(uint256 rows, uint256 cols, bytes16[] calldata data, uint256 row, uint256 col) external pure returns (bytes16) {
         MatrixMaster.Matrix memory m = _buildMatrix(rows, cols, data);
-        return MatrixMaster.get(m, row, col);
+        return MatrixMaster.getElement(m, row, col);
     }
 
     /**
@@ -101,11 +101,11 @@ contract MatrixFacet {
      * @return colsOut Number of columns of the updated matrix
      * @return dataOut Flattened updated matrix data
      */
-    function set(uint256 rows, uint256 cols, bytes16[] calldata data, uint256 row, uint256 col, bytes16 val)
+    function setElement(uint256 rows, uint256 cols, bytes16[] calldata data, uint256 row, uint256 col, bytes16 val)
         external pure returns (uint256, uint256, bytes16[] memory) {
 
         MatrixMaster.Matrix memory m = _buildMatrix(rows, cols, data);
-        MatrixMaster.set(m, row, col, val);
+        MatrixMaster.setElement(m, row, col, val);
         return _flatten(m);
     }
 
@@ -182,12 +182,12 @@ contract MatrixFacet {
      * @param  bData Flattened matrix B data
      * @return c     Result matrix A + B
      */
-    function add(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 bRows, uint256 bCols, bytes16[] calldata bData)
+    function addMatrices(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 bRows, uint256 bCols, bytes16[] calldata bData)
         external pure returns (uint256, uint256, bytes16[] memory) {
 
         MatrixMaster.Matrix memory A = _buildMatrix(aRows, aCols, aData);
         MatrixMaster.Matrix memory B = _buildMatrix(bRows, bCols, bData);
-        return _flatten(MatrixMaster.add(A, B));
+        return _flatten(MatrixMaster.addMatrices(A, B));
     }
 
     /**
@@ -200,12 +200,12 @@ contract MatrixFacet {
      * @param  bData Flattened matrix B data
      * @return c     Result matrix A − B
      */
-    function sub(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 bRows, uint256 bCols, bytes16[] calldata bData)
+    function subtractMatrices(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 bRows, uint256 bCols, bytes16[] calldata bData)
         external pure returns (uint256, uint256, bytes16[] memory) {
 
         MatrixMaster.Matrix memory A = _buildMatrix(aRows, aCols, aData);
         MatrixMaster.Matrix memory B = _buildMatrix(bRows, bCols, bData);
-        return _flatten(MatrixMaster.sub(A, B));
+        return _flatten(MatrixMaster.subtractMatrices(A, B));
     }
 
     /**
@@ -216,9 +216,9 @@ contract MatrixFacet {
      * @param  k    Scalar multiplier
      * @return c    Result matrix
      */
-    function mulScalar(uint256 rows, uint256 cols, bytes16[] calldata data, bytes16 k) external pure returns (uint256, uint256, bytes16[] memory) {
+    function multiplyScalar(uint256 rows, uint256 cols, bytes16[] calldata data, bytes16 k) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = _buildMatrix(rows, cols, data);
-        return _flatten(MatrixMaster.mulScalar(m, k));
+        return _flatten(MatrixMaster.multiplyScalar(m, k));
     }
 
     /**
@@ -229,9 +229,9 @@ contract MatrixFacet {
      * @param  k    Scalar divisor
      * @return c    Result matrix
      */
-    function divScalar(uint256 rows, uint256 cols, bytes16[] calldata data, bytes16 k) external pure returns (uint256, uint256, bytes16[] memory) {
+    function divideScalar(uint256 rows, uint256 cols, bytes16[] calldata data, bytes16 k) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = _buildMatrix(rows, cols, data);
-        return _flatten(MatrixMaster.divScalar(m, k));
+        return _flatten(MatrixMaster.divideScalar(m, k));
     }
 
     // ------------------------------------------------------------
@@ -250,12 +250,12 @@ contract MatrixFacet {
      * @param  bData Flattened matrix B data
      * @return c     Product matrix A · B
      */
-    function mulMatrix(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 bRows, uint256 bCols, bytes16[] calldata bData)
+    function multiplyMatrices(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 bRows, uint256 bCols, bytes16[] calldata bData)
         external pure returns (uint256, uint256, bytes16[] memory) {
 
         MatrixMaster.Matrix memory A = _buildMatrix(aRows, aCols, aData);
         MatrixMaster.Matrix memory B = _buildMatrix(bRows, bCols, bData);
-        return _flatten(MatrixMaster.mulMatrix(A, B));
+        return _flatten(MatrixMaster.multiplyMatrices(A, B));
     }
 
     // ------------------------------------------------------------
@@ -264,7 +264,6 @@ contract MatrixFacet {
 
     /**
      * @notice Multiply matrix A (mxn) by vector x (nx1). Result is (mx1).
-     *         Much faster than full matrixxmatrix mulMatrix for power iteration.
      * @param  aRows Number of rows of matrix A
      * @param  aCols Number of columns of matrix A
      * @param  aData Flattened matrix A data
@@ -273,12 +272,12 @@ contract MatrixFacet {
      * @param  xData Flattened vector x data
      * @return y     Result vector A · x
      */
-    function mulMatrixVector(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 xRows, uint256 xCols, bytes16[] calldata xData)
+    function multiplyMatrixVector(uint256 aRows, uint256 aCols, bytes16[] calldata aData, uint256 xRows, uint256 xCols, bytes16[] calldata xData)
         external pure returns (uint256, uint256, bytes16[] memory) {
 
         MatrixMaster.Matrix memory A = _buildMatrix(aRows, aCols, aData);
         MatrixMaster.Matrix memory x = _buildMatrix(xRows, xCols, xData);
-        return _flatten(MatrixMaster.mulMatrixVector(A, x));
+        return _flatten(MatrixMaster.multiplyMatrixVector(A, x));
     }
 
 
@@ -451,7 +450,7 @@ contract MatrixFacet {
     }
 
     /**
-     * @notice Build a MatrixMaster.Matrix from calldata.
+     * @notice Build a Matrix from calldata.
      */ 
     function _buildMatrix(uint256 rows, uint256 cols, bytes16[] calldata data) internal pure returns (MatrixMaster.Matrix memory m) {
         require(rows * cols == data.length, "MatrixFacet: shape mismatch");
@@ -463,8 +462,20 @@ contract MatrixFacet {
     }
 
     /**
-     * @notice Flatten Matrix into returnable tuple.
-     */ 
+    * @notice Flattens a Matrix struct into a returnable tuple.
+    *         This helper converts the internal Matrix representation
+    *         '{ rows, cols, data[] }' into a tuple format '(rows, cols, data[])'
+    *         that is ABI-friendly for external calls.
+    *
+    *         Solidity cannot directly return structs containing dynamic arrays
+    *         across external contract boundaries in a stable, user-friendly way.
+    *         Therefore, all facet functions expose matrices as flattened tuples.
+    *         
+    * @param  m    Internal Matrix instance in memory
+    * @return rows Number of rows of the matrix
+    * @return cols Number of columns of the matrix
+    * @return data Flattened matrix data in row-major order
+    */
     function _flatten(MatrixMaster.Matrix memory m) internal pure returns (uint256, uint256, bytes16[] memory) {
         return (m.rows, m.cols, m.data);
     }

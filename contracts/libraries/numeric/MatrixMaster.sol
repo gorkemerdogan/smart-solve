@@ -78,7 +78,7 @@ library MatrixMaster {
      * @param b Right operand
      */
     modifier checkMulShape(Matrix memory a, Matrix memory b) {
-        require(a.cols == b.rows, "MatrixMaster: mulMatrix dims a.cols != b.rows");
+        require(a.cols == b.rows, "MatrixMaster: multiplyMatrices dims a.cols != b.rows");
         _;
     }
 
@@ -107,7 +107,7 @@ library MatrixMaster {
      * @param  cols Number of columns
      * @return m    New zero matrix
      */
-    function zeros(uint256 rows, uint256 cols) internal pure validDims(rows, cols) returns (Matrix memory m) {
+    function createZerosMatrix(uint256 rows, uint256 cols) internal pure validDims(rows, cols) returns (Matrix memory m) {
         uint256 len = rows * cols;
         bytes16[] memory data = new bytes16[](len);
         m = Matrix({ rows: rows, cols: cols, data: data });
@@ -119,7 +119,7 @@ library MatrixMaster {
      * @param  cols Number of columns
      * @return m    New matrix with all entries = 1.0
      */
-    function ones(uint256 rows, uint256 cols) internal pure validDims(rows, cols) returns (Matrix memory m) {
+    function createOnesMatrix(uint256 rows, uint256 cols) internal pure validDims(rows, cols) returns (Matrix memory m) {
         uint256 len = rows * cols;
         bytes16[] memory data = new bytes16[](len);
         bytes16 one = MathLib.fromInt(1);
@@ -153,7 +153,7 @@ library MatrixMaster {
      * @param  diag Array of diagonal entries, length = n
      * @return m    nxn matrix with diag[i] on (i,i), zeros elsewhere
      */
-    function fromDiagonal(bytes16[] memory diag) internal pure returns (Matrix memory m) {
+    function createDiagonalMatrix(bytes16[] memory diag) internal pure returns (Matrix memory m) {
         uint256 n = diag.length;
         require(n > 0, "MatrixMaster: empty diagonal");
         bytes16[] memory data = new bytes16[](n * n);
@@ -175,7 +175,7 @@ library MatrixMaster {
      * @param  seed Arbitrary seed for deterministic generation
      * @return m    New matrix with pseudo-random contents
      */
-    function randomMatrix(uint256 rows, uint256 cols, bytes32 seed) internal pure validDims(rows, cols) returns (Matrix memory m) {
+    function createRandomMatrix(uint256 rows, uint256 cols, bytes32 seed) internal pure validDims(rows, cols) returns (Matrix memory m) {
         uint256 len = rows * cols;
         bytes16[] memory data = new bytes16[](len);
         bytes16 denom = MathLib.fromUInt(2**64);
@@ -206,7 +206,7 @@ library MatrixMaster {
      * @param  col   Zero-based column index
      * @return value Element m[row, col]
      */
-    function get(Matrix memory m, uint256 row, uint256 col) internal pure checkBounds(m, row, col) returns (bytes16) {
+    function getElement(Matrix memory m, uint256 row, uint256 col) internal pure checkBounds(m, row, col) returns (bytes16) {
         return m.data[_idx(m.cols, row, col)];
     }
 
@@ -218,7 +218,7 @@ library MatrixMaster {
      * @param col   Zero-based column index
      * @param val   New value to write
      */
-    function set(Matrix memory m, uint256 row, uint256 col, bytes16 val) internal pure checkBounds(m, row, col) {
+    function setElement(Matrix memory m, uint256 row, uint256 col, bytes16 val) internal pure checkBounds(m, row, col) {
         m.data[_idx(m.cols, row, col)] = val;
     }
 
@@ -306,7 +306,7 @@ library MatrixMaster {
      * @param  b Right operand
      * @return c Result matrix with same shape
      */
-    function add(Matrix memory a, Matrix memory b) internal pure checkSameShape(a, b) returns (Matrix memory c) {
+    function addMatrices(Matrix memory a, Matrix memory b) internal pure checkSameShape(a, b) returns (Matrix memory c) {
         uint256 len = a.rows * a.cols;
         bytes16[] memory data = new bytes16[](len);
 
@@ -323,7 +323,7 @@ library MatrixMaster {
      * @param  b Right operand
      * @return c Result matrix with same shape
      */
-    function sub(Matrix memory a, Matrix memory b) internal pure checkSameShape(a, b) returns (Matrix memory c) {
+    function subtractMatrices(Matrix memory a, Matrix memory b) internal pure checkSameShape(a, b) returns (Matrix memory c) {
         uint256 len = a.rows * a.cols;
         bytes16[] memory data = new bytes16[](len);
 
@@ -340,7 +340,7 @@ library MatrixMaster {
      * @param  k Scalar multiplier
      * @return c Result matrix
      */
-    function mulScalar(Matrix memory a, bytes16 k) internal pure returns (Matrix memory c) {
+    function multiplyScalar(Matrix memory a, bytes16 k) internal pure returns (Matrix memory c) {
         uint256 len = a.rows * a.cols;
         bytes16[] memory data = new bytes16[](len);
 
@@ -357,7 +357,7 @@ library MatrixMaster {
      * @param  k Scalar divisor (must be non-zero)
      * @return c Result matrix
      */
-    function divScalar(Matrix memory a, bytes16 k) internal pure returns (Matrix memory c) {
+    function divideScalar(Matrix memory a, bytes16 k) internal pure returns (Matrix memory c) {
         require(MathLib.cmp(k, QZERO) != 0, "MatrixMaster: division by zero");
 
         uint256 len = a.rows * a.cols;
@@ -382,7 +382,7 @@ library MatrixMaster {
      * @param  b Right operand matrix
      * @return c Product matrix
      */
-    function mulMatrix(Matrix memory a, Matrix memory b) internal pure checkMulShape(a, b) returns (Matrix memory c) {
+    function multiplyMatrices(Matrix memory a, Matrix memory b) internal pure checkMulShape(a, b) returns (Matrix memory c) {
         uint256 m = a.rows;
         uint256 k = a.cols;
         uint256 n = b.cols;
@@ -410,14 +410,13 @@ library MatrixMaster {
 
     /**
      * @notice Multiply matrix A (mxn) by vector x (nx1). Result is (mx1).
-     *         Much faster than full matrixxmatrix mulMatrix for power iteration.
      *
      * @param  A Matrix (mxn)
      * @param  x Vector as matrix (nx1)
      * @return y = A * x (mx1 column vector)
      */
-    function mulMatrixVector(Matrix memory A, Matrix memory x) internal pure returns (Matrix memory y) {
-        require(A.cols == x.rows, "MatrixMaster: mulMatrix dims a.cols != b.rows"); // Used mulMatrix for consistency
+    function multiplyMatrixVector(Matrix memory A, Matrix memory x) internal pure returns (Matrix memory y) {
+        require(A.cols == x.rows, "MatrixMaster: A.cols != x.rows");
         require(x.cols == 1, "MatrixMaster: x must be column vector");
 
         uint256 m = A.rows;
@@ -430,7 +429,7 @@ library MatrixMaster {
             acc = QZERO;
             for (uint256 j = 0; j < n; ++j) {
                 bytes16 a_ij = A.data[_idx(n, i, j)];
-                bytes16 x_j = x.data[j];
+                bytes16 x_j = x.data[j]; // x is (n×1)
                 acc = acc.add(a_ij.mul(x_j));
             }
             out[i] = acc;
@@ -513,7 +512,7 @@ library MatrixMaster {
         bytes16 nrm = euclideanNorm(v);
         require(MathLib.cmp(nrm, QZERO) != 0, "MatrixMaster: cannot normalize zero vector");
 
-        out = divScalar(v, nrm); // v / ||v||
+        out = divideScalar(v, nrm); // v / ||v||
     }
 
     /**
@@ -528,13 +527,13 @@ library MatrixMaster {
         require(vNew.cols == 1, "MatrixMaster: converged requires vectors");
 
         // Check Positive Direction
-        Matrix memory diffPos = sub(vNew, vOld);
+        Matrix memory diffPos = subtractMatrices(vNew, vOld);
         if (MathLib.cmp(euclideanNorm(diffPos), tol) < 0) {
             return true;
         }
 
         // Check Negative Direction (for negative eigenvalues)
-        Matrix memory diffNeg = add(vNew, vOld);
+        Matrix memory diffNeg = addMatrices(vNew, vOld);
         if (MathLib.cmp(euclideanNorm(diffNeg), tol) < 0) {
             return true;
         }
@@ -758,7 +757,7 @@ library MatrixMaster {
         x = normalize(x);
 
         for (uint256 iter = 0; iter < maxIter; ++iter) {
-            Matrix memory y = mulMatrixVector(A, x);
+            Matrix memory y = multiplyMatrixVector(A, x);
             
             // Avoid division by zero if matrix is singular
             if (MathLib.cmp(euclideanNorm(y), QZERO) == 0) { break; }
@@ -773,7 +772,7 @@ library MatrixMaster {
             x = xNew;
         }
         
-        Matrix memory Ax = mulMatrixVector(A, x);
+        Matrix memory Ax = multiplyMatrixVector(A, x);
         lambda = dot(x, Ax);
     }
 }

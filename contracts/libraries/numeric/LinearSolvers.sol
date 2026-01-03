@@ -111,10 +111,10 @@ library LinearSolvers {
 
         for (iters = 0; iters < maxIter; ++iters) {
             // r = A x - b: (m x n) * (n x 1) = (m x 1). Subtraction is valid.
-            r = MatrixMaster.sub(MatrixMaster.mulMatrix(A, x), b);
+            r = MatrixMaster.subtractMatrices(MatrixMaster.multiplyMatrices(A, x), b);
 
             // grad = A^T r: (n x m) * (m x 1) = (n x 1).
-            grad = MatrixMaster.mulMatrix(At, r);
+            grad = MatrixMaster.multiplyMatrices(At, r);
 
             // Stopping condition: ||grad||^2 <= tol
             bytes16 gNorm2 = _norm2Squared(grad);
@@ -123,8 +123,8 @@ library LinearSolvers {
             }
 
             // x = x - alpha * grad. All are n x 1.
-            step = MatrixMaster.mulScalar(grad, alpha);
-            x = MatrixMaster.sub(x, step);
+            step = MatrixMaster.multiplyScalar(grad, alpha);
+            x = MatrixMaster.subtractMatrices(x, step);
         }
 
         return (x, iters); // reached maxIter
