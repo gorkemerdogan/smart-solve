@@ -379,6 +379,53 @@ contract MatrixFacet {
         return _flatten(MatrixMaster.multiplyMatrixVector(A, x));
     }
 
+    // ------------------------------------------------------------
+    // Sparse Matrix x Vector multiplication (Facet)
+    // ------------------------------------------------------------
+
+    /**
+     * @notice Multiply a sparse matrix A (CSR) with a dense column vector x.
+     *         Computes y = A · x.
+     *
+     * @param  aRows   Number of rows of sparse matrix A
+     * @param  aCols   Number of columns of sparse matrix A
+     * @param  rowPtr  CSR row pointer array
+     * @param  colInd  CSR column index array
+     * @param  values  CSR non-zero values
+     * @param  xRows   Number of rows of vector x (columns = 1)
+     * @param  xData   Flattened vector data
+     * @return yRows   Number of rows of result vector
+     * @return yCols   Number of columns of result vector (1)
+     * @return yData   Flattened result vector data
+     */
+    function mulSparseMatrixVector(
+        uint256 aRows,
+        uint256 aCols,
+        uint256[] calldata rowPtr,
+        uint256[] calldata colInd,
+        bytes16[] calldata values,
+        uint256 xRows,
+        bytes16[] calldata xData
+    ) external pure returns (uint256 yRows, uint256 yCols, bytes16[] memory yData) {
+        
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.SparseMatrix({
+            rows: aRows,
+            cols: aCols,
+            rowPtr: _toMemory(rowPtr),
+            colInd: _toMemory(colInd),
+            values: _toMemory(values)
+        });
+
+        MatrixMaster.Matrix memory x = MatrixMaster.Matrix({
+            rows: xRows,
+            cols: 1,
+            data: _toMemory(xData)
+        });
+
+        MatrixMaster.Matrix memory y = MatrixMaster.mulSparseMatrixVector(A, x);
+
+        return (y.rows, y.cols, y.data);
+    }
 
     // ------------------------------------------------------------
     // Vector Operations (n×1 column vectors)
