@@ -390,16 +390,17 @@ library MatrixMaster {
         bytes16[] memory data = new bytes16[](m * n);
 
         for (uint256 i = 0; i < m; ++i) {
+            uint256 aRow = i * k;
+
             for (uint256 j = 0; j < n; ++j) {
                 bytes16 acc = QZERO;
                 for (uint256 t = 0; t < k; ++t) {
 
-                    uint256 aRow = i * k;
                     uint256 bRow = t * n;
 
                     bytes16 a_ik = a.data[aRow + t];
                     bytes16 b_tj = b.data[bRow + j];
-                    
+
                     acc = acc.add(a_ik.mul(b_tj));
                 }
                 data[_idx(n, i, j)] = acc;
