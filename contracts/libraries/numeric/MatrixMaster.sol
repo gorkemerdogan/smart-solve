@@ -554,7 +554,7 @@ library MatrixMaster {
     }
 
     // ------------------------------------------------------------
-    // Matrix multiplication
+    // Dense Matrix multiplication
     // ------------------------------------------------------------
 
     /**
@@ -594,7 +594,7 @@ library MatrixMaster {
     }
 
     // ------------------------------------------------------------
-    // Matrix x Vector multiplication
+    // Dense Matrix x Vector multiplication
     // ------------------------------------------------------------
 
     /**
@@ -625,6 +625,49 @@ library MatrixMaster {
         }
 
         y = Matrix({ rows: m, cols: 1, data: out });
+    }
+
+    // ------------------------------------------------------------
+    // Sparse Matrix x Vector multiplication
+    // ------------------------------------------------------------
+
+    /**
+    * @notice Multiply a sparse matrix A (CSR) with a dense column vector x.
+    *         Computes y = A · x.
+    *
+    * @param  A Sparse matrix in CSR format
+    * @param  x Dense column vector (n × 1)
+    * @return y Dense column vector (m × 1)
+    */
+    function mulSparseMatrixVector(SparseMatrix memory A, Matrix memory x) internal pure returns (Matrix memory y) {
+        require(A.cols == x.rows, "MatrixMaster: dimension mismatch");
+
+        uint256 m = A.rows;
+
+        bytes16[] memory yData = new bytes16[](m);
+
+        for (uint256 i = 0; i < m; ++i) {
+
+            uint256 rowStart = A.rowPtr[i];
+            uint256 rowEnd   = A.rowPtr[i + 1];
+
+            // If the row is empty in CSR, rowStart will equal rowEnd.
+            // Skip the logic and leave yData[i] as default.
+            if (rowStart == rowEnd) {
+                continue; 
+            }
+
+            bytes16 sum = QZERO;
+
+            for (uint256 k = rowStart; k < rowEnd; ++k) {
+                uint256 j = A.colInd[k];
+                sum = sum.add(A.values[k].mul(x.data[j]));
+            }
+
+            yData[i] = sum;
+        }
+
+        return Matrix({ rows: m, cols: 1, data: yData });
     }
 
     // ------------------------------------------------------------
