@@ -86,7 +86,9 @@ describe("Polynomial (library) — Horner, Derivative, Arithmetic, Calculus (ABD
     harness = await newHarness();
   });
 
-  // --- helpers (call into harness to build exact bytes16 quads) ---
+  // ---------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------
   async function qInt(n: number | string): Promise<string> {
     return harness.qFromInt(BigInt(n));
   }
@@ -164,9 +166,6 @@ describe("Polynomial (library) — Horner, Derivative, Arithmetic, Calculus (ABD
       const coeffs = [await qFrac(11, 10), await qFrac(-22, 10), await qFrac(33, 10), await qFrac(-44, 10)];
       const d = [...(await harness.derivative(coeffs))];
       expect(d.length).to.equal(3);
-      /*expect(d[0].toLowerCase()).to.equal((await qFrac(-22,10)).toLowerCase());
-      expect(d[1].toLowerCase()).to.equal((await qFrac(33,5)).toLowerCase());
-      expect(d[2].toLowerCase()).to.equal((await qFrac(-66,5)).toLowerCase());*/
 
       expectAlmostEqHex(d[0].toLowerCase(), (await qFrac(-22, 10)).toLowerCase(), 1n);
       expectAlmostEqHex(d[1].toLowerCase(), (await qFrac(33, 5)).toLowerCase(), 1n);

@@ -113,9 +113,9 @@ describe("Integration Library via IntegrationHarness", function () {
     TOL_TRAP = await harness.qFromFrac(1, 10_000n);
   });
 
-  // ==========================================================
+  // ---------------------------------------------------------
   // Trapezoidal Rule Tests
-  // ==========================================================
+  // ---------------------------------------------------------
   describe("Trapezoidal Rule", function () {
     it("1. f(x)=0 on [0,1], any n → integral = 0", async () => {
       const a = await harness.qFromInt(0);
@@ -199,9 +199,9 @@ describe("Integration Library via IntegrationHarness", function () {
     });
   });
 
-  // ==========================================================
+  // ---------------------------------------------------------
   // Simpson 1/3 Rule Tests
-  // ==========================================================
+  // ---------------------------------------------------------
   describe("Simpson 1/3 Rule", function () {
     it("11. f(x)=1 on [0,1], n=2 (even) → ≈ 1", async () => {
       const a = await harness.qFromInt(0);
@@ -260,9 +260,9 @@ describe("Integration Library via IntegrationHarness", function () {
     });
   });
 
-  // ==========================================================
+  // ---------------------------------------------------------
   // Simpson 3/8 Rule Tests
-  // ==========================================================
+  // ---------------------------------------------------------
   describe("Simpson 3/8 Rule", function () {
     it("18. f(x)=1 on [0,1], n=3 (multiple of 3) → ≈ 1", async () => {
       const a = await harness.qFromInt(0);
