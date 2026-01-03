@@ -14,7 +14,7 @@ import { MatrixMaster } from "../../libraries/numeric/MatrixMaster.sol";
 contract MatrixFacet {
 
     // ------------------------------------------------------------
-    // Creation
+    // Dense Matrix Creation
     // ------------------------------------------------------------
 
     /**
@@ -68,6 +68,105 @@ contract MatrixFacet {
      */
     function createRandomMatrix(uint256 rows, uint256 cols, bytes32 seed) external pure returns (uint256, uint256, bytes16[] memory) {
         return _flatten(MatrixMaster.createRandomMatrix(rows, cols, seed));
+    }
+
+    // ------------------------------------------------------------
+    // Sparse Matrix Creation
+    // ------------------------------------------------------------
+
+    /**
+     * @notice Create a sparse zero matrix in CSR format.
+     * @param  rows       Number of rows (must be > 0)
+     * @param  cols       Number of columns (must be > 0)
+     * @return outRows    Number of rows
+     * @return outColumns Number of columns
+     * @return rowPtr     CSR row pointer array
+     * @return colInd     Empty column index array
+     * @return values     Empty values array
+     */
+    function createZeroSparse(uint256 rows, uint256 cols) external pure returns (
+            uint256 outRows,
+            uint256 outColumns,
+            uint256[] memory rowPtr,
+            uint256[] memory colInd,
+            bytes16[] memory values) {
+
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createZeroSparse(rows, cols);
+        return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
+    }
+
+    /**
+     * @notice Create a sparse identity matrix (n × n) in CSR format.
+     * @param  n          Dimension of the square matrix (must be > 0)
+     * @return outRows    Number of rows
+     * @return outColumns Number of columns
+     * @return rowPtr     CSR row pointer array
+     * @return colInd     Column indices of diagonal elements
+     * @return values     Non-zero diagonal values (1.0)
+     */
+    function createIdentitySparse(uint256 n) external pure returns (
+            uint256 outRows,
+            uint256 outColumns,
+            uint256[] memory rowPtr,
+            uint256[] memory colInd,
+            bytes16[] memory values) {
+        
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createIdentitySparse(n);
+        return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
+    }
+
+    /**
+     * @notice Create a sparse diagonal matrix from diagonal entries.
+     * @param  diag       Diagonal values (length = n)
+     * @return outRows    Number of rows
+     * @return outColumns Number of columns
+     * @return rowPtr     CSR row pointer array
+     * @return colInd     Column indices (0..n-1)
+     * @return values     Diagonal values
+     */
+    function createDiagonalSparse(bytes16[] calldata diag) external pure returns (
+            uint256 outRows,
+            uint256 outColumns,
+            uint256[] memory rowPtr,
+            uint256[] memory colInd,
+            bytes16[] memory values) {
+                
+        bytes16[] memory d = _toMemory(diag);
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createDiagonalSparse(d);
+        return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
+    }
+
+    /**
+     * @notice Create a sparse matrix from COO-style triplets and convert to CSR.
+     * @param  rows       Number of rows of the matrix
+     * @param  cols       Number of columns of the matrix
+     * @param  rowInd     Row indices of non-zero entries
+     * @param  colInd     Column indices of non-zero entries
+     * @param  values     Non-zero values
+     * @return outRows    Number of rows
+     * @return outColumns Number of columns
+     * @return rowPtr     CSR row pointer array
+     * @return outColInd  CSR column indices
+     * @return outValues  CSR non-zero values
+     */
+    function createSparseFromTriplets(
+        uint256 rows,
+        uint256 cols,
+        uint256[] calldata rowInd,
+        uint256[] calldata colInd,
+        bytes16[] calldata values ) external pure returns (
+            uint256 outRows,
+            uint256 outColumns,
+            uint256[] memory rowPtr,
+            uint256[] memory outColInd,
+            bytes16[] memory outValues) {
+                
+        uint256[] memory r = _toMemory(rowInd);
+        uint256[] memory c = _toMemory(colInd);
+        bytes16[] memory v = _toMemory(values);
+
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createSparseFromTriplets(rows, cols, r, c, v);
+        return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
     }
 
     // ------------------------------------------------------------
@@ -290,13 +389,12 @@ contract MatrixFacet {
     * @param  data Vector entries
     * @return rows Number of rows (n)
     * @return cols Number of cols (1)
-    * @return vec Flattented vector data
+    * @return vec  Flattented vector data
      */
     function createVector(bytes16[] calldata data) external pure returns (uint256, uint256, bytes16[] memory) {
-
         bytes16[] memory v = _toMemory(data);
         return _flatten(MatrixMaster.createVector(v));
-    } 
+    }
 
     /**
      * @notice Create a pseudo-random column vector (nx1) with entries in [0,1).
@@ -455,11 +553,23 @@ contract MatrixFacet {
     // ------------------------------------------------------------
 
     /**
-     * @notice Copy calldata bytes16[] to a new memory array.
-     */ 
+    * @notice Copy calldata bytes16[] to a new memory array.
+    */ 
     function _toMemory(bytes16[] calldata a) internal pure returns (bytes16[] memory m) {
         m = new bytes16[](a.length);
-        for (uint256 i = 0; i < a.length; ++i) m[i] = a[i];
+        for (uint256 i = 0; i < a.length; ++i) {
+            m[i] = a[i];
+        }
+    }
+
+    /**
+    * @notice Copy calldata uint256[] to a new memory array.
+    */ 
+    function _toMemory(uint256[] calldata a) internal pure returns (uint256[] memory m) {
+        m = new uint256[](a.length);
+        for (uint256 i = 0; i < a.length; ++i) {
+            m[i] = a[i];
+        }
     }
 
     /**
