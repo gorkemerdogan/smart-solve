@@ -434,7 +434,7 @@ contract MatrixMasterHarness {
     }
 
     // ---------------------------------------------------------
-    // Matrix-Vector multiplication wrapper
+    // Dense Matrix x Vector multiplication wrapper
     // ---------------------------------------------------------
 
     /**
@@ -452,6 +452,45 @@ contract MatrixMasterHarness {
         MatrixMaster.Matrix memory b = _toMatrix(bRows, bCols, bData);
         MatrixMaster.Matrix memory c = MatrixMaster.multiplyMatrixVector(a, b);
         return _fromMatrix(c);
+    }
+
+    // ------------------------------------------------------------
+    // Sparse Matrix x Vector multiplication
+    // ------------------------------------------------------------
+
+    /**
+    * @notice Harness wrapper for sparse matrix × dense vector multiplication.
+    */
+    function mulSparseMatrixVectorHarness(
+        uint256 aRows,
+        uint256 aCols,
+        uint256[] calldata rowPtr,
+        uint256[] calldata colInd,
+        bytes16[] calldata values,
+        uint256 xRows,
+        bytes16[] calldata xData
+    )
+        external pure
+        returns (uint256, uint256, bytes16[] memory)
+    {
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.SparseMatrix({
+            rows: aRows,
+            cols: aCols,
+            rowPtr: _toMemory(rowPtr),
+            colInd: _toMemory(colInd),
+            values: _toMemory(values)
+        });
+
+        MatrixMaster.Matrix memory x = MatrixMaster.Matrix({
+            rows: xRows,
+            cols: 1,
+            data: _toMemory(xData)
+        });
+
+        MatrixMaster.Matrix memory y =
+            MatrixMaster.mulSparseMatrixVector(A, x);
+
+        return (y.rows, y.cols, y.data);
     }
 
     // ---------------------------------------------------------
@@ -678,5 +717,19 @@ contract MatrixMasterHarness {
         bytes16 qNum = MathLib.fromInt(num);
         bytes16 qDen = MathLib.fromInt(den);
         q = MathLib.div(qNum, qDen);
+    }
+
+    /// @notice Scaling factor used for JS-style fixed-decimal conversions.
+    uint256 public constant SCALE = 1e12;
+
+    /**
+     * @notice Converts a quadruple-precision number into a scaled integer (scaled by SCALE).
+     * @param x Quadruple-precision value.
+     * @return Integer representing x * SCALE.
+     */
+    function toFloat(bytes16 x) external pure returns (int256) {
+        bytes16 qScale = MathLib.fromUInt(SCALE);
+        bytes16 scaled = MathLib.mul(x, qScale);
+        return MathLib.toInt(scaled);
     }
 }
