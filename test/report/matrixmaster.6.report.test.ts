@@ -5,7 +5,7 @@ import type { Contract } from "ethers";
 import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
- * @title MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
+ * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
  * @notice Provides comprehensive utilities for matrix operations using the ABDK bytes16/quad fixed-point math type.
  *         Tests implements determinant and inverse critical, critical for solving systems of equations and performing transformations.
  */
