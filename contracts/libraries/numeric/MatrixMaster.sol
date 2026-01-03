@@ -22,15 +22,53 @@ library MatrixMaster {
     using MathLib for bytes16;
 
     bytes16 private constant QZERO = bytes16(0x00000000000000000000000000000000);
+    bytes16 private constant QONE = bytes16(0x3fff0000000000000000000000000000);
 
     // ------------------------------------------------------------
-    // Core type
+    // Structs
     // ------------------------------------------------------------
 
+    /**
+    * @notice Dense matrix stored in row-major order.
+    *         Represents a fully populated matrix of shape (rows × cols).
+    *         
+    *         Element (i, j) is located at data[i * cols + j].
+    *
+    * @custom:data
+    *  - data.length == rows * cols
+    */
     struct Matrix {
         uint256 rows;
         uint256 cols;
-        bytes16[] data; // row-major, length = rows * cols
+        bytes16[] data; // Flattened matrix entries in row-major order.
+    }
+
+    /**
+    * @notice Sparse matrix stored in Compressed Sparse Row (CSR) format.
+    *         Stores only non-zero elements to reduce memory usage and computation.
+    *         Zero entries are implicit and are not stored.
+    *
+    * @custom:data
+    *  - rowPtr.length == rows + 1
+    *  - colInd.length == values.length
+    *  - rowPtr[rows] == values.length
+    *  - colInd indices within each row are sorted in ascending order
+    */
+    struct SparseMatrix {
+        uint256 rows; /// Number of rows in the matrix.
+        uint256 cols; /// Number of columns in the matrix.
+
+        /// Row pointer array
+        /// rowPtr[i] to rowPtr[i+1]-1 defines the index range of non-zero
+        /// elements belonging to row i in colInd and values.
+        uint256[] rowPtr;
+
+        /// Column indices corresponding to each non-zero value
+        /// colInd[k] is the column index of values[k].
+        uint256[] colInd;
+
+        /// values[k] corresponds to matrix entry (row, colInd[k]).
+        bytes16[] values;
     }
 
     // ------------------------------------------------------------
