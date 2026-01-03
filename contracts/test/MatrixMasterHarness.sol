@@ -110,8 +110,28 @@ contract MatrixMasterHarness {
         return true;
     }
 
+    /**
+    * @notice Copy calldata bytes16[] to a new memory array.
+    */ 
+    function _toMemory(bytes16[] calldata a) internal pure returns (bytes16[] memory m) {
+        m = new bytes16[](a.length);
+        for (uint256 i = 0; i < a.length; ++i) {
+            m[i] = a[i];
+        }
+    }
+
+    /**
+    * @notice Copy calldata uint256[] to a new memory array.
+    */ 
+    function _toMemory(uint256[] calldata a) internal pure returns (uint256[] memory m) {
+        m = new uint256[](a.length);
+        for (uint256 i = 0; i < a.length; ++i) {
+            m[i] = a[i];
+        }
+    }
+
     // ---------------------------------------------------------
-    // Creation wrappers
+    // Dense Matrix Creation wrappers
     // ---------------------------------------------------------
 
     /**
@@ -158,6 +178,74 @@ contract MatrixMasterHarness {
     function randomMatrixHarness(uint256 rows, uint256 cols, bytes32 seed) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = MatrixMaster.createRandomMatrix(rows, cols, seed);
         return _fromMatrix(m);
+    }
+
+    // ---------------------------------------------------------
+    // Sparse Matrix Creation wrappers
+    // ---------------------------------------------------------
+
+    /**
+    * @notice Wrapper for createZeroSparse.
+    */
+    function createZeroSparseHarness(uint256 rows, uint256 cols) external pure returns (
+            uint256,
+            uint256,
+            uint256[] memory,
+            uint256[] memory,
+            bytes16[] memory) {
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createZeroSparse(rows, cols);
+        return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
+    }
+
+    /**
+    * @notice Wrapper for createIdentitySparse.
+    */
+    function createIdentitySparseHarness(uint256 n) external pure returns (
+            uint256,
+            uint256,
+            uint256[] memory,
+            uint256[] memory,
+            bytes16[] memory) {
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createIdentitySparse(n);
+        return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
+    }
+
+    /**
+    * @notice Wrapper for createDiagonalSparse.
+    */
+    function createDiagonalSparseHarness(bytes16[] calldata diag) external pure returns (
+            uint256,
+            uint256,
+            uint256[] memory,
+            uint256[] memory,
+            bytes16[] memory) {
+        
+        bytes16[] memory d = _toMemory(diag);
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createDiagonalSparse(d);
+        return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
+    }
+
+    /**
+    * @notice Wrapper for createSparseFromTriplets.
+    */
+    function createSparseFromTripletsHarness(
+        uint256 rows,
+        uint256 cols,
+        uint256[] calldata rowInd,
+        uint256[] calldata colInd,
+        bytes16[] calldata values) external pure returns (
+            uint256,
+            uint256,
+            uint256[] memory,
+            uint256[] memory,
+            bytes16[] memory) {
+
+        uint256[] memory r = _toMemory(rowInd);
+        uint256[] memory c = _toMemory(colInd);
+        bytes16[] memory v = _toMemory(values);
+
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createSparseFromTriplets(rows, cols, r, c, v);
+        return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
     }
 
     // ---------------------------------------------------------
