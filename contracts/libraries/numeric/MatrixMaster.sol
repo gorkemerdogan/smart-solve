@@ -136,7 +136,7 @@ library MatrixMaster {
     }
 
     // ------------------------------------------------------------
-    // Creation
+    // Dense matrix creation
     // ------------------------------------------------------------
 
     /**
@@ -231,6 +231,151 @@ library MatrixMaster {
         }
 
         m = Matrix({ rows: rows, cols: cols, data: data });
+    }
+
+    // ------------------------------------------------------------
+    // Sparse matrix creation (CSR)
+    // ------------------------------------------------------------
+
+    /**
+    * @notice Create a sparse zero matrix of shape (rows × cols).
+    *         No non-zero entries are stored (nnz = 0).
+    *
+    * @param  rows Number of rows (must be > 0)
+    * @param  cols Number of columns (must be > 0)
+    * @return A    Sparse zero matrix in CSR format
+    */
+    function createZeroSparse(uint256 rows, uint256 cols) internal pure returns (SparseMatrix memory A) {
+        require(rows > 0 && cols > 0, "MatrixMaster: invalid sparse shape");
+
+        A = SparseMatrix({
+            rows: rows,
+            cols: cols,
+            rowPtr: new uint256[](rows + 1),
+            colInd: new uint256[](0),
+            values: new bytes16[](0)
+        });
+    }
+
+    /**
+    * @notice Create a sparse identity matrix of shape (n × n).
+    *         Exactly one non-zero entry per row.
+    *         values[i] = 1 at position (i, i).
+    *
+    * @param  n Dimension of the square matrix (must be > 0)
+    * @return A Sparse identity matrix in CSR format
+    */
+    function createIdentitySparse(uint256 n) internal pure returns (SparseMatrix memory A) {
+        require(n > 0, "MatrixMaster: n = 0");
+
+        uint256[] memory rowPtr = new uint256[](n + 1);
+        uint256[] memory colInd = new uint256[](n);
+        bytes16[] memory values = new bytes16[](n);
+
+        for (uint256 i = 0; i < n; ++i) {
+            rowPtr[i] = i;
+            colInd[i] = i;
+            values[i] = bytes16(uint128(QONE));
+        }
+        rowPtr[n] = n;
+
+        A = SparseMatrix({
+            rows: n,
+            cols: n,
+            rowPtr: rowPtr,
+            colInd: colInd,
+            values: values
+        });
+    }
+
+    /**
+    * @notice Create a sparse diagonal matrix from diagonal entries.
+    *         Produces an (n × n) matrix where only diagonal elements are non-zero.
+    *         Diagonal order is preserved.
+    *
+    * @param  diag Diagonal values, where diag[i] is placed at (i, i)
+    * @return A    Sparse diagonal matrix in CSR format
+    */
+    function createDiagonalSparse(bytes16[] memory diag) internal pure returns (SparseMatrix memory A) {
+        uint256 n = diag.length;
+        require(n > 0, "MatrixMaster: empty diagonal");
+
+        uint256[] memory rowPtr = new uint256[](n + 1);
+        uint256[] memory colInd = new uint256[](n);
+        bytes16[] memory values = new bytes16[](n);
+
+        for (uint256 i = 0; i < n; ++i) {
+            rowPtr[i] = i;
+            colInd[i] = i;
+            values[i] = diag[i];
+        }
+        rowPtr[n] = n;
+
+        A = SparseMatrix({
+            rows: n,
+            cols: n,
+            rowPtr: rowPtr,
+            colInd: colInd,
+            values: values
+        });
+    }
+
+    /**
+    * @notice Create a sparse matrix from COO-style triplets.
+    *         Converts (rowInd, colInd, values) into CSR format.
+    *         Duplicate entries are not merged.
+    *
+    * @param  rows   Number of rows of the matrix
+    * @param  cols   Number of columns of the matrix
+    * @param  rowInd Row indices of non-zero entries
+    * @param  colInd Column indices of non-zero entries
+    * @param  values Non-zero values corresponding to (rowInd, colInd)
+    * @return A      Sparse matrix in CSR format
+    */
+    function createSparseFromTriplets(
+        uint256 rows,
+        uint256 cols,
+        uint256[] memory rowInd,
+        uint256[] memory colInd,
+        bytes16[] memory values
+    ) internal pure returns (SparseMatrix memory A) {
+        require(rows > 0 && cols > 0, "MatrixMaster: invalid sparse shape");
+        require(rowInd.length == colInd.length && colInd.length == values.length, "MatrixMaster: triplet length mismatch");
+
+        uint256 nnz = values.length;
+        uint256[] memory rowPtr = new uint256[](rows + 1);
+        
+        // Count elements for rows
+        for (uint256 k = 0; k < nnz; ++k) {
+            rowPtr[rowInd[k] + 1]++;
+        }
+        // Identify starting position
+        for (uint256 i = 0; i < rows; ++i) {
+            rowPtr[i + 1] += rowPtr[i];
+        }
+
+        // Insert data
+        uint256[] memory sortedColInd = new uint256[](nnz);
+        bytes16[] memory sortedValues = new bytes16[](nnz);
+        uint256[] memory currentPos = new uint256[](rows);
+        
+        for (uint256 i = 0; i < rows; i++) currentPos[i] = rowPtr[i];
+
+        for (uint256 k = 0; k < nnz; ++k) {
+            uint256 r = rowInd[k];
+            uint256 dest = currentPos[r];
+            sortedColInd[dest] = colInd[k];
+            sortedValues[dest] = values[k];
+            currentPos[r]++;
+        }
+
+        A = SparseMatrix({
+            rows: rows,
+            cols: cols,
+            rowPtr: rowPtr,
+            colInd: sortedColInd,
+            values: sortedValues
+        });
     }
 
     // ------------------------------------------------------------
