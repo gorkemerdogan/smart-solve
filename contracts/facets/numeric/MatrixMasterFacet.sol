@@ -11,7 +11,7 @@ import { MatrixMaster } from "../../libraries/numeric/MatrixMaster.sol";
  *            because MatrixMaster expects 'bytes16[] memory'.
  *          - For vectors: treat them as matrices with shape (n×1) or (1×n).
  */
-contract MatrixFacet {
+contract MatrixMasterFacet {
 
     // ------------------------------------------------------------
     // Dense Matrix Creation
