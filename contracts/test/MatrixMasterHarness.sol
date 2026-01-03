@@ -115,7 +115,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.zeros.
+     * @notice Wrapper for zeros.
      */
     function zerosHarness(uint256 rows, uint256 cols) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = MatrixMaster.createZerosMatrix(rows, cols);
@@ -123,7 +123,7 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.ones.
+     * @notice Wrapper for ones.
      */
     function onesHarness(uint256 rows, uint256 cols) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = MatrixMaster.createOnesMatrix(rows, cols);
@@ -131,7 +131,7 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.createIdentityMatrix.
+     * @notice Wrapper for createIdentityMatrix.
      */
     function createIdentityMatrixHarness(uint256 n) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = MatrixMaster.createIdentityMatrix(n);
@@ -139,7 +139,7 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.fromDiagonal.
+     * @notice Wrapper for fromDiagonal.
      */
     function fromDiagonalHarness(bytes16[] calldata diag) external pure returns (uint256, uint256, bytes16[] memory) {
         // Copy diag into memory for the library
@@ -153,7 +153,7 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.randomMatrix.
+     * @notice Wrapper for randomMatrix.
      */
     function randomMatrixHarness(uint256 rows, uint256 cols, bytes32 seed) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = MatrixMaster.createRandomMatrix(rows, cols, seed);
@@ -165,7 +165,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.get.
+     * @notice Wrapper for get.
      */
     function getHarness(
         uint256 rows,
@@ -179,7 +179,7 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.set.
+     * @notice Wrapper for set.
      *         Returns full matrix after modification.
      */
     function setHarness(
@@ -200,7 +200,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.slice.
+     * @notice Wrapper for slice.
      */
     function sliceHarness(
         uint256 rows,
@@ -223,7 +223,7 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.reshape.
+     * @notice Wrapper for reshape.
      */
     function reshapeHarness(
         uint256 rows,
@@ -246,7 +246,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.transpose.
+     * @notice Wrapper for transpose.
      */
     function transposeHarness(
         uint256 rows,
@@ -263,7 +263,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.add.
+     * @notice Wrapper for add.
      */
     function addHarness(
         uint256 aRows,
@@ -280,7 +280,7 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.sub.
+     * @notice Wrapper for sub.
      */
     function subHarness(
         uint256 aRows,
@@ -297,7 +297,7 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.mulScalar.
+     * @notice Wrapper for mulScalar.
      */
     function mulScalarHarness(
         uint256 rows,
@@ -311,7 +311,7 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.divScalar.
+     * @notice Wrapper for divScalar.
      */
     function divScalarHarness(
         uint256 rows,
@@ -329,7 +329,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.multiplyMatrices.
+     * @notice Wrapper for multiplyMatrices.
      */
     function mulMatrixHarness(
         uint256 aRows,
@@ -350,7 +350,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.multiplyMatrixVector.
+     * @notice Wrapper for multiplyMatrixVector.
      */
     function mulMatrixVectorHarness(
         uint256 aRows,
@@ -371,7 +371,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.dot.
+     * @notice Wrapper for dot.
      */
     function dotHarness(
         uint256 aRows,
@@ -391,7 +391,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.det.
+     * @notice Wrapper for det.
      */
     function detHarness(
         uint256 rows,
@@ -407,7 +407,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.inverse.
+     * @notice Wrapper for inverse.
      */
     function inverseHarness(
         uint256 rows,
@@ -424,7 +424,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.euclideanNorm.
+     * @notice Wrapper for euclideanNorm.
      *         Input must be vector-shaped: (n×1) or (1×n).
      * @return norm  l_2-vector norm ||v||_2
      */
@@ -438,7 +438,7 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for MatrixMaster.normalize, computing v / ||v||_2.
+     * @notice Wrapper for normalize, computing v / ||v||_2.
      *         Reverts on zero vector.  
      * @return (rows, cols, data)  normalized vector with unit l_2 norm
      */
@@ -453,11 +453,24 @@ contract MatrixMasterHarness {
     }
 
     // ---------------------------------------------------------
+    // Vector creation wrapper
+    // ---------------------------------------------------------
+
+    /**
+    * @notice Wrapper for createVector (n × 1).
+    */
+    function createVectorHarness(bytes16[] calldata data)
+        external pure returns (uint256, uint256, bytes16[] memory) {
+        MatrixMaster.Matrix memory v = MatrixMaster.createVector(data);
+        return (v.rows, v.cols, v.data);
+    }
+
+    // ---------------------------------------------------------
     // Vector randomization wrapper
     // ---------------------------------------------------------
 
     /**
-    * @notice Wrapper for MatrixMaster.randomVector (n × 1).
+    * @notice Wrapper for randomVector (n × 1).
     */
     function randomVectorHarness(
         uint256 n,
@@ -472,7 +485,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-     * @notice Wrapper for MatrixMaster.hasConverged.
+     * @notice Wrapper for hasConverged.
      */
     function hasConvergedHarness(
         uint256 xRows,
@@ -493,7 +506,7 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-    * @notice Wrapper for MatrixMaster.powerIteration.
+    * @notice Wrapper for powerIteration.
     */
     function powerIterationHarness(
         uint256 rows,

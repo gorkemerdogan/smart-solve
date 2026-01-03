@@ -286,6 +286,19 @@ contract MatrixFacet {
     // ------------------------------------------------------------
 
     /**
+    * @notice Create column vector (nx1) from array
+    * @param  data Vector entries
+    * @return rows Number of rows (n)
+    * @return cols Number of cols (1)
+    * @return vec Flattented vector data
+     */
+    function createVector(bytes16[] calldata data) external pure returns (uint256, uint256, bytes16[] memory) {
+
+        bytes16[] memory v = _toMemory(data);
+        return _flatten(MatrixMaster.createVector(v));
+    } 
+
+    /**
      * @notice Create a pseudo-random column vector (nx1) with entries in [0,1).
      *         Uses deterministic keccak-based generation, NOT secure randomness.
      * @param  n    Dimension of the vector (n > 0)

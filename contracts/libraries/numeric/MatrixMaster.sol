@@ -449,6 +449,17 @@ library MatrixMaster {
     // ------------------------------------------------------------
 
     /**
+    * @notice Create column vector (nx1) from array
+    * @param  data Vector entries
+    * @return v    Column vector matrix of shape nx1
+     */
+    function createVector(bytes16[] memory data) internal pure returns (Matrix memory v) {
+        require(data.length > 0, "MatrixMaster: empty vector");
+        
+        v = Matrix({rows: data.length, cols: 1, data: data});
+    }
+
+    /**
      * @notice Create a pseudo-random column vector (nx1) with entries in [0,1).
      *         Uses deterministic keccak-based generation, NOT secure randomness.
      * @param  n    Dimension of the vector (n > 0)

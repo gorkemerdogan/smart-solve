@@ -23,6 +23,9 @@ type MatrixMasterHarness = Contract & {
     euclideanNormHarness(vRows: bigint, vCols: bigint, vData: string[]): Promise<string>;
     normalizeHarness(vRows: bigint, vCols: bigint, vData: string[]): Promise<[bigint, bigint, string[]]>;
 
+    // create vector
+    createVectorHarness(data: string[]): Promise<[bigint, bigint, string[]]>;
+
     // random vector
     randomVectorHarness(n: bigint, seed: string): Promise<[bigint, bigint, string[]]>;
 
@@ -208,13 +211,63 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
     //  Section 2: Random Vector & Convergence
     // ------------------------------------------------------------
 
-    describe("Section 2: Random & Convergence", function () {
+    describe("Section 2: Creation & Random & Convergence", function () {
+
+        // ------------------------------
+        // Create Vector
+        // ------------------------------
+
+        it("Test 5: createVector creates a column vector (n×1) from array", async function () {
+            t++;
+            const v = [await qInt(1), await qInt(2), await qInt(3)]; // length = 3
+
+            await touchGas(harness, "createVectorHarness", [v]);
+            const gas = await estimateGas(harness, "createVectorHarness", [v]);
+
+            const [rows, cols, data] = await harness.createVectorHarness(v);
+
+            expect(rows).to.equal(3n);
+            expect(cols).to.equal(1n);
+            expect(data).to.deep.equal(v);
+
+            printBlockMatrix({
+                t,
+                method: "createVectorHarness",
+                explanation: "Creates a column vector (3×1) from input array, preserving order.",
+                gas,
+                shapeIn: "3",
+                shapeOut: "3x1",
+                inHex: `v=${fmtHexArr(v)}`,
+                outHex: fmtHexArr(data),
+            });
+        });
+
+        it("Test 6: createVector reverts on empty array", async function () {
+            t++;
+            const v: string[] = []; // empty vector
+
+            await touchGas(harness, "createVectorHarness", [v]);
+            const gas = await estimateGas(harness, "createVectorHarness", [v]);
+
+            await expect(harness.createVectorHarness(v)).to.be.revertedWith("MatrixMaster: empty vector");
+
+            printBlockMatrix({
+                t,
+                method: "createVectorHarness",
+                explanation: "Rejects empty input. createVector requires at least one element.",
+                gas,
+                shapeIn: "0",
+                shapeOut: "revert",
+                inHex: "[]",
+                outHex: "-",
+            });
+        });
 
         // ------------------------------
         // Random Vector
         // ------------------------------
 
-        it("Test 5: randomVector generates deterministic n×1 vector for fixed seed", async function () {
+        it("Test 7: randomVector generates deterministic n×1 vector for fixed seed", async function () {
             t++;
             const n = 5n;
             const seed = ethers.ZeroHash;
@@ -246,7 +299,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             });
         });
 
-        it("Test 6: randomVector – different seeds produce different vectors", async function () {
+        it("Test 8: randomVector – different seeds produce different vectors", async function () {
             t++;
             const n = 5n;
             const seedA = ethers.ZeroHash;
@@ -280,7 +333,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
         // Convergence
         // ------------------------------
 
-        it("Test 7: hasConverged detects ||vNew - vOld|| < tol correctly", async function () {
+        it("Test 9: hasConverged detects ||vNew - vOld|| < tol correctly", async function () {
             t++;
             // vOld = [0, 0], vNew = [1, 0]
             // ||vNew - vOld||_2 = 1
@@ -313,7 +366,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             });
         });
 
-        it("Test 8: hasConverged reverts on row vectors", async function () {
+        it("Test 10: hasConverged reverts on row vectors", async function () {
             t++;
             const vRow = [await qInt(1), await qInt(2)]; // 1x2
             const tol = await qInt(1);
@@ -341,7 +394,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
     // ---------------------------------------------------------
 
     describe("Section 3: PowerIteration", function () {
-        it("Test 9: diagonal 2x2 matrix – dominant eigenvalue 5", async function () {
+        it("Test 11: diagonal 2x2 matrix – dominant eigenvalue 5", async function () {
             t++;
 
             const five = await qInt(5);
@@ -381,7 +434,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             });
         });
 
-        it("Test 10: symmetric 2x2 matrix – dominant eigenvalue 4", async function () {
+        it("Test 12: symmetric 2x2 matrix – dominant eigenvalue 4", async function () {
             t++;
 
             const three = await qInt(3);
@@ -420,7 +473,7 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             });
         });
 
-        it("Test 11: non-symmetric 3x3 upper-triangular – dominant eigenvalue 3", async function () {
+        it("Test 13: non-symmetric 3x3 upper-triangular – dominant eigenvalue 3", async function () {
             t++;
 
             const one = await qInt(1);
