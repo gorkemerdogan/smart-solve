@@ -11,7 +11,8 @@ import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
 type RootFindingHarness = Contract & {
   qFromInt(n: bigint): Promise<string>;
   qFromFrac(num: bigint, den: bigint): Promise<string>;
-
+  toFloat(x: string): Promise<bigint>;
+  
   f_x2_minus_4(x: string): Promise<string>;
   df_2x(x: string): Promise<string>;
   f_cubic(x: string): Promise<string>;
