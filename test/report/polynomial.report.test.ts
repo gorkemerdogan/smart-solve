@@ -3,6 +3,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
+import { string } from "hardhat/internal/core/params/argumentTypes";
 
 // ------------------------------------------------------------
 //  Types & Constants
@@ -30,8 +31,6 @@ type PolynomialHarness = Contract & {
   getAddress(): Promise<string>;
 };
 
-const QZERO = "0x00000000000000000000000000000000";
-
 // ------------------------------------------------------------
 //  JS Numeric Mirrors (Verification)
 // ------------------------------------------------------------
@@ -53,6 +52,12 @@ function evalHornerMonicNum(lower: number[], x: number) { let acc = 1; for (let 
 // Helpers
 // ------------------------------------------------------------
 
+/**
+ * @notice Formats an array into a readable string showing the first and last N elements.
+ * @param  arr   Array of any type to be formatted.
+ * @param  limit The number of elements to show at the start and the end. Default: 3.
+ * @return A string representation of the array: "[head..., ..., tail] (len=x)".
+ */
 function headTail(arr: any[], limit = 3) {
   if (arr.length <= limit * 2) return `[${arr.join(", ")}] (len=${arr.length})`;
   const head = arr.slice(0, limit).join(", ");
@@ -60,7 +65,32 @@ function headTail(arr: any[], limit = 3) {
   return `[${head}, …, ${tail}] (len=${arr.length})`;
 }
 
+/// Converts a 128-bit quad-precision hex string from the contract into a JS number by dividing the raw integer value by the scale. 
+async function fromQuad(h: PolynomialHarness, hex: string): Promise<number> {
+  const raw: bigint = await h.toFloat(hex);
+  return Number(raw) / 1e12;
+}
+
+async function fromQuadArray(h: PolynomialHarness, hexArr: string[]): Promise<number[]> {
+  const decArr: number[] = [];
+  for (const hex of hexArr) {
+    decArr.push(await fromQuad(h, hex));
+  }
+  return decArr;
+}
+
+/**
+ * @notice Formats an array of hex strings into a single comma-separated string.
+ * @param  arr Array of strings.
+ * @return A string wrapped in square brackets: "[0x1, 0x2]".
+ */
 const fmtHexArr = (arr: string[]) => `[${arr.join(", ")}]`;
+
+/**
+ * @notice Formats an array of numbers or strings into a single comma-separated string.
+ * @param  arr Array of values.
+ * @return A string wrapped in square brackets: "[100, 200]".
+ */
 const fmtDecArr = (arr: (number | string)[]) => `[${arr.join(", ")}]`;
 
 // ------------------------------------------------------------
@@ -70,6 +100,8 @@ const fmtDecArr = (arr: (number | string)[]) => `[${arr.join(", ")}]`;
 describe("Polynomial Library - Operations & Calculus", function () {
   let harness: PolynomialHarness;
   let t = 0;
+
+  let QZERO: string;
 
   // Helper Wrappers
   const qInt = async (n: number | string) => await harness.qFromInt(BigInt(n));
@@ -86,6 +118,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
 
     harness = (await HarnessFactory.deploy()) as unknown as PolynomialHarness;
     await harness.waitForDeployment();
+
+    QZERO = await harness.fromFloat(0n);
   });
 
   // ------------------------------------------------------------
@@ -104,6 +138,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
       const out = await harness.evaluateHorners(coeffs, x);
 
+      const outDec = await fromQuad(harness, out);
+
       printBlockRegular({
         t,
         method: "evaluateHorners",
@@ -112,7 +148,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (analytic double result)",
         outHex: out,
         expectedDec: `${expectedDec}`,
-        outDec: `${expectedDec}`,
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -127,6 +163,9 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateWithDerivative", [coeffs, x]);
       const { px, dpx } = await harness.evaluateWithDerivative(coeffs, x);
 
+      const pOut = await fromQuad(harness, px);
+      const dpOut = await fromQuad(harness, dpx);
+
       printBlockRegular({
         t,
         method: "evaluateWithDerivative",
@@ -135,7 +174,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (p, p' in quad form)",
         outHex: `p=${px}, p'=${dpx}`,
         expectedDec: `p=${pDec}, p'=${dpDec}`,
-        outDec: `p=${pDec}, p'=${dpDec}`,
+        outDec: `p=${pOut}, p'=${dpOut}`,
         gas,
       });
     });
@@ -150,6 +189,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evalHornerMonic", [lower, x]);
       const out = await harness.evalHornerMonic(lower, x);
 
+      const outDec = await fromQuad(harness, out);
+
       printBlockRegular({
         t,
         method: "evalHornerMonic",
@@ -158,7 +199,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (monic analytic result)",
         outHex: out,
         expectedDec: `${expectedDec}`,
-        outDec: `${expectedDec}`,
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -180,6 +221,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "add", [p1, p2]);
       const out = await harness.add(p1, p2);
 
+      const outDec = await fromQuadArray(harness, out);
+
       printBlockRegular({
         t,
         method: "add",
@@ -188,7 +231,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (computed via JS mirror)",
         outHex: fmtHexArr(out),
         expectedDec: expected,
-        outDec: expected,
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -203,6 +246,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "sub", [p1, p2]);
       const out = await harness.sub(p1, p2);
 
+      const outDec = await fromQuadArray(harness, out);
+
       printBlockRegular({
         t,
         method: "sub",
@@ -211,7 +256,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (computed via JS mirror)",
         outHex: fmtHexArr(out),
         expectedDec: expected,
-        outDec: expected,
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -226,6 +271,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mulScalar", [p, k]);
       const out = await harness.mulScalar(p, k);
 
+      const outDec = await fromQuadArray(harness, out);
+
       printBlockRegular({
         t,
         method: "mulScalar",
@@ -234,7 +281,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (coeffs doubled in quad)",
         outHex: fmtHexArr(out),
         expectedDec: expected,
-        outDec: expected,
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -249,6 +296,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mul", [p1, p2]);
       const out = await harness.mul(p1, p2);
 
+      const outDec = await fromQuadArray(harness, out);
+
       printBlockRegular({
         t,
         method: "mul",
@@ -257,7 +306,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (convolution via JS mirror)",
         outHex: fmtHexArr(out),
         expectedDec: expected,
-        outDec: expected,
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -278,6 +327,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "derivative", [coeffs]);
       const out = await harness.derivative(coeffs);
 
+      const outDec = await fromQuadArray(harness, out);
+
       printBlockRegular({
         t,
         method: "derivative",
@@ -286,7 +337,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (derived in JS mirror)",
         outHex: fmtHexArr(out),
         expectedDec: expected,
-        outDec: expected,
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -301,6 +352,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "integral", [p, C]);
       const out = await harness.integral(p, C);
 
+      const outDec = await fromQuadArray(harness, out);
+
       printBlockRegular({
         t,
         method: "integral",
@@ -309,7 +362,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (integrated form in quad)",
         outHex: fmtHexArr(out),
         expectedDec: expected,
-        outDec: expected,
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -325,6 +378,10 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const [qHex, rHex] = await harness.syntheticDivide(coeffs, root);
 
       const expectedDec = `Q=${fmtDecArr(rQ)}, R=${rR}`;
+
+      const qOutDec = await fromQuadArray(harness, qHex);
+      const rOutDec = await fromQuad(harness, rHex);
+
       printBlockRegular({
         t,
         method: "syntheticDivide",
@@ -333,7 +390,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (Q,R in quad form)",
         outHex: `Q=${fmtHexArr(qHex)}, R=${rHex}`,
         expectedDec,
-        outDec: expectedDec,
+        outDec: `Q=${fmtDecArr(qOutDec)}, R=${rOutDec}`,
         gas,
       });
     });
@@ -355,7 +412,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (scalar degree)",
         outHex: out.toString(),
         expectedDec: `${expected}`,
-        outDec: `${out}`,
+        outDec: `${Number(out)}`,
         gas,
       });
     });
@@ -369,6 +426,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "trimTrailingZeros", [p]);
       const out = await harness.trimTrailingZeros(p);
 
+      const outDec = await fromQuadArray(harness, out);
+
       printBlockRegular({
         t,
         method: "trimTrailingZeros",
@@ -377,7 +436,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (canonical form in quad)",
         outHex: fmtHexArr(out),
         expectedDec: expected,
-        outDec: `${out}`,
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -398,15 +457,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
       const out = await harness.evaluateHorners(coeffs, x);
 
+      const outDec = await fromQuad(harness, out);
+
       printBlockRegular({
         t,
         method: "evaluateHorners",
         explanation: "Evaluating an empty coefficient array should behave like polynomial 0 and return 0.",
         inHex: "[], x=7",
-        expectedHex: QZERO,
+        expectedHex: `${QZERO}`,
         outHex: out,
         expectedDec: "0",
-        outDec: "0",
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -420,6 +481,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
       const out = await harness.evaluateHorners(coeffs, x);
 
+      const outDec = await fromQuad(harness, out);
+
       printBlockRegular({
         t,
         method: "evaluateHorners",
@@ -428,7 +491,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: coeffs[0],
         outHex: out,
         expectedDec: "7",
-        outDec: "7",
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -442,15 +505,17 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "evaluateWithDerivative", [coeffs, x]);
       const { dpx } = await harness.evaluateWithDerivative(coeffs, x);
 
+      const dpxDec = await fromQuad(harness, dpx);
+
       printBlockRegular({
         t,
         method: "evaluateWithDerivative",
         explanation: "Derivative of a constant polynomial is identically 0; checks dpx output only.",
         inHex: "[5]",
-        expectedHex: QZERO,
+        expectedHex: `${QZERO}`,
         outHex: `p'=${dpx}`,
         expectedDec: "p'=0",
-        outDec: "p'=0",
+        outDec: `p'=${dpxDec}`,
         gas,
       });
     });
@@ -464,6 +529,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mulScalar", [p, k]);
       const out = await harness.mulScalar(p, k);
 
+      const outDec = await fromQuadArray(harness, out);
+
       printBlockRegular({
         t,
         method: "mulScalar",
@@ -472,7 +539,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (all coeffs zero in quad)",
         outHex: fmtHexArr(out),
         expectedDec: "[0]",
-        outDec: "[0]",
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -486,6 +553,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "mul", [a, b]);
       const out = await harness.mul(a, b);
 
+      const outDec = await fromQuadArray(harness, out);
+
       printBlockRegular({
         t,
         method: "mul",
@@ -494,7 +563,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (zero polynomial)",
         outHex: fmtHexArr(out),
         expectedDec: "[0]",
-        outDec: "[0]",
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -508,6 +577,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
       const gas = await estimateGas(harness, "integral", [a, C]);
       const out = await harness.integral(a, C);
 
+      const outDec = await fromQuadArray(harness, out);
+
       printBlockRegular({
         t,
         method: "integral",
@@ -516,7 +587,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
         expectedHex: "N/A (constant-only polynomial)",
         outHex: fmtHexArr(out),
         expectedDec: "[9]",
-        outDec: "[9]",
+        outDec: `${outDec}`,
         gas,
       });
     });
@@ -549,6 +620,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
         const gas = await estimateGas(harness, "evaluateHorners", [coeffs, x]);
         const out = await harness.evaluateHorners(coeffs, x);
 
+        const outDec = await fromQuad(harness, out);
+
         printBlockRegular({
           t,
           method: `evaluateHorners (n=${n})`,
@@ -557,7 +630,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
           expectedHex: "N/A (large-n analytic double)",
           outHex: out,
           expectedDec: `${expected}`,
-          outDec: `${out}`,
+          outDec: `${outDec}`,
           gas,
         });
       }
@@ -577,6 +650,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
         const gas = await estimateGas(harness, "add", [a, b]);
         const out = await harness.add(a, b);
 
+        const outDec = await fromQuadArray(harness, out);
+
         printBlockRegular({
           t,
           method: `add (n=${n})`,
@@ -585,7 +660,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
           expectedHex: "N/A (large coeff array)",
           outHex: headTail(out),
           expectedDec: headTail(expected),
-          outDec: headTail(expected),
+          outDec: headTail(outDec),
           gas,
         });
       }
@@ -605,6 +680,8 @@ describe("Polynomial Library - Operations & Calculus", function () {
         const gas = await estimateGas(harness, "mul", [a, b]);
         const out = await harness.mul(a, b);
 
+        const outDec = await fromQuadArray(harness, out);
+
         printBlockRegular({
           t,
           method: `mul (n=${n})`,
@@ -613,7 +690,7 @@ describe("Polynomial Library - Operations & Calculus", function () {
           expectedHex: "N/A (large convolution result)",
           outHex: headTail(out),
           expectedDec: headTail(expected),
-          outDec: headTail(expected),
+          outDec: headTail(outDec),
           gas,
         });
       }

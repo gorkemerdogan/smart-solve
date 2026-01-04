@@ -201,4 +201,30 @@ contract PolynomialHarness {
         bytes16 qDen = MathLib.fromInt(den);
         q = MathLib.div(qNum, qDen);
     }
+
+    /// Scaling factor used for JS-style fixed-decimal conversions.
+    uint256 public constant SCALE = 1e12;
+
+    /**
+     * @notice Converts a quadruple-precision number into a scaled integer (scaled by SCALE).
+     * @param x Quadruple-precision value.
+     * @return Integer representing x * SCALE.
+     */
+    function toFloat(bytes16 x) external pure returns (int256) {
+        bytes16 qScale = MathLib.fromUInt(SCALE);
+        bytes16 scaled = MathLib.mul(x, qScale);
+        return MathLib.toInt(scaled);
+    }
+
+    /**
+     * @notice Converts a scaled integer (scaled by SCALE) into quadruple precision.
+     *         Example: scaledValue = 1234500000000 → represents 1.2345.
+     * @param scaledValue Integer representing a float multiplied by SCALE.
+     * @return Quadruple-precision value.
+     */
+    function fromFloat(int256 scaledValue) external pure returns (bytes16) {
+        bytes16 qInt = MathLib.fromInt(scaledValue);
+        bytes16 qScale = MathLib.fromUInt(SCALE);
+        return MathLib.div(qInt, qScale);
+    }
 }
