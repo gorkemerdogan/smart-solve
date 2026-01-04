@@ -55,7 +55,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
     const qf = async (n: number | bigint, d: number | bigint) => h.qFromFrac(n, d);
 
     before(async () => {
-        
+
         // Deploy MathLib
         const MathLibFactory = await ethers.getContractFactory("MathLib");
         const mathLib = await MathLibFactory.deploy();
@@ -205,7 +205,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 6: Zero slope", async function () {
+        it("Test 6: Zero step size (h=0)", async function () {
             t++;
             const y0 = await qi(3);
 
@@ -218,7 +218,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             printBlockRegular({
                 t,
                 method: "Euler",
-                explanation: "Zero slope and zero step keeps state unchanged.",
+                explanation: "If step size h is 0, the state remains identical regardless of the slope.",
                 gas,
                 inHex: y0,
                 expectedHex: y0,
@@ -373,7 +373,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 13: Zero slope", async function () {
+        it("Test 13: Zero step size (h=0)", async function () {
             t++;
             const y0 = await qi(3);
 
@@ -386,7 +386,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             printBlockRegular({
                 t,
                 method: "RK2 Midpoint",
-                explanation: "Zero slope produces no change regardless of method order.",
+                explanation: "Midpoint method evaluates slope at x + h/2; with h=0.",
                 gas,
                 inHex: y0,
                 expectedHex: y0,
@@ -541,7 +541,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 20: Zero slope", async function () {
+        it("Test 20: Zero step size (h=0)", async function () {
             t++;
             const y0 = await qi(4);
 
@@ -554,7 +554,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             printBlockRegular({
                 t,
                 method: "RK2 Heun",
-                explanation: "Zero slope means no evolution.",
+                explanation: "When h=0, the predictor step is zero, nullifying the trapezoidal correction.",
                 gas,
                 inHex: y0,
                 expectedHex: y0,
@@ -709,7 +709,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 27: Zero slope", async function () {
+        it("Test 27: Zero step size (h=0)", async function () {
             t++;
             const y0 = await qi(3);
 
@@ -722,7 +722,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             printBlockRegular({
                 t,
                 method: "RK4",
-                explanation: "Zero slope causes no change even with RK4.",
+                explanation: "Zero step size ensures all internal k-values are weighted against a zero multiplier.",
                 gas,
                 inHex: y0,
                 expectedHex: y0,
