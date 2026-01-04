@@ -28,6 +28,9 @@ type RootFindingFacet = Contract & {
 //  JS Numeric Mirrors (Verification)
 // ------------------------------------------------------------
 
+// JS mirrors act as a dynamic ground truth that re-calculates the expected results,
+// allowing you to verify the contract's precision and iteration count against a trusted reference.
+
 function f_x2_minus_4(x: number) { return x * x - 4; }
 function df_2x(x: number) { return 2 * x; }
 function f_cubic(x: number) { return x * x * x - x - 2; }
@@ -86,12 +89,27 @@ function secantRef(f: (x: number) => number, x0: number, x1: number, eps = 1e-12
 //  Helpers
 // ------------------------------------------------------------
 
+/// Formats a number for reporting, for extreme values and removes redundant trailing zeros from decimals. 
 function trim(n: number) {
   if (!Number.isFinite(n)) return String(n);
   const a = Math.abs(n);
   if (a === 0) return "0";
   if (a >= 1e6 || a < 1e-6) return n.toExponential(6);
   return n.toFixed(12).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+/// Converts a 128-bit quad-precision hex string from the contract into a JS number by dividing the raw integer value by the scale. 
+async function fromQuad(h: RootFindingHarness, hex: string): Promise<number> {
+  const raw: bigint = await h.toFloat(hex);
+  return Number(raw) / 1e12;
+}
+
+/// Determines if two numbers are equivalent within a relative tolerance threshold.
+function approx(a: number, b: number, tol = 1e-12) {
+  if (a === b) return true;
+  const diff = Math.abs(a - b);
+  // Relative error check: (abs(a - b) / (abs(a) + abs(b)))
+  return diff / (Math.abs(a) + Math.abs(b)) < tol;
 }
 
 // ------------------------------------------------------------
@@ -154,8 +172,12 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
       const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fx2m4, a, b);
 
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "bisection",
@@ -163,8 +185,8 @@ describe("RootFinding — Report (values + gas)", function () {
         inHex: "f=x^2-4, [1,3]",
         expectedHex: "N/A (JS bisection reference)",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -180,17 +202,22 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
       const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fx2m4, a, b);
 
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
+      // Verify convergence and numerical proximity to the JS mirror
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "bisection",
         explanation: "Bisection with reversed bounds [3,1]. Implementation should auto-swap endpoints and still converge to root ≈2.",
         inHex: "f=x^2-4, [3,1]",
-        expectedHex: "N/A (JS bisection reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -206,17 +233,22 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
       const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fx2m4, a, b);
 
+      // Convert actual outputs from the EVM
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "bisection",
         explanation: "Endpoint a is an exact root (x=2). Bisection should terminate immediately without further subdivision.",
         inHex: "f=x^2-4, [2,3]",
-        expectedHex: "N/A (JS bisection reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -253,17 +285,21 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fcubic, a, b]);
       const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fcubic, a, b);
 
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "bisection",
         explanation: "Bisection on cubic x^3-x-2 over [1,2]. Should converge to the real root ≈1.521 with guaranteed bracketing.",
         inHex: "f=x^3-x-2, [1,2]",
-        expectedHex: "N/A (JS bisection reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -285,17 +321,21 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
       const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0);
 
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "newton",
         explanation: "Standard Newton-Raphson on x^2-4, starting at x0=3; expects fast quadratic convergence to ≈2.",
         inHex: "f=x^2-4, df=2x, x0=3",
-        expectedHex: "N/A (JS Newton reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -310,17 +350,21 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0]);
       const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fcubic, target, sel_dfcubic, x0);
 
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "newton",
         explanation: "Newton-Raphson on cubic x^3-x-2 with derivative 3x^2-1, starting at x0=1, should converge to the real root near 1.52.",
         inHex: "f=x^3-x-2, df=3x^2-1, x0=1",
-        expectedHex: "N/A (JS Newton reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -335,17 +379,21 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
       const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0);
 
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "newton",
         explanation: "Starting exactly at the root x0=2, Newton should detect convergence in zero iterations or a single trivial step.",
         inHex: "f=x^2-4, df=2x, x0=2",
-        expectedHex: "N/A (JS Newton reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -355,6 +403,7 @@ describe("RootFinding — Report (values + gas)", function () {
       const x0 = await qInt(0);
       const target = await harness.getAddress();
 
+      // At x=0, f'(x) = 2x = 0. Update step x - f(x)/f'(x) would divide by zero.
       await expect(root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0)).to.be.reverted;
 
       printBlockRegular({
@@ -380,17 +429,21 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
       const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0);
 
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "newton",
         explanation: "Repeat of quadratic case to inspect stop conditions (|f| and |Δx|) under a tight tolerance regime.",
         inHex: "f=x^2-4, df=2x, x0=3",
-        expectedHex: "N/A (JS Newton reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -413,17 +466,21 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fx2m4, x0, x1]);
       const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fx2m4, x0, x1);
 
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "secant",
         explanation: "Derivative-free secant method on x^2-4 with [1,3] seeds. should converge superlinearly to root ≈2.",
         inHex: "f=x^2-4, x0=1, x1=3",
-        expectedHex: "N/A (JS secant reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -439,17 +496,21 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fcubic, x0, x1]);
       const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fcubic, x0, x1);
 
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "secant",
         explanation: "Secant method on cubic x^3-x-2 with initial guesses 1 and 2. Tests behavior near the unique real root.",
         inHex: "f=x^3-x-2, x0=1, x1=2",
-        expectedHex: "N/A (JS secant reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -465,17 +526,21 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fx2m4, x0, x1]);
       const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fx2m4, x0, x1);
 
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       expect(ok).to.eq(true);
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
       printBlockRegular({
         t,
         method: "secant",
         explanation: "One of the initial guesses x1=2 is already the exact root, so secant should converge in essentially one check.",
         inHex: "f=x^2-4, x0=1, x1=2",
-        expectedHex: "N/A (JS secant reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
@@ -486,6 +551,7 @@ describe("RootFinding — Report (values + gas)", function () {
       const x1 = await qInt(-1);
       const target = await harness.getAddress();
 
+      // At x0=1 and x1=-1, f(1)= -3 and f(-1)= -3. f(x1)-f(x0) = 0.
       await expect(root.rootFindingSecant(target, sel_fx2m4, x0, x1)).to.be.reverted;
 
       printBlockRegular({
@@ -512,16 +578,18 @@ describe("RootFinding — Report (values + gas)", function () {
       const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fcubic, x0, x1]);
       const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fcubic, x0, x1);
 
-      const expectedDec = `ref~${trim(ref.root)}, f(ref)~${trim(ref.fAtRoot)}, iter=${ref.iterations}, conv=${ref.converged}`;
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
       printBlockRegular({
         t,
         method: "secant",
         explanation: "Stress case with very wide initial guesses [-10,10]. Examines max-iteration behavior and convergence flag.",
         inHex: "f=x^3-x-2, x0=-10, x1=10",
-        expectedHex: "N/A (JS secant reference)",
+        expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec,
-        outDec: expectedDec,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
         gas,
       });
     });
