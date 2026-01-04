@@ -123,12 +123,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff of x^2 at x=3, derivative 2x gives expected slope 6.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -149,12 +149,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff of x^2 at x=-10, analytical derivative 2x gives slope -20.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -175,12 +175,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff of constant f(x)=5, derivative should be exactly zero everywhere.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -202,12 +202,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff with explicit h=1 for x^2 at x=4, finite-diff slope is 9 (2x+h).",
+                gas,
                 inHex: x,
                 expectedHex: expectedDistorted,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -228,12 +228,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff of linear f(x)=3x+1, constant analytical slope 3 should be matched.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -245,12 +245,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "forwardDiff",
                 explanation: "Forward diff with invalid function selector should revert staticcall to target.",
+                gas: "N/A",
                 inHex: x,
                 expectedHex: "Reverted",
                 outHex: "Reverted",
                 expectedDec: "Reverted",
-                outDec: "Reverted",
-                gas: "N/A",
+                outDec: "Reverted"
             });
         });
     });
@@ -278,12 +278,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff of x^2 at x=4, derivative 2x gives expected slope 8.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -304,12 +304,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff of x^2 at x=0, expects tiny negative slope ≈-h from (f(0)-f(-h))/h.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -330,12 +330,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff of x^3 at x=-5, analytical derivative 3x^2 gives slope 75.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -356,12 +356,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff of |x| at x=-1, left-sided derivative around kink is expected to be -1.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
                 outDec: outDec,
-                gas,
             });
         });
 
@@ -383,12 +383,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff with h=1 for x^2 at x=4, finite-diff slope 7 from (f(4)-f(3))/1.",
+                gas,
                 inHex: x,
                 expectedHex: expectedDistorted,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -400,12 +400,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "backwardDiff",
                 explanation: "Backward diff with zero target address should revert due to invalid staticcall target.",
+                gas: "N/A",
                 inHex: x,
                 expectedHex: "Reverted",
                 outHex: "Reverted",
                 expectedDec: "Reverted",
-                outDec: "Reverted",
-                gas: "N/A",
+                outDec: "Reverted"
             });
         });
     });
@@ -433,12 +433,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff of x^2 at x=10, symmetric stencil should match exact 2x=20.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -459,12 +459,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff of x^2 at x=-10, symmetric stencil should recover exact 2x=-20.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -485,12 +485,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff of |x| at x=0, symmetric limit around kink averages to zero.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -511,12 +511,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff of x^3 at x=2, derivative 3x^2=12 with small higher-order error.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -538,12 +538,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff with h=1 for x^2 at x=123, (f(x+h)-f(x-h))/(2h) gives 2x=246.",
+                gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
                 expectedDec: expDec,
-                outDec: outDec,
-                gas,
+                outDec: outDec
             });
         });
 
@@ -555,12 +555,12 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 t,
                 method: "centeredDiff",
                 explanation: "Centered diff with bogus selector should revert, covering staticcall failure path.",
+                gas: "N/A",
                 inHex: x,
                 expectedHex: "Reverted",
                 outHex: "Reverted",
                 expectedDec: "Reverted",
-                outDec: "Reverted",
-                gas: "N/A",
+                outDec: "Reverted"
             });
         });
     });
