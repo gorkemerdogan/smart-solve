@@ -11,12 +11,19 @@ import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
 type IntegrationHarness = Contract & {
   qFromInt(n: bigint | number): Promise<string>;
   qFromFrac(n: bigint | number, d: bigint | number): Promise<string>;
+  qAdd(a: string, b: string): Promise<string>;
   PI(): Promise<string>;
+  
+  // Helpers for conversions
+  toFloat(q: string): Promise<bigint>;
+  fromFloat(n: bigint): Promise<string>;
 
+  // Methods
   trapezoidal(target: string, selector: string, a: string, b: string, n: number): Promise<string>;
   simpson13(target: string, selector: string, a: string, b: string, n: number): Promise<string>;
   simpson38(target: string, selector: string, a: string, b: string, n: number): Promise<string>;
 
+  // Functions to integrate
   f_linear(x: string): Promise<string>;
   f_square(x: string): Promise<string>;
   f_cube(x: string): Promise<string>;
@@ -28,7 +35,10 @@ type IntegrationHarness = Contract & {
   f_piecewise(x: string): Promise<string>;
 };
 
-const QZERO = "0x00000000000000000000000000000000";
+let QZERO: string;
+
+const TOL_APPROX = 1_000_000n; // Allow ~1e-6 for approximations.
+const TOL_EXACT = 100n;        // For exact methods (like Simpson on cubic), allow tiny rounding noise.
 
 // ------------------------------------------------------------
 //  Helpers
@@ -40,13 +50,36 @@ const SCALE = 10n ** SCALE_DECIMALS;
 function formatScaledInt(v: bigint): string {
   const neg = v < 0n;
   const abs = neg ? -v : v;
-
   const intPart = abs / SCALE;
   const fracPart = abs % SCALE;
-
   const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
+  return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`.replace(/\.?0+$/, "");
+}
 
-  return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`;
+async function fmt(harness: IntegrationHarness, val: string): Promise<string> {
+  const v = await harness.toFloat(val);
+  return formatScaledInt(v);
+}
+
+/// Check if values are close (for approximations)
+async function expectClose(h: IntegrationHarness, actualHex: string, expectedHex: string, tolerance: bigint) {
+    const a = await h.toFloat(actualHex);
+    const b = await h.toFloat(expectedHex);
+    let diff = a - b;
+    if (diff < 0n) diff = -diff;
+
+    if (diff > tolerance) {
+        console.log(`    Mismatch > tolerance!`);
+        console.log(`    Exp: ${b} (scaled)`);
+        console.log(`    Act: ${a} (scaled)`);
+        console.log(`    Diff:${diff}`);
+    }
+    expect(diff <= tolerance).to.be.true;
+}
+
+/// Check if values are identical (for exact polynomials)
+async function expectEqual(actualHex: string, expectedHex: string) {
+    expect(actualHex).to.equal(expectedHex);
 }
 
 // ------------------------------------------------------------
@@ -65,7 +98,6 @@ describe("Integration Library - Numerical Methods", function () {
   let selLinear: string, selSquare: string, selCube: string, selConst5: string;
   let selSin: string, selInv: string, selTiny: string, selLarge: string, selPiecewise: string;
 
-  // Helper Wrappers
   const qInt = async (n: number | bigint) => await harness.qFromInt(n);
 
   before(async () => {
@@ -86,6 +118,7 @@ describe("Integration Library - Numerical Methods", function () {
     q1 = await harness.qFromInt(1);
     q2 = await harness.qFromInt(2);
     qPI = await harness.PI();
+    QZERO = q0;
 
     // Init Selectors
     selLinear = harness.interface.getFunction("f_linear")!.selector;
@@ -107,152 +140,144 @@ describe("Integration Library - Numerical Methods", function () {
 
     it("Test 1: Linear Exactness (f(x)=x on [0,1], n=10)", async function () {
       t++;
-      const expectedDec = "≈0.5";
+      
+      const expected = await harness.qFromFrac(1, 2); // Exact integral of x from 0 to 1 is 0.5. Trapezoidal is exact for linear.
 
       await touchGas(harness, "trapezoidal", [target, selLinear, q0, q1, 10]);
       const gas = await estimateGas(harness, "trapezoidal", [target, selLinear, q0, q1, 10]);
       const out = await harness.trapezoidal(target, selLinear, q0, q1, 10);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectClose(harness, out, expected, TOL_EXACT); // Should be very close to exact.
 
-      expect(typeof out).to.equal("string");
       printBlockRegular({
         t,
         method: "trapezoidal",
-        explanation: "Trapezoidal rule on linear f(x)=x over [0,1]. Analytic integral is 1/2 so result should be very close to 0.5.",
+        explanation: "Trapezoidal rule on linear f(x)=x over [0,1]. Analytic integral is 0.5.",
+        gas,
         inHex: "f=x, [0,1]",
-        expectedHex: "N/A (analytic 0.5 in quad)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 2: Smooth Quadratic (f(x)=x^2 on [0,1], n=300)", async function () {
       t++;
-      const expectedDec = "≈0.3333";
+      
+      const expected = await harness.qFromFrac(1, 3); // Analytic integral of x^2 from 0 to 1 is 1/3.
 
       await touchGas(harness, "trapezoidal", [target, selSquare, q0, q1, 300]);
       const gas = await estimateGas(harness, "trapezoidal", [target, selSquare, q0, q1, 300]);
       const out = await harness.trapezoidal(target, selSquare, q0, q1, 300);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectClose(harness, out, expected, TOL_APPROX);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "trapezoidal",
-        explanation: "Trapezoidal rule on smooth quadratic f(x)=x^2 over [0,1]. With n=300, it should approximate 1/3 with high accuracy.",
+        explanation: "Trapezoidal rule on f(x)=x^2 over [0,1]. n=300 approximates 1/3.",
+        gas,
         inHex: "f=x^2, [0,1]",
-        expectedHex: "N/A (analytic 1/3 in quad)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 3: Constant Exactness (f=5 on [0,10], n=50)", async function () {
       t++;
       const b = await qInt(10);
-      const expectedDec = "50";
+      const expected = await qInt(50); // 5 * 10
 
       await touchGas(harness, "trapezoidal", [target, selConst5, q0, b, 50]);
       const gas = await estimateGas(harness, "trapezoidal", [target, selConst5, q0, b, 50]);
       const out = await harness.trapezoidal(target, selConst5, q0, b, 50);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectEqual(out, expected);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "trapezoidal",
-        explanation: "Trapezoidal rule on constant f(x)=5 over [0,10]. Constant integrand should give exactly 5x10 = 50.",
+        explanation: "Trapezoidal rule on constant f(x)=5 over [0,10]. Result is exactly 50.",
+        gas,
         inHex: "f=5, [0,10]",
-        expectedHex: "N/A (exact area 50 in quad)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 4: Trig Function (sin(x) on [0,π], n=200)", async function () {
       t++;
-      const expectedDec = "≈2";
+      
+      const expected = await qInt(2); // Integral of sin(x) from 0 to pi is -cos(pi) - (-cos(0)) = 1 - (-1) = 2.
 
       await touchGas(harness, "trapezoidal", [target, selSin, q0, qPI, 200]);
       const gas = await estimateGas(harness, "trapezoidal", [target, selSin, q0, qPI, 200]);
       const out = await harness.trapezoidal(target, selSin, q0, qPI, 200);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectClose(harness, out, expected, TOL_APPROX);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "trapezoidal",
-        explanation: "Trapezoidal integration of sin(x) over [0,π]. Analytic value is 2 so the numeric result should cluster near 2.",
+        explanation: "Trapezoidal integration of sin(x) over [0,π]. Clusters near analytic 2.",
+        gas,
         inHex: "f=sin, [0,π]",
-        expectedHex: "N/A (analytic integral 2)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 5: Degenerate Interval ([0,0], n=100)", async function () {
       t++;
-      const expectedDec = "0";
+      const expected = q0;
 
       await touchGas(harness, "trapezoidal", [target, selSquare, q0, q0, 100]);
       const gas = await estimateGas(harness, "trapezoidal", [target, selSquare, q0, q0, 100]);
       const out = await harness.trapezoidal(target, selSquare, q0, q0, 100);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectEqual(out, expected);
 
-      expect(out).to.equal(q0);
       printBlockRegular({
         t,
         method: "trapezoidal",
-        explanation: "Trapezoidal rule on zero-length interval [0,0]. Regardless of f(x), the integral must evaluate to exactly 0.",
+        explanation: "Zero-length interval [0,0] must evaluate to exactly 0.",
+        gas,
         inHex: "[0,0]",
-        expectedHex: q0,
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 6: Max Iteration Comparison (f=x^2)", async function () {
       t++;
-      const expectedDec = "~";
+      
+      const expected = await harness.qFromFrac(1, 3);
 
       await touchGas(harness, "trapezoidal", [target, selSquare, q0, q1, 50]);
       const gas = await estimateGas(harness, "trapezoidal", [target, selSquare, q0, q1, 50]);
       const out = await harness.trapezoidal(target, selSquare, q0, q1, 50);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectClose(harness, out, expected, TOL_APPROX);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "trapezoidal",
-        explanation: "Trapezoidal integration of x^2 on [0,1] with n=50. Esed mainly for gas and Java reference comparison.",
+        explanation: "Low iteration (n=50) check for x^2. Used for gas benchmarking.",
+        gas,
         inHex: "[0,1]",
-        expectedHex: "N/A (used for comparison only)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
   });
@@ -263,103 +288,100 @@ describe("Integration Library - Numerical Methods", function () {
 
   describe("Method 2: Simpson 1/3 Rule", function () {
 
-    it("Test 7: Quadratic Exactness-ish (f=x^2 on [0,1], n=10)", async function () {
+    it("Test 7: Quadratic Exactness (f=x^2 on [0,1], n=10)", async function () {
       t++;
-      const expectedDec = "≈0.3333";
+      
+      const expected = await harness.qFromFrac(1, 3); // Simpson 1/3 is exact for degree <= 3. x^2 integral is 1/3.
 
       await touchGas(harness, "simpson13", [target, selSquare, q0, q1, 10]);
       const gas = await estimateGas(harness, "simpson13", [target, selSquare, q0, q1, 10]);
       const out = await harness.simpson13(target, selSquare, q0, q1, 10);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectEqual(out, expected);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "simpson13",
-        explanation: "Simpson 1/3 rule on quadratic f(x)=x^2 over [0,1]. Even n=10 should give a value extremely close to 1/3.",
+        explanation: "Simpson 1/3 is exact for polynomials deg<=3. Matches 1/3 exactly.",
+        gas,
         inHex: "[0,1], n=10",
-        expectedHex: "N/A (analytic 1/3 in quad)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 8: Cubic Exactness (f=x^3 on [0,1], n=12)", async function () {
       t++;
-      const expectedDec = "0.25";
+      
+      const expected = await harness.qFromFrac(1, 4); // Analytic integral x^3 on [0,1] is 1/4 = 0.25.
 
       await touchGas(harness, "simpson13", [target, selCube, q0, q1, 12]);
       const gas = await estimateGas(harness, "simpson13", [target, selCube, q0, q1, 12]);
       const out = await harness.simpson13(target, selCube, q0, q1, 12);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectEqual(out, expected);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "simpson13",
-        explanation: "Simpson 1/3 rule on cubic f(x)=x^3 over [0,1]. Method is exact for cubics so the value should be exactly 1/4.",
+        explanation: "Simpson 1/3 exactness for cubics. Result must be exactly 0.25.",
+        gas,
         inHex: "[0,1], n=12",
-        expectedHex: "N/A (exact 0.25 in quad)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 9: Exp Approx (Linear proxy on [0,1], n=20)", async function () {
       t++;
-      const expectedDec = "~";
+      
+      const expected = await harness.qFromFrac(1, 2); // f_linear integral [0,1] is 0.5.
 
       await touchGas(harness, "simpson13", [target, selLinear, q0, q1, 20]);
       const gas = await estimateGas(harness, "simpson13", [target, selLinear, q0, q1, 20]);
       const out = await harness.simpson13(target, selLinear, q0, q1, 20);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectEqual(out, expected); 
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "simpson13",
-        explanation: "Simpson 1/3 on linear proxy (placeholder for exp-like curve) mainly to compare behavior and gas usage.",
+        explanation: "Simpson 1/3 on linear function. Should also be exact (deg 1 < 3).",
+        gas,
         inHex: "[0,1], n=20",
-        expectedHex: "N/A (comparison-only scenario)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 10: Inverse Function (1/x on [1,2], n=40)", async function () {
       t++;
-      const expectedDec = "≈0.693";
+
+      const ln2_js = Math.log(2);
+      const expected = await harness.fromFloat(BigInt(Math.round(ln2_js * 1e12)));
 
       await touchGas(harness, "simpson13", [target, selInv, q1, q2, 40]);
       const gas = await estimateGas(harness, "simpson13", [target, selInv, q1, q2, 40]);
       const out = await harness.simpson13(target, selInv, q1, q2, 40);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectClose(harness, out, expected, TOL_APPROX);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "simpson13",
-        explanation: "Simpson 1/3 integration of 1/x over [1,2]. Analytic value is ln(2) ≈ 0.693, smooth non-polynomial.",
+        explanation: "Simpson 1/3 of 1/x over [1,2]. Approximates ln(2).",
+        gas,
         inHex: "[1,2], n=40",
-        expectedHex: "N/A (analytic ln(2))",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
@@ -369,13 +391,13 @@ describe("Integration Library - Numerical Methods", function () {
       printBlockRegular({
         t,
         method: "simpson13",
-        explanation: "Simpson 1/3 called with odd n=7 should revert, enforcing even-subinterval constraint.",
+        explanation: "Simpson 1/3 called with odd n=7 should revert.",
+        gas: "N/A",
         inHex: "x^2, n=7",
         expectedHex: "Revert",
         outHex: "Revert",
         expectedDec: "Revert",
-        outDec: "Revert",
-        gas: "N/A",
+        outDec: "Revert"
       });
     });
   });
@@ -388,102 +410,97 @@ describe("Integration Library - Numerical Methods", function () {
 
     it("Test 12: Quadratic Exactness (f=x^2 on [0,1], n=9)", async function () {
       t++;
-      const expectedDec = "≈0.3333";
+
+      const expected = await harness.qFromFrac(1, 3);
 
       await touchGas(harness, "simpson38", [target, selSquare, q0, q1, 9]);
       const gas = await estimateGas(harness, "simpson38", [target, selSquare, q0, q1, 9]);
       const out = await harness.simpson38(target, selSquare, q0, q1, 9);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectEqual(out, expected);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "simpson38",
-        explanation: "Simpson 3/8 rule on quadratic f(x)=x^2 over [0,1]. Higher-order accuracy should give integral near 1/3.",
+        explanation: "Simpson 3/8 rule on quadratic f(x)=x^2. Exact result 1/3.",
+        gas,
         inHex: "[0,1], n=9",
-        expectedHex: "N/A (analytic 1/3 in quad)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 13: Cubic Exactness (f=x^3 on [0,1], n=12)", async function () {
       t++;
-      const expectedDec = "0.25";
+
+      const expected = await harness.qFromFrac(1, 4);
 
       await touchGas(harness, "simpson38", [target, selCube, q0, q1, 12]);
       const gas = await estimateGas(harness, "simpson38", [target, selCube, q0, q1, 12]);
       const out = await harness.simpson38(target, selCube, q0, q1, 12);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectEqual(out, expected); 
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "simpson38",
-        explanation: "Simpson 3/8 rule on cubic f(x)=x^3 over [0,1]. Expecting integral 1/4.",
+        explanation: "Simpson 3/8 rule on cubic f(x)=x^3. Exact result 1/4.",
+        gas,
         inHex: "[0,1], n=12",
-        expectedHex: "N/A (exact 0.25 in quad)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: expectedDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 14: Inverse Function (1/x on [1,2], n=12)", async function () {
       t++;
-      const expectedDec = "≈0.693";
+      const ln2_js = Math.log(2);
+      const expected = await harness.fromFloat(BigInt(Math.round(ln2_js * 1e12)));
 
       await touchGas(harness, "simpson38", [target, selInv, q1, q2, 12]);
       const gas = await estimateGas(harness, "simpson38", [target, selInv, q1, q2, 12]);
       const out = await harness.simpson38(target, selInv, q1, q2, 12);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectClose(harness, out, expected, TOL_APPROX);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "simpson38",
-        explanation: "Simpson 3/8 integration of 1/x over [1,2]. Should approximate ln(2) ≈ 0.693 similarly to 1/3 rule.",
+        explanation: "Simpson 3/8 integration of 1/x over [1,2]. Approximates ln(2).",
+        gas,
         inHex: "[1,2], n=12",
-        expectedHex: "N/A (analytic ln(2))",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 15: Degenerate Interval ([5,5], n=3)", async function () {
       t++;
       const five = await qInt(5);
-      const expectedDec = "0";
+      const expected = QZERO;
 
       await touchGas(harness, "simpson38", [target, selSquare, five, five, 3]);
       const gas = await estimateGas(harness, "simpson38", [target, selSquare, five, five, 3]);
       const out = await harness.simpson38(target, selSquare, five, five, 3);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectEqual(out, expected);
 
-      expect(out).to.equal(q0);
       printBlockRegular({
         t,
         method: "simpson38",
-        explanation: "Simpson 3/8 rule on zero-length interval [5,5]. Tntegral must be exactly zero, confirming bounds handling.",
+        explanation: "Simpson 3/8 rule on zero-length interval [5,5]. Integral must be zero.",
+        gas,
         inHex: "[5,5]",
-        expectedHex: q0,
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
@@ -493,13 +510,13 @@ describe("Integration Library - Numerical Methods", function () {
       printBlockRegular({
         t,
         method: "simpson38",
-        explanation: "Simpson 3/8 called with n=10 where n%3!=0. Should revert enforcing multiple-of-3 requirement.",
+        explanation: "Simpson 3/8 called with n=10 where n%3!=0. Should revert.",
+        gas: "N/A",
         inHex: "x^2, n=10",
         expectedHex: "Revert",
         outHex: "Revert",
         expectedDec: "Revert",
-        outDec: "Revert",
-        gas: "N/A",
+        outDec: "Revert"
       });
     });
   });
@@ -512,102 +529,100 @@ describe("Integration Library - Numerical Methods", function () {
 
     it("Test 17: Tiny Magnitudes (1e-30·x)", async function () {
       t++;
-      const expectedDec = "≈5e-31";
+      // If f(x) = 1e-30 * x, Integral 0->1 is 1e-30 * (1/2) = 5e-31
+      const expected = await harness.qFromFrac(5, BigInt("1" + "0".repeat(31))); // 5/1e31
 
       await touchGas(harness, "trapezoidal", [target, selTiny, q0, q1, 30]);
       const gas = await estimateGas(harness, "trapezoidal", [target, selTiny, q0, q1, 30]);
       const out = await harness.trapezoidal(target, selTiny, q0, q1, 30);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectClose(harness, out, expected, TOL_EXACT); // Expect 0 (or close to 0)
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "trapezoidal",
-        explanation: "Trapezoidal rule on extremely small-magnitude function 1e-30·x over [0,1]. Stress underflow and precision.",
+        explanation: "Tiny magnitude 1e-30·x. Integral 5e-31. Checks underflow/precision limits.",
+        gas,
         inHex: "1e-30·x",
-        expectedHex: "N/A (≈5e-31 in quad)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 18: Large Magnitudes (1e20·x)", async function () {
       t++;
-      const expectedDec = "≈5e19";
+      // f(x) = 1e20 * x. Integral 0->1 is 0.5e20 = 5e19.
+      const largeNum = BigInt("1" + "0".repeat(20));
+      const expected = await harness.qFromFrac(largeNum, 2);
 
       await touchGas(harness, "trapezoidal", [target, selLarge, q0, q1, 30]);
       const gas = await estimateGas(harness, "trapezoidal", [target, selLarge, q0, q1, 30]);
       const out = await harness.trapezoidal(target, selLarge, q0, q1, 30);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectClose(harness, out, expected, TOL_APPROX);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "trapezoidal",
-        explanation: "Trapezoidal rule on very large-magnitude function 1e20·x over [0,1]. Checks overflow resilience and scaling.",
+        explanation: "Large magnitude 1e20·x. Integral 5e19. Checks overflow/scaling.",
+        gas,
         inHex: "1e20·x",
-        expectedHex: "N/A (≈5e19 in quad)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 19: Piecewise Discontinuous", async function () {
       t++;
-      const expectedDec = "≈4";
+      // f_piecewise: x < 1 ? 1 : 3.
+      // Integral 0->2 = Integral(0->1 of 1) + Integral(1->2 of 3) = 1 + 3 = 4.
+      const expected = await qInt(4);
 
       await touchGas(harness, "simpson13", [target, selPiecewise, q0, q2, 60]);
       const gas = await estimateGas(harness, "simpson13", [target, selPiecewise, q0, q2, 60]);
       const out = await harness.simpson13(target, selPiecewise, q0, q2, 60);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectClose(harness, out, expected, TOL_APPROX);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "simpson13",
-        explanation: "Simpson 1/3 on piecewise-discontinuous f(x) over [0,2]. Tests robustness around internal jump from 1 to 3.",
+        explanation: "Piecewise jump. Integral 0->2 is 4. Tests robustness at discontinuity.",
+        gas,
         inHex: "[0,2]",
-        expectedHex: "N/A (piecewise analytic ≈4)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
     it("Test 20: Narrow Interval ([0,1e-12])", async function () {
       t++;
       const tiny = await harness.qFromFrac(1, BigInt("1000000000000"));
-      const expectedDec = "≈3.33e-37";
+      // Integral x^2 from 0 to 1e-12 is (1e-12)^3 / 3 = 1e-36 / 3.
+      const expected = await harness.qFromFrac(1, BigInt("3" + "0".repeat(36)));
 
       await touchGas(harness, "simpson38", [target, selSquare, q0, tiny, 9]);
       const gas = await estimateGas(harness, "simpson38", [target, selSquare, q0, tiny, 9]);
       const out = await harness.simpson38(target, selSquare, q0, tiny, 9);
 
-      const outInt = await harness.toFloat(out);
-      const outDec = formatScaledInt(outInt);
+      await expectClose(harness, out, expected, TOL_EXACT);
 
-      expect(out).to.be.a("string");
       printBlockRegular({
         t,
         method: "simpson38",
-        explanation: "Simpson 3/8 rule for x^2 over ultra-narrow interval [0,1e-12]. Validates tiny-domain integration stability.",
+        explanation: "Ultra-narrow interval [0,1e-12]. Result 3.33e-37.",
+        gas,
         inHex: "[0,1e-12]",
-        expectedHex: "N/A (≈3.33e-37 in quad)",
+        expectedHex: expected,
         outHex: out,
-        expectedDec: expectedDec,
-        outDec: outDec,
-        gas
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
       });
     });
 
@@ -617,13 +632,13 @@ describe("Integration Library - Numerical Methods", function () {
       printBlockRegular({
         t,
         method: "trapezoidal",
-        explanation: "Trapezoidal call with reversed bounds [1,0]. Library must revert, enforcing b >= a precondition.",
+        explanation: "Trapezoidal call with reversed bounds [1,0]. Should revert.",
+        gas: "N/A",
         inHex: "x^2, [1,0]",
         expectedHex: "Revert",
         outHex: "Revert",
         expectedDec: "Revert",
-        outDec: "Revert",
-        gas: "N/A"
+        outDec: "Revert"
       });
     });
   });
