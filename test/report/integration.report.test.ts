@@ -446,7 +446,7 @@ describe("Integration Library - Numerical Methods", function () {
       const out1 = await harness.simpson13(target, selPiecewise, q0, q1, 30);
       // Part 2: [1, 2]
       const out2 = await harness.simpson13(target, selPiecewise, q1, q2, 30);
-      
+
       // Sum the parts
       const total = await harness.qAdd(out1, out2);
 
@@ -456,7 +456,7 @@ describe("Integration Library - Numerical Methods", function () {
       // This high endpoint distorts the left integral, adding ~0.022 of error.
       // This is unavoidable with closed Newton-Cotes methods on jump discontinuities.
       const PIECEWISE_TOL = 30_000_000_000n; // ~0.03
-      
+
       await expectClose(harness, total, expected, PIECEWISE_TOL);
 
       // Gas estimate for reporting (approximation)
@@ -482,6 +482,10 @@ describe("Integration Library - Numerical Methods", function () {
   //  Simpson 3/8 Rule
   // ------------------------------------------------------------
 
+  // ------------------------------------------------------------
+  //  Simpson 3/8 Rule
+  // ------------------------------------------------------------
+
   describe("Section 3: Simpson 3/8 Rule", function () {
 
     it("Test 16: Quadratic Exactness (f=x^2 on [0,1], n=9)", async function () {
@@ -491,7 +495,7 @@ describe("Integration Library - Numerical Methods", function () {
       await expectClose(harness, out, expected, TOL_EXACT);
 
       await touchGas(harness, "simpson38", [target, selSquare, q0, q1, 9]);
-      const gas = await estimateGas(harness, "simpson38", [target, selSquare, 5, 5, 3]);
+      const gas = await estimateGas(harness, "simpson38", [target, selSquare, q0, q1, 9]);
 
       printBlockRegular({
         t,
@@ -512,8 +516,8 @@ describe("Integration Library - Numerical Methods", function () {
       const out = await harness.simpson38(target, selCube, q0, q1, 12);
       await expectClose(harness, out, expected, TOL_EXACT);
 
-      await touchGas(harness, "simpson38", [target, selSquare, 5, 5, 3]);
-      const gas = await estimateGas(harness, "simpson38", [target, selSquare, 5, 5, 3]);
+      await touchGas(harness, "simpson38", [target, selCube, q0, q1, 12]);
+      const gas = await estimateGas(harness, "simpson38", [target, selCube, q0, q1, 12]);
 
       printBlockRegular({
         t,
@@ -543,7 +547,7 @@ describe("Integration Library - Numerical Methods", function () {
         method: "simpson38",
         explanation: "Simpson 3/8 integration of 1/x over [1,2]. Approximates ln(2).",
         gas,
-        inHex: "[1,2], n=12",
+        inHex: "[1,2], n=99",
         expectedHex: expected,
         outHex: out,
         expectedDec: await fmt(harness, expected),
