@@ -20,8 +20,40 @@ type ODESolverHarness = Contract & {
 };
 
 let QZERO: string;
-const TOL_EXACT = 18446744073709551616n;           // 2^64
-const TOL_APPROX = 39614081257132168796771975168n; // 2^95
+const TOL_EXACT = 1n;     // For exact (constant slope), expect 0 or 1 bit of rounding noise.
+const TOL_APPROX = 1000n; // For approximate (integration drift), allow a very small margin (1e-9).
+
+// ------------------------------------------------------------
+// JS Numeric Mirrors (Verification)
+// ------------------------------------------------------------
+
+// y' = y
+// Euler: y * (1 + h)
+const exactEulerLinear = (y: number, h: number) => y * (1 + h);
+// RK2 (Heun & Midpoint match for linear): y * (1 + h + h^2/2)
+const exactRK2Linear   = (y: number, h: number) => y * (1 + h + 0.5 * h * h);
+// RK4 Discrete Step: y * (1 + h + h^2/2 + h^3/6 + h^4/24)
+const exactRK4Linear   = (y: number, h: number) => y * (1 + h + 0.5*h*h + (h**3)/6 + (h**4)/24);
+
+// y' = x^2
+const exactEulerSquare = (y: number, x: number, h: number) => y + h * (x**2);
+const exactMidSquare   = (y: number, x: number, h: number) => y + h * ((x + 0.5*h)**2);
+
+// Heun Discrete: y + (h/2) * (f(x) + f(x+h))
+const exactHeunSquare  = (y: number, x: number, h: number) => {
+    const k1 = x**2;
+    const k2 = (x + h)**2;
+    return y + (0.5 * h * (k1 + k2));
+};
+
+// RK4 Discrete: Weighted average of 4 slopes
+const exactRK4Square   = (y: number, x: number, h: number) => {
+    const k1 = x**2;
+    const k2 = (x + 0.5*h)**2;
+    const k3 = k2; // For f(x), k3 is same as k2 (x is same)
+    const k4 = (x + h)**2;
+    return y + (h/6) * (k1 + 2*k2 + 2*k3 + k4);
+};
 
 // ------------------------------------------------------------
 // Helpers
@@ -31,15 +63,23 @@ const TOL_APPROX = 39614081257132168796771975168n; // 2^95
  * @notice    Compares two numerical values and reverts if the absolute difference exceeds a tolerance.
  * @param h   The ODESolverHarness instance used for state access and conversion.
  * @param a   The string identifier or raw value of the first operand.
- * @param b   The string identifier or raw value of the second operand.
+ * @param b   Number identifier or raw value of the second operand.
  * @param tol The maximum allowable absolute difference (tolerance) between a and b.
  */
-async function expectClose(h: ODESolverHarness, a: string, b: string, tol: bigint) {
+async function expectClose(h: ODESolverHarness, a: string, bDec: number, tol: bigint) {
     const ai = await h.toFloat(a);
-    const bi = await h.toFloat(b);
+    const bi = BigInt(Math.round(bDec * 1e12)); // Convert JS number expectation to BigInt scaled by 1e12
+    
     let d = ai - bi;
     if (d < 0n) d = -d;
+
+    if (d > tol) {
+        console.log(`\nNumerical Failure: diff is ${d}, which exceeds tol ${tol}`);
+        console.log(`Contract (Hex->Dec): ${fmt(ai)}`);
+        console.log(`JS Expected:         ${fmt(bi)}`);
+    }
     expect(d <= tol).to.be.true;
+    return bi;
 }
 
 /**
@@ -62,8 +102,13 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
     let target: string;
     let t = 0;
 
-    let H: string;
-    let HNEG: string;
+    // Step size constants
+    let H_HEX: string;
+    let HNEG_HEX: string;
+    
+    // JS Numbers for verification
+    const H_NUM = 0.1;
+    const HNEG_NUM = -0.1;
 
     let selConst5: string;
     let selLinear: string;
@@ -93,9 +138,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         selLinear = h.interface.getFunction("f_linear")!.selector;
         selSquare = h.interface.getFunction("f_square")!.selector;
 
-        QZERO = await harness.fromFloat(0n);
-        H = await h.qFromFrac(1, 10);     // h = 0.1
-        HNEG = await h.qFromFrac(-1, 10); // h = -0.1
+        QZERO = await h.fromFloat(0n);
+        H_HEX = await h.qFromFrac(1, 10);
+        HNEG_HEX = await h.qFromFrac(-1, 10);
     });
 
     // ---------------------------------------------------------===
@@ -107,11 +152,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 1: Constant ODE y' = 5", async function () {
             t++;
             const y0 = await qi(2);
-            const expected = await qf(5, 2); // 2.5
+            const expected = 2.5
+            const expectedHex = await qf(5, 2); // 2.5
 
-            await touchGas(h, "euler", [target, selConst5, QZERO, y0, H]);
-            const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, H]);
-            const out = await h.euler(target, selConst5, QZERO, y0, H);
+            await touchGas(h, "euler", [target, selConst5, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, H_HEX]);
+            const out = await h.euler(target, selConst5, QZERO, y0, H_HEX);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -121,9 +167,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Euler integrates constant slope exactly: y + h·5.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -131,11 +177,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 2: Linear ODE y' = y", async function () {
             t++;
             const y0 = await qi(10);
-            const expected = await qi(11);
+            const expected = 11;
+            const expectedHex = await qi(11);
 
-            await touchGas(h, "euler", [target, selLinear, QZERO, y0, H]);
-            const gas = await estimateGas(h, "euler", [target, selLinear, QZERO, y0, H]);
-            const out = await h.euler(target, selLinear, QZERO, y0, H);
+            await touchGas(h, "euler", [target, selLinear, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "euler", [target, selLinear, QZERO, y0, H_HEX]);
+            const out = await h.euler(target, selLinear, QZERO, y0, H_HEX);
 
             await expectClose(h, out, expected, TOL_APPROX);
 
@@ -145,9 +192,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Euler on y'=y gives y+h·y (first-order approximation).",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -156,11 +203,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const x = await qi(2);
             const y0 = await qi(1);
-            const expected = await qf(7, 5); // 1.4
+            const expected = 1.4;
+            const expectedHex = await qf(7, 5); // 1.4
 
-            await touchGas(h, "euler", [target, selSquare, x, y0, H]);
-            const gas = await estimateGas(h, "euler", [target, selSquare, x, y0, H]);
-            const out = await h.euler(target, selSquare, x, y0, H);
+            await touchGas(h, "euler", [target, selSquare, x, y0, H_HEX]);
+            const gas = await estimateGas(h, "euler", [target, selSquare, x, y0, H_HEX]);
+            const out = await h.euler(target, selSquare, x, y0, H_HEX);
 
             await expectClose(h, out, expected, TOL_APPROX);
 
@@ -170,9 +218,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Euler with y'=x² uses slope at x only: y + h·x².",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -203,11 +251,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 5: Negative step", async function () {
             t++;
             const y0 = await qi(10);
-            const expected = await qf(19, 2); // 9.5
+            const expected = 9.5
+            const expectedHex = await qf(19, 2); // 9.5
 
-            await touchGas(h, "euler", [target, selConst5, QZERO, y0, HNEG]);
-            const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, HNEG]);
-            const out = await h.euler(target, selConst5, QZERO, y0, HNEG);
+            await touchGas(h, "euler", [target, selConst5, QZERO, y0, HNEG_HEX]);
+            const gas = await estimateGas(h, "euler", [target, selConst5, QZERO, y0, HNEG_HEX]);
+            const out = await h.euler(target, selConst5, QZERO, y0, HNEG_HEX);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -217,9 +266,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Negative h integrates backward in time.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -250,7 +299,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 7: Invalid selector reverts", async function () {
             t++;
             await expect(
-                h.euler(target, "0xdeadbeef", QZERO, await qi(1), H)
+                h.euler(target, "0xdeadbeef", QZERO, await qi(1), H_HEX)
             ).to.be.reverted;
 
             printBlockRegular({
@@ -275,11 +324,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 8: Constant ODE y' = 5 (exact)", async function () {
             t++;
             const y0 = await qi(2);
-            const expected = await qf(5, 2); // 2.5;
+            const expected = 2.5;
+            const expectedHex = await qf(5, 2); // 2.5;
 
-            await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, H]);
-            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, H]);
-            const out = await h.rk2Midpoint(target, selConst5, QZERO, y0, H);
+            await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, H_HEX]);
+            const out = await h.rk2Midpoint(target, selConst5, QZERO, y0, H_HEX);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -289,9 +339,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Midpoint RK2 integrates constant slope exactly.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -299,11 +349,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 9: Linear ODE y' = y", async function () {
             t++;
             const y0 = await qi(10);
-            const expected = await qf(221, 20); // 11.05
+            const expected = 11.05; // 11.05
+            const expectedHex = await qf(221, 20); // 11.05
 
-            await touchGas(h, "rk2Midpoint", [target, selLinear, QZERO, y0, H]);
-            const gas = await estimateGas(h, "rk2Midpoint", [target, selLinear, QZERO, y0, H]);
-            const out = await h.rk2Midpoint(target, selLinear, QZERO, y0, H);
+            await touchGas(h, "rk2Midpoint", [target, selLinear, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk2Midpoint", [target, selLinear, QZERO, y0, H_HEX]);
+            const out = await h.rk2Midpoint(target, selLinear, QZERO, y0, H_HEX);
 
             await expectClose(h, out, expected, TOL_APPROX);
 
@@ -313,35 +364,29 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Midpoint RK2 improves Euler accuracy for y'=y.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
 
         it("Test 10: Quadratic slope y'=x²", async function () {
             t++;
-            const x = await qi(2);
-            const y0 = await qi(1);
-            const expected = await qf(29, 20); // 1.45
+            const xStart = 2; const yStart = 1;
+            const x = await qi(xStart); const y0 = await qi(yStart);
+            const expectedNum = exactMidSquare(yStart, xStart, H_NUM); // 1.42025
 
-            await touchGas(h, "rk2Midpoint", [target, selSquare, x, y0, H]);
-            const gas = await estimateGas(h, "rk2Midpoint", [target, selSquare, x, y0, H]);
-            const out = await h.rk2Midpoint(target, selSquare, x, y0, H);
+            await touchGas(h, "rk2Midpoint", [target, selSquare, x, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk2Midpoint", [target, selSquare, x, y0, H_HEX]);
+            const out = await h.rk2Midpoint(target, selSquare, x, y0, H_HEX);
 
-            await expectClose(h, out, expected, TOL_APPROX);
+            await expectClose(h, out, expectedNum, TOL_APPROX);
 
             printBlockRegular({
-                t,
-                method: "RK2 Midpoint",
-                explanation: "Midpoint samples slope at x+h/2, improving quadratic integration.",
-                gas,
-                inHex: y0,
-                expectedHex: expected,
-                outHex: out,
-                expectedDec: await getDec(h, expected),
-                outDec: fmt(await h.toFloat(out)),
+                t, method: "RK2 Midpoint", explanation: "Midpoint samples slope at x+h/2.",
+                gas, inHex: y0, expectedHex: "~", outHex: out,
+                expectedDec: `${expectedNum}`, outDec: await getDec(h, out),
             });
         });
 
@@ -371,11 +416,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 12: Negative step", async function () {
             t++;
             const y0 = await qi(10);
-            const expected = await qf(19, 2);  // 9.5
+            const expected = 9.5
+            const expectedHex = await qf(19, 2);  // 9.5
 
-            await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, HNEG]);
-            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, HNEG]);
-            const out = await h.rk2Midpoint(target, selConst5, QZERO, y0, HNEG);
+            await touchGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, HNEG_HEX]);
+            const gas = await estimateGas(h, "rk2Midpoint", [target, selConst5, QZERO, y0, HNEG_HEX]);
+            const out = await h.rk2Midpoint(target, selConst5, QZERO, y0, HNEG_HEX);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -385,9 +431,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Negative step integrates backward in time.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -418,7 +464,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 14: Invalid selector reverts", async function () {
             t++;
             await expect(
-                h.rk2Midpoint(target, "0xdeadbeef", QZERO, await qi(1), H)
+                h.rk2Midpoint(target, "0xdeadbeef", QZERO, await qi(1), H_HEX)
             ).to.be.reverted;
 
             printBlockRegular({
@@ -443,11 +489,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 15: Constant ODE exact", async function () {
             t++;
             const y0 = await qi(2);
-            const expected = await qf(5, 2); // 2.5;
+            const expected = 2.5;
+            const expectedHex = await qf(5, 2); // 2.5
 
-            await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, H]);
-            const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, H]);
-            const out = await h.rk2Heun(target, selConst5, QZERO, y0, H);
+            await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, H_HEX]);
+            const out = await h.rk2Heun(target, selConst5, QZERO, y0, H_HEX);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -457,48 +504,53 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Heun integrates constant slope exactly via trapezoidal averaging.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
 
         it("Test 16: Linear ODE y'=y", async function () {
             t++;
-            const y0 = await qi(10);
-            const expected = await qf(11051709, 1_000_000); // 11.051709
+            const yStart = 10;
+            const y0 = await qi(yStart);
 
-            await touchGas(h, "rk2Heun", [target, selLinear, QZERO, y0, H]);
-            const gas = await estimateGas(h, "rk2Heun", [target, selLinear, QZERO, y0, H]);
-            const out = await h.rk2Heun(target, selLinear, QZERO, y0, H);
+            const expectedNum = exactRK2Linear(yStart, H_NUM); // Use RK2 Linear Generator
+            const expectedHex = await h.fromFloat(BigInt(Math.round(expectedNum * 1e12)));
 
-            await expectClose(h, out, expected, TOL_APPROX);
+            await touchGas(h, "rk2Heun", [target, selLinear, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk2Heun", [target, selLinear, QZERO, y0, H_HEX]);
+            const out = await h.rk2Heun(target, selLinear, QZERO, y0, H_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX); // Passes with 1000n
 
             printBlockRegular({
                 t,
                 method: "RK2 Heun",
-                explanation: "Heun averages initial and predicted slopes for better linear accuracy.",
+                explanation: "Heun averages initial and predicted slopes.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
-                outDec: fmt(await h.toFloat(out)),
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
             });
         });
 
         it("Test 17: Quadratic slope y'=x²", async function () {
             t++;
-            const x = await qi(2);
-            const y0 = await qi(1);
-            const expected = await qf(7, 5); // 1.4
+            const xStart = 2; const yStart = 1;
+            const x = await qi(xStart); const y0 = await qi(yStart);
 
-            await touchGas(h, "rk2Heun", [target, selSquare, x, y0, H]);
-            const gas = await estimateGas(h, "rk2Heun", [target, selSquare, x, y0, H]);
-            const out = await h.rk2Heun(target, selSquare, x, y0, H);
+            const expectedNum = exactHeunSquare(yStart, xStart, H_NUM); // Use Heun Square Generator
+            const expectedHex = await h.fromFloat(BigInt(Math.round(expectedNum * 1e12)));
 
-            await expectClose(h, out, expected, TOL_APPROX);
+            await touchGas(h, "rk2Heun", [target, selSquare, x, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk2Heun", [target, selSquare, x, y0, H_HEX]);
+            const out = await h.rk2Heun(target, selSquare, x, y0, H_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX);
 
             printBlockRegular({
                 t,
@@ -506,10 +558,10 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Heun uses forward prediction and trapezoidal correction.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
-                outDec: fmt(await h.toFloat(out)),
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
             });
         });
 
@@ -539,11 +591,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 19: Negative step", async function () {
             t++;
             const y0 = await qi(10);
-            const expected = await qf(19, 2); // 9.5
+            const expected = 9.5
+            const expectedHex = await qf(19, 2); // 9.5
 
-            await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, HNEG]);
-            const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, HNEG]);
-            const out = await h.rk2Heun(target, selConst5, QZERO, y0, HNEG);
+            await touchGas(h, "rk2Heun", [target, selConst5, QZERO, y0, HNEG_HEX]);
+            const gas = await estimateGas(h, "rk2Heun", [target, selConst5, QZERO, y0, HNEG_HEX]);
+            const out = await h.rk2Heun(target, selConst5, QZERO, y0, HNEG_HEX);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -553,9 +606,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Negative step integrates backward.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -586,7 +639,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 21: Invalid selector reverts", async function () {
             t++;
             await expect(
-                h.rk2Heun(target, "0xdeadbeef", QZERO, await qi(1), H)
+                h.rk2Heun(target, "0xdeadbeef", QZERO, await qi(1), H_HEX)
             ).to.be.reverted;
 
             printBlockRegular({
@@ -611,11 +664,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 22: Constant ODE exact", async function () {
             t++;
             const y0 = await qi(2);
-            const expected = await qf(5, 2); // 2.5;
+            const expected = 2.5;
+            const expectedHex = await qf(5, 2); // 2.5;
 
-            await touchGas(h, "rk4", [target, selConst5, QZERO, y0, H]);
-            const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, H]);
-            const out = await h.rk4(target, selConst5, QZERO, y0, H);
+            await touchGas(h, "rk4", [target, selConst5, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, H_HEX]);
+            const out = await h.rk4(target, selConst5, QZERO, y0, H_HEX);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -625,59 +679,64 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "RK4 integrates constant slope exactly.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
 
         it("Test 23: Linear ODE y'=y", async function () {
             t++;
-            const y0 = await qi(10);
-            const expected = await qf(11051709, 1_000_000); // 11.051709
+            const yStart = 10;
+            const y0 = await qi(yStart);
+            
+            const expectedNum = exactRK4Linear(yStart, H_NUM); // Use RK4 Linear Generator
+            const expectedHex = await h.fromFloat(BigInt(Math.round(expectedNum * 1e12)));
 
-            await touchGas(h, "rk4", [target, selLinear, QZERO, y0, H]);
-            const gas = await estimateGas(h, "rk4", [target, selLinear, QZERO, y0, H]);
-            const out = await h.rk4(target, selLinear, QZERO, y0, H);
+            await touchGas(h, "rk4", [target, selLinear, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk4", [target, selLinear, QZERO, y0, H_HEX]);
+            const out = await h.rk4(target, selLinear, QZERO, y0, H_HEX);
 
-            await expectClose(h, out, expected, TOL_APPROX);
+            await expectClose(h, out, expectedNum, TOL_APPROX);
 
             printBlockRegular({
                 t,
                 method: "RK4",
-                explanation: "RK4 closely matches exponential growth for y'=y.",
+                explanation: "RK4 closely matches exponential growth.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
-                outDec: fmt(await h.toFloat(out)),
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
             });
         });
 
         it("Test 24: Quadratic slope y'=x²", async function () {
             t++;
-            const x = await qi(2);
-            const y0 = await qi(1);
-            const expected = await qf(7, 5); // 1.4
+            const xStart = 2; const yStart = 1;
+            const x = await qi(xStart); const y0 = await qi(yStart);
 
-            await touchGas(h, "rk4", [target, selSquare, x, y0, H]);
-            const gas = await estimateGas(h, "rk4", [target, selSquare, x, y0, H]);
-            const out = await h.rk4(target, selSquare, x, y0, H);
+            const expectedNum = exactRK4Square(yStart, xStart, H_NUM); // Use RK4 Square Generator
+            const expectedHex = await h.fromFloat(BigInt(Math.round(expectedNum * 1e12)));
 
-            await expectClose(h, out, expected, TOL_APPROX);
+            await touchGas(h, "rk4", [target, selSquare, x, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk4", [target, selSquare, x, y0, H_HEX]);
+            const out = await h.rk4(target, selSquare, x, y0, H_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX);
 
             printBlockRegular({
                 t,
                 method: "RK4",
-                explanation: "RK4 samples slope at four points for high accuracy.",
+                explanation: "RK4 is accurate to 4th order for polynomials.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
-                outDec: fmt(await h.toFloat(out)),
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
             });
         });
 
@@ -707,11 +766,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 26: Negative step", async function () {
             t++;
             const y0 = await qi(10);
-            const expected = await qf(19, 2);  // 9.5
+            const expected = 9.5
+            const expectedHex = await qf(19, 2);  // 9.5
 
-            await touchGas(h, "rk4", [target, selConst5, QZERO, y0, HNEG]);
-            const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, HNEG]);
-            const out = await h.rk4(target, selConst5, QZERO, y0, HNEG);
+            await touchGas(h, "rk4", [target, selConst5, QZERO, y0, HNEG_HEX]);
+            const gas = await estimateGas(h, "rk4", [target, selConst5, QZERO, y0, HNEG_HEX]);
+            const out = await h.rk4(target, selConst5, QZERO, y0, HNEG_HEX);
 
             await expectClose(h, out, expected, TOL_EXACT);
 
@@ -721,9 +781,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 explanation: "Negative step integrates backward exactly for constant slope.",
                 gas,
                 inHex: y0,
-                expectedHex: expected,
+                expectedHex: expectedHex,
                 outHex: out,
-                expectedDec: await getDec(h, expected),
+                expectedDec: await getDec(h, expectedHex),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -754,7 +814,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         it("Test 28: Invalid selector reverts", async function () {
             t++;
             await expect(
-                h.rk4(target, "0xdeadbeef", QZERO, await qi(1), H)
+                h.rk4(target, "0xdeadbeef", QZERO, await qi(1), H_HEX)
             ).to.be.reverted;
 
             printBlockRegular({

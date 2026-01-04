@@ -45,11 +45,11 @@ contract ODESolverHarness {
 
     /** 
      * @notice Linear ODE: y' = y
-     * @param  x Input value.
+     * @param  y Input value.
      * @return v Quad-precision output equal to x.
      */
-    function f_linear(bytes16 x) external pure returns (bytes16) {
-        return x;
+    function f_linear(bytes16 /* x */, bytes16 y) external pure returns (bytes16) {
+        return y; 
     }
 
     /**
@@ -57,8 +57,8 @@ contract ODESolverHarness {
      * @param  x Input value.
      * @return v Quad-precision square of x.
      */
-    function f_square(bytes16 x) external pure returns (bytes16) {
-        return x.mul(x);
+    function f_square(bytes16 x, bytes16 /* y */) external pure returns (bytes16) {
+            return x.mul(x);
     }
 
     // ------------------------------------------------------------

@@ -185,5 +185,4 @@ library ODESolver {
 
         return y.add(h.mul(weighted).mul(QC.ONESIXTH()));
     }
-
 }
