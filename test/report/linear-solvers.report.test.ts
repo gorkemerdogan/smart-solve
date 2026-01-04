@@ -12,7 +12,7 @@ type LinearSolversHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
     toFloat(q: string): Promise<bigint>;
-
+    
     gradientDescentLeastSquares(m: bigint, n: bigint, Adata: string[], bdata: string[], x0data: string[], alpha: string, maxIter: bigint, tol: string): Promise<[string[], bigint]>;
     jacobi(n: bigint, Adata: string[], bdata: string[], x0data: string[], maxIter: bigint, tolDiff: string): Promise<[string[], bigint]>;
     gaussSeidel(n: bigint, Adata: string[], bdata: string[], x0data: string[], maxIter: bigint, tolDiff: string): Promise<[string[], bigint]>;
@@ -28,6 +28,18 @@ function toBigIntArray(arr: number[]): bigint[] {
     return arr.map((x) => BigInt(x));
 }
 
+// Convert Array<number> to Array<BigInt> scaled
+function toScaledArray(arr: number[]): bigint[] {
+    return arr.map(x => BigInt(Math.round(x * Number(SCALE))));
+}
+
+// Check if scalar values are close
+function expectClose(actual: bigint, expected: bigint, tol: bigint, msg: string = "") {
+    let diff = actual - expected;
+    if (diff < 0n) diff = -diff;
+    expect(diff).to.be.below(tol, `${msg} | Expected ${expected}, got ${actual}, diff ${diff}`);
+}
+
 /// Helper to multiply A (n×n) by x (n×1) in JS for verification.
 function multiplyMatrixVector(n: number, A: bigint[], x: bigint[]): bigint[] {
     const out: bigint[] = new Array(n).fill(0n);
@@ -41,7 +53,7 @@ function multiplyMatrixVector(n: number, A: bigint[], x: bigint[]): bigint[] {
     return out;
 }
 
-/// Helper to multiply two n×n matrices in JS.
+// Matrix Multiplication (A * B) / SCALE
 function multiplyMatrices(n: number, A: bigint[], B: bigint[]): bigint[] {
     const C: bigint[] = new Array(n * n).fill(0n);
     for (let i = 0; i < n; ++i) {
@@ -56,17 +68,9 @@ function multiplyMatrices(n: number, A: bigint[], B: bigint[]): bigint[] {
     return C;
 }
 
-/// Helper to check two matrices numerically the same within a tolerance
-function expectMatrixSimilar(
-    n: number,
-    A: bigint[],
-    B: bigint[],
-    tol: bigint
-) {
+function expectMatrixSimilar(n: number, A: bigint[], B: bigint[], tol: bigint) {
     for (let i = 0; i < n * n; i++) {
-        const diff = A[i] - B[i];
-        const abs = diff < 0n ? -diff : diff;
-        expect(abs).to.be.lessThan(tol, `Matrix mismatch at index ${i}`);
+        expectClose(A[i], B[i], tol, `Matrix mismatch at index ${i}`);
     }
 }
 
@@ -81,18 +85,17 @@ function expectVecEq(actual: bigint[], expected: number[]) {
 
 const SCALE_DECIMALS = 12n;
 const SCALE = 10n ** SCALE_DECIMALS;
-const MAT_TOL = 5n * SCALE; // matrix reconstruction tolerance
+const TOL_DIRECT = 500n; // For direct solvers (Gaussian/LU) (1e-10)
+const TOL_ITERATIVE = 1_000_000n; // For iterative solvers (GD/Jacobi) (1e-6)
+const MAT_TOL = 1_000n; // Matrix reconstruction tolerance (1e-9)
 
 function formatScaledInt(v: bigint): string {
     const neg = v < 0n;
     const abs = neg ? -v : v;
-
     const intPart = abs / SCALE;
     const fracPart = abs % SCALE;
-
     const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
-
-    return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`;
+    return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`.replace(/\.?0+$/, "");
 }
 
 // ------------------------------------------------------------
@@ -124,15 +127,167 @@ describe("LinearSolversHarness", function () {
 
         it("Test 1: 1D identity A=1 converges in one step", async function () {
             t++;
+            const valA = 1n;
+            const valB = 5n;
+            
+            const expectedVal = (valB * SCALE) / valA; 
 
-            // Dimensions
+            const A = [await harness.qFromInt(valA)];
+            const b = [await harness.qFromInt(valB)];
+            const x0 = [await harness.qFromInt(0)];
+            const alpha = await harness.qFromInt(1);
+            const tol = await harness.qFromInt(0);
+            
+            const args = [1n, 1n, A, b, x0, alpha, 10n, tol];
+            await touchGas(harness, "gradientDescentLeastSquares", args);
+            const gas = await estimateGas(harness, "gradientDescentLeastSquares", args);
+
+            const [x, iters] = await harness.gradientDescentLeastSquares(1n, 1n, A, b, x0, alpha, 10n, tol);
+            const actualVal = await harness.toFloat(x[0]);
+
+            expectClose(actualVal, expectedVal, TOL_ITERATIVE, "Result x0");
+            expect(iters).to.be.lessThanOrEqual(1n);
+
+            printBlockRegular({
+                t,
+                method: "Gradient Descent",
+                explanation: `1D identity (A=${valA}, b=${valB}) | x = b/A.`,
+                inHex: `A=[${valA}], b=[${valB}]`,
+                expectedHex: await harness.qFromInt(5),
+                outHex: x[0],
+                expectedDec: formatScaledInt(expectedVal),
+                outDec: formatScaledInt(actualVal),
+                gas,
+            });
+        });
+
+        it("Test 2: 1D scaled identity A=2", async function () {
+            t++;
+            const valA = 2n;
+            const valB = 8n;
+            const expectedVal = (valB * SCALE) / valA;
+
+            const A = [await harness.qFromInt(valA)];
+            const b = [await harness.qFromInt(valB)];
+            const x0 = [await harness.qFromInt(0)];
+            const alpha = await harness.qFromFrac(1, 4);
+
+            const [x] = await harness.gradientDescentLeastSquares(1n, 1n, A, b, x0, alpha, 50n, await harness.qFromInt(0));
+            const actualVal = await harness.toFloat(x[0]);
+
+            expectClose(actualVal, expectedVal, TOL_ITERATIVE);
+
+            await touchGas(harness, "gradientDescentLeastSquares", [1n, 1n, A, b, x0, alpha, 50n, await harness.qFromInt(0)]);
+            const gas = await estimateGas(harness, "gradientDescentLeastSquares", [1n, 1n, A, b, x0, alpha, 50n, await harness.qFromInt(0)]);
+
+            printBlockRegular({
+                t,
+                method: "Gradient Descent",
+                explanation: "Should converge to 4 for 1D scaled.",
+                inHex: `A=[${valA}], b=[${valB}]`,
+                expectedHex: await harness.qFromInt(4), 
+                outHex: x[0],
+                expectedDec: formatScaledInt(expectedVal),
+                outDec: formatScaledInt(actualVal),
+                gas,
+            });
+        });
+
+        it("Test 3: 2D identity system", async function () {
+            t++;
+
+            const bVals = [3n, -7n];
+            const expectedVec = bVals.map(v => v * SCALE);
+
+            const A = [await harness.qFromInt(1), await harness.qFromInt(0), await harness.qFromInt(0), await harness.qFromInt(1)];
+            const b = [await harness.qFromInt(bVals[0]), await harness.qFromInt(bVals[1])];
+            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
+
+            const [x] = await harness.gradientDescentLeastSquares(2n, 2n, A, b, x0, await harness.qFromInt(1), 10n, await harness.qFromInt(0));
+            
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
+
+            expectClose(actual0, expectedVec[0], TOL_ITERATIVE);
+            expectClose(actual1, expectedVec[1], TOL_ITERATIVE);
+
+            const gas = await estimateGas(harness, "gradientDescentLeastSquares", [2n, 2n, A, b, x0, await harness.qFromInt(1), 10n, await harness.qFromInt(0)]);
+
+            printBlockRegular({
+                t,
+                method: "Gradient Descent",
+                explanation: "Result matches input b for 2D Identity.",
+                inHex: "A=I, b=[3,-7]",
+                expectedHex: `[${b[0]}, ${b[1]}]`,
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: `[${bVals.join(", ")}]`,
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}]`,
+                gas,
+            });
+        });
+
+        it("Test 4: Overdetermined least-squares system", async function () {
+            t++;
+
+            const m = 2n;
+            const n = 1n;
+
+            const valA = [1n, 1n];
+            const valB = [2n, 4n];
+
+            const numerator = valA.reduce((sum, ai, i) => sum + ai * valB[i], 0n);
+            const denominator = valA.reduce((sum, ai) => sum + ai * ai, 0n);
+            const expectedVal = (numerator * SCALE) / denominator;
+
+            const A = await Promise.all(valA.map(v => harness.qFromInt(v)));
+            const b = await Promise.all(valB.map(v => harness.qFromInt(v)));
+            const x0 = [await harness.qFromInt(0)];
+            const alpha = await harness.qFromFrac(1, 2);
+            const tol = await harness.qFromInt(0);
+            const maxIter = 50n;
+
+            const args = [m, n, A, b, x0, alpha, maxIter, tol];
+
+            await touchGas(harness, "gradientDescentLeastSquares", args);
+            const gas = await estimateGas(harness, "gradientDescentLeastSquares", args);
+
+            const [x] = await harness.gradientDescentLeastSquares(m, n, A, b, x0, alpha, maxIter, tol);
+
+            const actualVal = await harness.toFloat(x[0]);
+
+            // Use TOL_ITERATIVE (1e-6)
+            expectClose(actualVal, expectedVal, TOL_ITERATIVE, "Least Squares Solution Mismatch");
+
+            printBlockRegular({
+                t,
+                method: "Gradient Descent Least Squares",
+                explanation: "Minimal residual found at the mean for unit A. (m=2, n=1)",
+                inHex: `A=[${valA.join(",")}], b=[${valB.join(",")}]`,
+                expectedHex: await harness.fromFloat(expectedVal),
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: formatScaledInt(expectedVal),
+                outDec: formatScaledInt(actualVal),
+                gas,
+            });
+        });
+
+        it("Test 5: Zero gradient at start", async function () {
+            t++;
+
             const m = 1n;
             const n = 1n;
 
-            // Build quad inputs
-            const A = [await harness.qFromInt(1)];   // [1]
-            const b = [await harness.qFromInt(5)];   // [5]
-            const x0 = [await harness.qFromInt(0)];  // [0]
+            const valA = [1n];
+            const valB = [0n];
+            const valX0 = [0n];
+
+            // For 1D: grad = A * (A * x0 - b)
+            const initialGrad = valA[0] * (valA[0] * valX0[0] - valB[0]);
+            const expectedVal = valX0[0] * SCALE;
+
+            const A = [await harness.qFromInt(valA[0])];
+            const b = [await harness.qFromInt(valB[0])];
+            const x0 = [await harness.qFromInt(valX0[0])];
 
             const alpha = await harness.qFromInt(1);
             const tol = await harness.qFromInt(0);
@@ -145,194 +300,24 @@ describe("LinearSolversHarness", function () {
 
             const [x, iters] = await harness.gradientDescentLeastSquares(m, n, A, b, x0, alpha, maxIter, tol);
 
-            expect(x.length).to.equal(1);
+            const actualVal = await harness.toFloat(x[0]);
 
-            const x0Int = await harness.toFloat(x[0]);
-            expect(x0Int / SCALE).to.equal(5n);
-            expect(iters).to.be.lessThanOrEqual(1n);
-
-            const outDec = formatScaledInt(x0Int);
-
-            const expected = await harness.qFromInt(5);
-
-            printBlockRegular({
-                t,
-                method: "Gradient Descent Least Squares",
-                explanation: "1D identity matrix (A=1, b=5). Should converge in one step.",
-                inHex: "A=[1], b=[5], x0=[0]",
-                expectedHex: expected,
-                outHex: `[${x.join(", ")}]`,
-                expectedDec: "5",
-                outDec: outDec.toString(),
-                gas,
-            });
-        });
-
-        it("Test 2: 1D scaled identity A=2", async function () {
-            t++;
-
-            const m = 1n;
-            const n = 1n;
-
-            const A = [await harness.qFromInt(2)];
-            const b = [await harness.qFromInt(8)];
-            const x0 = [await harness.qFromInt(0)];
-
-            const alpha = await harness.qFromFrac(1, 4); // 0.25
-            const tol = await harness.qFromInt(0);
-            const maxIter = 50n;
-
-            const args = [m, n, A, b, x0, alpha, maxIter, tol];
-
-            await touchGas(harness, "gradientDescentLeastSquares", args);
-            const gas = await estimateGas(harness, "gradientDescentLeastSquares", args);
-
-            const [x, iters] =
-                await harness.gradientDescentLeastSquares(m, n, A, b, x0, alpha, maxIter, tol);
-
-            const xInt = await harness.toFloat(x[0]);
-            expect(xInt / SCALE).to.equal(4n);
-
-            const expected = await harness.qFromInt(4);
-            const outDec = formatScaledInt(xInt);
+            expect(actualVal).to.equal(expectedVal);
+        
+            // If JS shows gradient is 0, iterations must be 0
+            if (initialGrad === 0n) {
+                expect(iters).to.equal(0n, "Should terminate immediately with zero gradient");
+            }
 
             printBlockRegular({
                 t,
                 method: "Gradient Descent Least Squares",
-                explanation: "1D scaled identity (A=2, b=8). Expected solution x=4.",
-                inHex: "A=[2], b=[8], x0=[0]",
-                expectedHex: expected,
+                explanation: "If initial gradient is null, iterations must be zero.",
+                inHex: `A=[${valA}], b=[${valB}], x0=[${valX0}]`,
+                expectedHex: await harness.qFromInt(valX0[0]),
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "4",
-                outDec,
-                gas,
-            });
-        });
-
-        it("Test 3: 2D identity system", async function () {
-            t++;
-
-            const m = 2n;
-            const n = 2n;
-
-            const A = [
-                await harness.qFromInt(1), await harness.qFromInt(0),
-                await harness.qFromInt(0), await harness.qFromInt(1),
-            ];
-            const b = [await harness.qFromInt(3), await harness.qFromInt(-7)];
-            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
-
-            const alpha = await harness.qFromInt(1);
-            const tol = await harness.qFromInt(0);
-            const maxIter = 10n;
-
-            const args = [m, n, A, b, x0, alpha, maxIter, tol];
-
-            await touchGas(harness, "gradientDescentLeastSquares", args);
-            const gas = await estimateGas(harness, "gradientDescentLeastSquares", args);
-
-            const [x] =
-                await harness.gradientDescentLeastSquares(m, n, A, b, x0, alpha, maxIter, tol);
-
-            const x0Int = await harness.toFloat(x[0]);
-            const x1Int = await harness.toFloat(x[1]);
-
-            expect(x0Int / SCALE).to.equal(3n);
-            expect(x1Int / SCALE).to.equal(-7n);
-
-            const expected0 = await harness.qFromInt(3);
-            const expected1 = await harness.qFromInt(-7);
-
-            printBlockRegular({
-                t,
-                method: "Gradient Descent Least Squares",
-                explanation: "2D identity system should recover b exactly.",
-                inHex: "A=I₂, b=[3,-7]",
-                expectedHex: `[${expected0}, ${expected1}]`,
-                outHex: `[${x.join(", ")}]`,
-                expectedDec: "[3, -7]",
-                outDec: `[${formatScaledInt(x0Int)}, ${formatScaledInt(x1Int)}]`,
-                gas,
-            });
-        });
-
-        it("Test 4: Overdetermined least-squares system", async function () {
-            t++;
-
-            const m = 2n;
-            const n = 1n;
-
-            const A = [await harness.qFromInt(1), await harness.qFromInt(1)];
-            const b = [await harness.qFromInt(2), await harness.qFromInt(4)];
-            const x0 = [await harness.qFromInt(0)];
-
-            const alpha = await harness.qFromFrac(1, 2);
-            const tol = await harness.qFromInt(0);
-            const maxIter = 50n;
-
-            const args = [m, n, A, b, x0, alpha, maxIter, tol];
-
-            await touchGas(harness, "gradientDescentLeastSquares", args);
-            const gas = await estimateGas(harness, "gradientDescentLeastSquares", args);
-
-            const [x] =
-                await harness.gradientDescentLeastSquares(m, n, A, b, x0, alpha, maxIter, tol);
-
-            const xInt = await harness.toFloat(x[0]);
-            expect(xInt / SCALE).to.equal(3n);
-
-            const expected = await harness.qFromInt(3);
-
-            printBlockRegular({
-                t,
-                method: "Gradient Descent Least Squares",
-                explanation: "Overdetermined system, solution is mean of b.",
-                inHex: "A=[1,1], b=[2,4]",
-                expectedHex: expected,
-                outHex: `[${x.join(", ")}]`,
-                expectedDec: "3",
-                outDec: formatScaledInt(xInt),
-                gas,
-            });
-        });
-
-        it("Test 5: Zero gradient at start", async function () {
-            t++;
-
-            const m = 1n;
-            const n = 1n;
-
-            const A = [await harness.qFromInt(1)];
-            const b = [await harness.qFromInt(0)];
-            const x0 = [await harness.qFromInt(0)];
-
-            const alpha = await harness.qFromInt(1);
-            const tol = await harness.qFromInt(0);
-            const maxIter = 10n;
-
-            const args = [m, n, A, b, x0, alpha, maxIter, tol];
-
-            await touchGas(harness, "gradientDescentLeastSquares", args);
-            const gas = await estimateGas(harness, "gradientDescentLeastSquares", args);
-
-            const [x, iters] =
-                await harness.gradientDescentLeastSquares(m, n, A, b, x0, alpha, maxIter, tol);
-
-            const xInt = await harness.toFloat(x[0]);
-            expect(xInt).to.equal(0n);
-            expect(iters).to.equal(0n);
-
-            const expected = await harness.qFromInt(0);
-
-            printBlockRegular({
-                t,
-                method: "Gradient Descent Least Squares",
-                explanation: "Zero gradient at initial point should terminate immediately.",
-                inHex: "A=[1], b=[0], x0=[0]",
-                expectedHex: expected,
-                outHex: `[${x.join(", ")}]`,
-                expectedDec: "0",
-                outDec: "0.000000000000",
+                expectedDec: formatScaledInt(expectedVal),
+                outDec: formatScaledInt(actualVal),
                 gas,
             });
         });
@@ -343,34 +328,51 @@ describe("LinearSolversHarness", function () {
             const m = 1n;
             const n = 1n;
 
-            const A = [await harness.qFromInt(1)];
-            const b = [await harness.qFromInt(1)];
-            const x0 = [await harness.qFromInt(0)];
-
-            const alpha = await harness.qFromFrac(1, 1_000_000);
-            const tol = await harness.qFromInt(0);
+            const valA = 1n;
+            const valB = 1n;
+            const valX0 = 0n;
             const maxIter = 5n;
 
-            const args = [m, n, A, b, x0, alpha, maxIter, tol];
+            const alphaNum = 1n;
+            const alphaDen = 1_000_000n;
 
+            // x_next = x - alpha * (A * (A * x - b))
+            let xJS = Number(valX0);
+            const aJS = Number(valA);
+            const bJS = Number(valB);
+            const lrJS = Number(alphaNum) / Number(alphaDen);
+
+            for (let i = 0; i < Number(maxIter); i++) {
+                const grad = aJS * (aJS * xJS - bJS);
+                xJS = xJS - lrJS * grad;
+            }
+            
+            const expectedVal = BigInt(Math.round(xJS * Number(SCALE)));
+
+            const A = [await harness.qFromInt(valA)];
+            const b = [await harness.qFromInt(valB)];
+            const x0 = [await harness.qFromInt(valX0)];
+            const alpha = await harness.qFromFrac(alphaNum, alphaDen);
+            const tol = await harness.qFromInt(0);
+
+            const args = [m, n, A, b, x0, alpha, maxIter, tol];
             await touchGas(harness, "gradientDescentLeastSquares", args);
             const gas = await estimateGas(harness, "gradientDescentLeastSquares", args);
 
-            const [x] =
-                await harness.gradientDescentLeastSquares(m, n, A, b, x0, alpha, maxIter, tol);
+            const [x] = await harness.gradientDescentLeastSquares(m, n, A, b, x0, alpha, maxIter, tol);
+            const actualVal = await harness.toFloat(x[0]);
 
-            const xInt = await harness.toFloat(x[0]);
-            expect(xInt).to.be.lessThan(SCALE);
+            expectClose(actualVal, expectedVal, TOL_DIRECT, "Slow convergence mismatch");
 
             printBlockRegular({
                 t,
-                method: "Gradient Descent Least Squares",
-                explanation: "Very small alpha causes slow convergence without divergence.",
-                inHex: "A=[1], b=[1], α≈1e-6",
-                expectedHex: "≈0",
+                method: "Gradient Descent",
+                explanation: "Small alpha should result in minimal but precise progress.",
+                inHex: `A=[1], b=[1], α=1e-6, iters=${maxIter}`,
+                expectedHex: await harness.fromFloat(expectedVal),
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "~0",
-                outDec: formatScaledInt(xInt),
+                expectedDec: formatScaledInt(expectedVal),
+                outDec: formatScaledInt(actualVal),
                 gas,
             });
         });
