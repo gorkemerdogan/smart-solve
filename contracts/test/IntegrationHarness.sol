@@ -213,6 +213,10 @@ contract IntegrationHarness {
     //  Numerical Helpers
     // ------------------------------------------------------------
 
+    function qAdd(bytes16 a, bytes16 b) external pure returns (bytes16) {
+        return MathLib.add(a, b);
+    }
+
     /**
      * @notice Converts a signed integer to IEEE-754 quadruple precision.
      * @param  n Signed integer.
