@@ -96,6 +96,20 @@ contract RootFindingHarness {
         q = MathLib.div(qNum, qDen);
     }
 
+    /// Scaling factor used for JS-style fixed-decimal conversions.
+    uint256 public constant SCALE = 1e12;
+
+    /**
+     * @notice Converts a quadruple-precision number into a scaled integer (scaled by SCALE).
+     * @param x Quadruple-precision value.
+     * @return Integer representing x * SCALE.
+     */
+    function toFloat(bytes16 x) external pure returns (int256) {
+        bytes16 qScale = MathLib.fromUInt(SCALE);
+        bytes16 scaled = MathLib.mul(x, qScale);
+        return MathLib.toInt(scaled);
+    }
+
     /**
      * @notice Compares two quadruple-precision values.
      * @dev Returns:
