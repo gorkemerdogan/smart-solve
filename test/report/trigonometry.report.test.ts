@@ -54,13 +54,11 @@ function flipSign(hex: string): string {
     return "0x" + flipped.toString(16).padStart(32, "0");
 }
 
-// function approx(a: number, b: number, tol = 1e-10) {
-//     return Math.abs(a - b) <= tol;
-// }
-
+/// Determines if two numbers are equivalent within a relative tolerance threshold.
 function approx(a: number, b: number, tol = 1e-11) {
     if (a === b) return true;
     const diff = Math.abs(a - b);
+    // Relative error check: (abs(a - b) / (abs(a) + abs(b)))
     return diff / (Math.abs(a) + Math.abs(b)) < tol;
 }
 
