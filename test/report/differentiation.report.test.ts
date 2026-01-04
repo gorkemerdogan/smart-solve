@@ -13,6 +13,7 @@ type DifferentiationHarness = Contract & {
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
 
     toFloat(q: string): Promise<bigint>;
+    fromFloat(n: bigint): Promise<string>;
 
     forwardDiffHarness(target: string, selector: string, x: string, h: string): Promise<string>;
     backwardDiffHarness(target: string, selector: string, x: string, h: string): Promise<string>;
@@ -20,9 +21,8 @@ type DifferentiationHarness = Contract & {
 };
 
 let QZERO: string;
-
-const TOL_APPROX = 10_000_000n; // Allow 1e-5 error for O(h) approximations
-const TOL_EXACT = 100n;         // Allow 1e-10 error for Exact/O(h^2) cases (rounding noise)   
+const TOL_APPROX = 10_000_000n; // Forward/Backward Diff have O(h) error. h=1e-8
+const TOL_EXACT = 100n;         // Centered Diff has O(h^2) error. h^2=1e-16.    
 
 // ------------------------------------------------------------
 //  Helpers
@@ -37,29 +37,30 @@ function formatScaledInt(v: bigint): string {
     const intPart = abs / SCALE;
     const fracPart = abs % SCALE;
     const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
-    return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`.replace(/\.?0+$/, ""); // Trim trailing zeros
+    return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`.replace(/\.?0+$/, "");
 }
 
-/// Helper to convert a Hex/Quad string to a formatted decimal string
 async function fmt(harness: DifferentiationHarness, val: string): Promise<string> {
     const v = await harness.toFloat(val);
     return formatScaledInt(v);
 }
 
-function expectClose(actualHex: string, expectedHex: string, toleranceBits: bigint) {
-    const a = BigInt(actualHex);
-    const b = BigInt(expectedHex);
+/// Compares two quad values by converting them to scaled integers first.
+async function expectClose(h: DifferentiationHarness, actualHex: string, expectedHex: string, tolerance: bigint) {
+    const a = await h.toFloat(actualHex);
+    const b = await h.toFloat(expectedHex);
     let diff = a - b;
     if (diff < 0n) diff = -diff;
 
-    if (diff > toleranceBits) {
+    if (diff > tolerance) {
         console.log(`    Mismatch > tolerance!`);
-        console.log(`    Exp: ${expectedHex}`);
-        console.log(`    Act: ${actualHex}`);
-        console.log(`    Diff: ${diff}`);
-        console.log(`    Tol:  ${toleranceBits}`);
+        console.log(`    Exp (sc): ${b}`);
+        console.log(`    Act (sc): ${a}`);
+        console.log(`    Diff:     ${diff}`);
+        console.log(`    Tol:      ${tolerance}`);
     }
-    expect(diff <= toleranceBits).to.be.true;
+
+    expect(diff <= tolerance).to.be.true;
 }
 
 // ------------------------------------------------------------
@@ -115,10 +116,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "forwardDiffHarness", [target, selSquare, x, QZERO]);
             const out = await harness.forwardDiffHarness(target, selSquare, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_APPROX);
 
-            expectClose(out, expected, TOL_APPROX);
             printBlockRegular({
                 t,
                 method: "forwardDiff",
@@ -127,8 +126,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -141,20 +140,18 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "forwardDiffHarness", [target, selSquare, x, QZERO]);
             const out = await harness.forwardDiffHarness(target, selSquare, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_APPROX);
 
-            expectClose(out, expected, TOL_APPROX);
             printBlockRegular({
                 t,
                 method: "forwardDiff",
-                explanation: "Forward diff of x^2 at x=-10, analytical derivative 2x gives slope -20.",
+                explanation: "Forward diff of x^2 at x=-10, derivative 2x gives slope -20.",
                 gas,
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -167,10 +164,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "forwardDiffHarness", [target, selConstFive, x, QZERO]);
             const out = await harness.forwardDiffHarness(target, selConstFive, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
-
             expect(out).to.equal(expected);
+
             printBlockRegular({
                 t,
                 method: "forwardDiff",
@@ -179,8 +174,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -194,10 +189,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "forwardDiffHarness", [target, selSquare, x, stepOne]);
             const out = await harness.forwardDiffHarness(target, selSquare, x, stepOne);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expectedDistorted);
+            await expectClose(harness, out, expectedDistorted, TOL_EXACT);
 
-            expectClose(out, expectedDistorted, TOL_EXACT);
             printBlockRegular({
                 t,
                 method: "forwardDiff",
@@ -206,8 +199,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expectedDistorted,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expectedDistorted),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -220,10 +213,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "forwardDiffHarness", [target, selLinear, x, QZERO]);
             const out = await harness.forwardDiffHarness(target, selLinear, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_EXACT);
 
-            expectClose(out, expected, TOL_EXACT);
             printBlockRegular({
                 t,
                 method: "forwardDiff",
@@ -232,8 +223,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -241,6 +232,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             t++;
             const x = await qInt(1);
             await expect(harness.forwardDiffHarness(target, "0x12345678", x, QZERO)).to.be.reverted;
+
             printBlockRegular({
                 t,
                 method: "forwardDiff",
@@ -250,7 +242,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 expectedHex: "Reverted",
                 outHex: "Reverted",
                 expectedDec: "Reverted",
-                outDec: "Reverted"
+                outDec: "Reverted",
             });
         });
     });
@@ -270,10 +262,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "backwardDiffHarness", [target, selSquare, x, QZERO]);
             const out = await harness.backwardDiffHarness(target, selSquare, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_APPROX);
 
-            expectClose(out, expected, TOL_APPROX);
             printBlockRegular({
                 t,
                 method: "backwardDiff",
@@ -282,8 +272,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -296,10 +286,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "backwardDiffHarness", [target, selSquare, x, QZERO]);
             const out = await harness.backwardDiffHarness(target, selSquare, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_APPROX);
 
-            expectClose(out, expected, TOL_APPROX);
             printBlockRegular({
                 t,
                 method: "backwardDiff",
@@ -308,8 +296,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -322,10 +310,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "backwardDiffHarness", [target, selCube, x, QZERO]);
             const out = await harness.backwardDiffHarness(target, selCube, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_APPROX);
 
-            expectClose(out, expected, TOL_APPROX);
             printBlockRegular({
                 t,
                 method: "backwardDiff",
@@ -334,8 +320,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -348,10 +334,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "backwardDiffHarness", [target, selAbs, x, QZERO]);
             const out = await harness.backwardDiffHarness(target, selAbs, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_APPROX);
 
-            expectClose(out, expected, TOL_APPROX);
             printBlockRegular({
                 t,
                 method: "backwardDiff",
@@ -360,8 +344,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec,
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -375,10 +359,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "backwardDiffHarness", [target, selSquare, x, stepOne]);
             const out = await harness.backwardDiffHarness(target, selSquare, x, stepOne);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expectedDistorted);
+            await expectClose(harness, out, expectedDistorted, TOL_EXACT);
 
-            expectClose(out, expectedDistorted, TOL_EXACT);
             printBlockRegular({
                 t,
                 method: "backwardDiff",
@@ -387,8 +369,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expectedDistorted,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expectedDistorted),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -396,6 +378,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             t++;
             const x = await qInt(1);
             await expect(harness.backwardDiffHarness(ethers.ZeroAddress, selSquare, x, QZERO)).to.be.reverted;
+
             printBlockRegular({
                 t,
                 method: "backwardDiff",
@@ -405,7 +388,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 expectedHex: "Reverted",
                 outHex: "Reverted",
                 expectedDec: "Reverted",
-                outDec: "Reverted"
+                outDec: "Reverted",
             });
         });
     });
@@ -425,10 +408,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "centeredDiffHarness", [target, selSquare, x, QZERO]);
             const out = await harness.centeredDiffHarness(target, selSquare, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_EXACT);
 
-            expectClose(out, expected, TOL_EXACT);
             printBlockRegular({
                 t,
                 method: "centeredDiff",
@@ -437,8 +418,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -451,10 +432,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "centeredDiffHarness", [target, selSquare, x, QZERO]);
             const out = await harness.centeredDiffHarness(target, selSquare, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_EXACT);
 
-            expectClose(out, expected, TOL_EXACT);
             printBlockRegular({
                 t,
                 method: "centeredDiff",
@@ -463,8 +442,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -477,10 +456,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "centeredDiffHarness", [target, selAbs, x, QZERO]);
             const out = await harness.centeredDiffHarness(target, selAbs, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
-
             expect(out).to.equal(expected);
+            
             printBlockRegular({
                 t,
                 method: "centeredDiff",
@@ -489,8 +466,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -503,10 +480,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "centeredDiffHarness", [target, selCube, x, QZERO]);
             const out = await harness.centeredDiffHarness(target, selCube, x, QZERO);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_EXACT); // Centered diff on cubic is precise
 
-            expectClose(out, expected, TOL_APPROX);
             printBlockRegular({
                 t,
                 method: "centeredDiff",
@@ -515,8 +490,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -530,10 +505,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             const gas = await estimateGas(harness, "centeredDiffHarness", [target, selSquare, x, stepOne]);
             const out = await harness.centeredDiffHarness(target, selSquare, x, stepOne);
 
-            const outDec = await fmt(harness, out);
-            const expDec = await fmt(harness, expected);
+            await expectClose(harness, out, expected, TOL_EXACT);
 
-            expectClose(out, expected, TOL_EXACT);
             printBlockRegular({
                 t,
                 method: "centeredDiff",
@@ -542,8 +515,8 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 inHex: x,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: expDec,
-                outDec: outDec
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
             });
         });
 
@@ -551,6 +524,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
             t++;
             const x = await qInt(5);
             await expect(harness.centeredDiffHarness(target, "0xdeadbeef", x, QZERO)).to.be.reverted;
+
             printBlockRegular({
                 t,
                 method: "centeredDiff",
@@ -560,7 +534,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 expectedHex: "Reverted",
                 outHex: "Reverted",
                 expectedDec: "Reverted",
-                outDec: "Reverted"
+                outDec: "Reverted",
             });
         });
     });
