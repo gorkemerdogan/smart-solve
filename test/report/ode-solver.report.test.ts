@@ -19,7 +19,7 @@ type ODESolverHarness = Contract & {
     rk4(target: string, selector: string, x: string, y: string, h: string): Promise<string>;
 };
 
-const QZERO = "0x00000000000000000000000000000000";
+let QZERO: string;
 const TOL_EXACT = 18446744073709551616n;           // 2^64
 const TOL_APPROX = 39614081257132168796771975168n; // 2^95
 
@@ -27,12 +27,30 @@ const TOL_APPROX = 39614081257132168796771975168n; // 2^95
 // Helpers
 // ------------------------------------------------------------
 
+/**
+ * @notice    Compares two numerical values and reverts if the absolute difference exceeds a tolerance.
+ * @param h   The ODESolverHarness instance used for state access and conversion.
+ * @param a   The string identifier or raw value of the first operand.
+ * @param b   The string identifier or raw value of the second operand.
+ * @param tol The maximum allowable absolute difference (tolerance) between a and b.
+ */
 async function expectClose(h: ODESolverHarness, a: string, b: string, tol: bigint) {
     const ai = await h.toFloat(a);
     const bi = await h.toFloat(b);
     let d = ai - bi;
     if (d < 0n) d = -d;
     expect(d <= tol).to.be.true;
+}
+
+/**
+ * @notice  Retrieves a value from the harness and formats it as a decimal string.
+ * @param h The ODESolverHarness instance used for state access and conversion.
+ * @param q The string identifier or key for the value to be retrieved.
+ * @return  A promise that resolves to a formatted decimal string representation of the value.
+ */
+async function getDec(h: ODESolverHarness, q: string): Promise<string> {
+    const val = await h.toFloat(q);
+    return fmt(val);
 }
 
 // ------------------------------------------------------------
@@ -75,6 +93,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         selLinear = h.interface.getFunction("f_linear")!.selector;
         selSquare = h.interface.getFunction("f_square")!.selector;
 
+        QZERO = await harness.fromFloat(0n);
         H = await h.qFromFrac(1, 10);     // h = 0.1
         HNEG = await h.qFromFrac(-1, 10); // h = -0.1
     });
@@ -104,7 +123,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "2.5",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -128,7 +147,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "11",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -153,7 +172,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "1.4",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -176,7 +195,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: y0,
                 outHex: out,
-                expectedDec: "7",
+                expectedDec: await getDec(h, y0),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -200,7 +219,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "9.5",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -223,7 +242,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: y0,
                 outHex: out,
-                expectedDec: "3",
+                expectedDec: await getDec(h, y0),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -272,7 +291,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "2.5",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -296,7 +315,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "11.05",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -321,7 +340,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "1.45",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -344,7 +363,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: y0,
                 outHex: out,
-                expectedDec: "7",
+                expectedDec: await getDec(h, y0),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -368,7 +387,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "9.5",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -391,7 +410,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: y0,
                 outHex: out,
-                expectedDec: "3",
+                expectedDec: await getDec(h, y0),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -440,7 +459,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "2.5",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -464,7 +483,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "11.051709",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -489,7 +508,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "1.4",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -512,7 +531,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: y0,
                 outHex: out,
-                expectedDec: "6",
+                expectedDec: await getDec(h, y0),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -536,7 +555,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "9.5",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -559,7 +578,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: y0,
                 outHex: out,
-                expectedDec: "4",
+                expectedDec: await getDec(h, y0),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -608,7 +627,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "2.5",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -632,7 +651,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "11.051709",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -657,7 +676,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "1.4",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -680,7 +699,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: y0,
                 outHex: out,
-                expectedDec: "5",
+                expectedDec: await getDec(h, y0),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -704,7 +723,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: expected,
                 outHex: out,
-                expectedDec: "9.5",
+                expectedDec: await getDec(h, expected),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
@@ -727,7 +746,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 inHex: y0,
                 expectedHex: y0,
                 outHex: out,
-                expectedDec: "3",
+                expectedDec: await getDec(h, y0),
                 outDec: fmt(await h.toFloat(out)),
             });
         });
