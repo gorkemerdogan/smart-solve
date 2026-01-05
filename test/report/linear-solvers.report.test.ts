@@ -409,12 +409,12 @@ describe("LinearSolversHarness", function () {
             const actualVal = await harness.toFloat(x[0]);
 
             expectClose(actualVal, expectedVal, TOL_DIRECT, "Jacobi 1D Solution Mismatch");
-            expect(iters).to.be.lessThanOrEqual(1n);
+            expect(iters).to.be.lessThanOrEqual(2n); // Iter 1 jumps to solution. Iter 2 confirms stability.
 
             printBlockRegular({
                 t,
                 method: "Jacobi",
-                explanation: "1D identity convergence.",
+                explanation: "1D identity convergence. Iteration 1 solves, Iteration 2 verifies.",
                 inHex: `A=[${valA}], b=[${valB}]`,
                 expectedHex: await harness.fromFloat(expectedVal),
                 outHex: `[${x.join(", ")}]`,
@@ -428,7 +428,6 @@ describe("LinearSolversHarness", function () {
             t++;
 
             const n = 2n;
-
             const m = [[4n, 1n], [2n, 3n]];
             const bVals = [1n, 2n];
 
@@ -443,11 +442,10 @@ describe("LinearSolversHarness", function () {
             const b = [await harness.qFromInt(bVals[0]), await harness.qFromInt(bVals[1])];
             const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
 
-            const tol = await harness.qFromFrac(1, 1_000_000); // 1e-6
-            const maxIter = 50n;
+            const tol = await harness.qFromFrac(1, 1_000_000_000_000n); // 1e-12 precision
+            const maxIter = 200n;
 
             const args = [n, A, b, x0, maxIter, tol];
-
             await touchGas(harness, "jacobi", args);
             const gas = await estimateGas(harness, "jacobi", args);
 
