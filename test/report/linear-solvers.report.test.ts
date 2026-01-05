@@ -388,11 +388,15 @@ describe("LinearSolversHarness", function () {
             t++;
 
             const n = 1n;
+            const valA = 1n;
+            const valB = 7n;
 
-            const A = [await harness.qFromInt(1)];
-            const b = [await harness.qFromInt(7)];
+            // x = b / A
+            const expectedVal = (valB * SCALE) / valA;
+
+            const A = [await harness.qFromInt(valA)];
+            const b = [await harness.qFromInt(valB)];
             const x0 = [await harness.qFromInt(0)];
-
             const tol = await harness.qFromInt(0);
             const maxIter = 10n;
 
@@ -402,19 +406,20 @@ describe("LinearSolversHarness", function () {
             const gas = await estimateGas(harness, "jacobi", args);
 
             const [x, iters] = await harness.jacobi(n, A, b, x0, maxIter, tol);
+            const actualVal = await harness.toFloat(x[0]);
 
-            const xInt = await harness.toFloat(x[0]);
-            expect(xInt / SCALE).to.equal(7n);
+            expectClose(actualVal, expectedVal, TOL_DIRECT, "Jacobi 1D Solution Mismatch");
+            expect(iters).to.be.lessThanOrEqual(1n);
 
             printBlockRegular({
                 t,
                 method: "Jacobi",
-                explanation: "1D identity system converges in one iteration.",
-                inHex: "A=[1], b=[7], x0=[0]",
-                expectedHex: await harness.qFromInt(7),
+                explanation: "1D identity convergence.",
+                inHex: `A=[${valA}], b=[${valB}]`,
+                expectedHex: await harness.fromFloat(expectedVal),
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "7",
-                outDec: formatScaledInt(xInt),
+                expectedDec: formatScaledInt(expectedVal),
+                outDec: formatScaledInt(actualVal),
                 gas,
             });
         });
@@ -424,24 +429,21 @@ describe("LinearSolversHarness", function () {
 
             const n = 2n;
 
-            // A = [[4,1],[2,3]]
+            const m = [[4n, 1n], [2n, 3n]];
+            const bVals = [1n, 2n];
+
+            const det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+            const x0Exp = (bVals[0] * m[1][1] - bVals[1] * m[0][1]) * SCALE / det;
+            const x1Exp = (m[0][0] * bVals[1] - m[1][0] * bVals[0]) * SCALE / det;
+
             const A = [
-                await harness.qFromInt(4), await harness.qFromInt(1),
-                await harness.qFromInt(2), await harness.qFromInt(3),
+                await harness.qFromInt(m[0][0]), await harness.qFromInt(m[0][1]),
+                await harness.qFromInt(m[1][0]), await harness.qFromInt(m[1][1]),
             ];
+            const b = [await harness.qFromInt(bVals[0]), await harness.qFromInt(bVals[1])];
+            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
 
-            // b = [1,2]
-            const b = [
-                await harness.qFromInt(1),
-                await harness.qFromInt(2),
-            ];
-
-            const x0 = [
-                await harness.qFromInt(0),
-                await harness.qFromInt(0),
-            ];
-
-            const tol = await harness.qFromFrac(1, 1_000_000);
+            const tol = await harness.qFromFrac(1, 1_000_000); // 1e-6
             const maxIter = 50n;
 
             const args = [n, A, b, x0, maxIter, tol];
@@ -454,18 +456,17 @@ describe("LinearSolversHarness", function () {
             const x0Int = await harness.toFloat(x[0]);
             const x1Int = await harness.toFloat(x[1]);
 
-            // Expected ≈ [0.1, 0.6]
-            expect(x0Int / SCALE).to.equal(0n);
-            expect(x1Int / SCALE).to.equal(0n);
+            expectClose(x0Int, x0Exp, TOL_ITERATIVE, "x0 result mismatch");
+            expectClose(x1Int, x1Exp, TOL_ITERATIVE, "x1 result mismatch");
 
             printBlockRegular({
                 t,
                 method: "Jacobi",
-                explanation: "2×2 diagonally dominant system converges.",
+                explanation: "Verification of a 2x2 diagonally dominant system.",
                 inHex: "A=[[4,1],[2,3]], b=[1,2]",
-                expectedHex: "≈[0.1,0.6]",
+                expectedHex: `[${await harness.fromFloat(x0Exp)}, ${await harness.fromFloat(x1Exp)}]`,
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "[0.1, 0.6]",
+                expectedDec: `[${formatScaledInt(x0Exp)}, ${formatScaledInt(x1Exp)}]`,
                 outDec: `[${formatScaledInt(x0Int)}, ${formatScaledInt(x1Int)}]`,
                 gas,
             });
@@ -476,46 +477,46 @@ describe("LinearSolversHarness", function () {
 
             const n = 2n;
 
+            const bVals = [3n, 4n];
+            const x0Vals = [3n, 4n];
+
             const A = [
                 await harness.qFromInt(1), await harness.qFromInt(0),
                 await harness.qFromInt(0), await harness.qFromInt(1),
             ];
 
-            const b = [
-                await harness.qFromInt(3),
-                await harness.qFromInt(4),
-            ];
-
-            const x0 = [
-                await harness.qFromInt(3),
-                await harness.qFromInt(4),
-            ];
+            const b = await Promise.all(bVals.map(v => harness.qFromInt(v)));
+            const x0 = await Promise.all(x0Vals.map(v => harness.qFromInt(v)));
 
             const tol = await harness.qFromInt(0);
-            const maxIter = 5n;
+            const maxIter = 5n; // Should converge immediately
 
             const args = [n, A, b, x0, maxIter, tol];
 
             await touchGas(harness, "jacobi", args);
             const gas = await estimateGas(harness, "jacobi", args);
 
-            const [x] = await harness.jacobi(n, A, b, x0, maxIter, tol);
+            const [x, iters] = await harness.jacobi(n, A, b, x0, maxIter, tol);
 
-            const x0Int = await harness.toFloat(x[0]);
-            const x1Int = await harness.toFloat(x[1]);
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
 
-            expect(x0Int / SCALE).to.equal(3n);
-            expect(x1Int / SCALE).to.equal(4n);
+            // Since A=I, x should exactly equal to b.
+            const expected0 = bVals[0] * SCALE;
+            const expected1 = bVals[1] * SCALE;
+
+            expectClose(actual0, expected0, TOL_DIRECT, "x[0] drifted from solution");
+            expectClose(actual1, expected1, TOL_DIRECT, "x[1] drifted from solution");
 
             printBlockRegular({
                 t,
                 method: "Jacobi",
-                explanation: "Already-correct initial guess remains unchanged.",
-                inHex: "A=I, b=[3,4], x0=[3,4]",
-                expectedHex: "[3,4]",
+                explanation: "Initial guess x0 matches exact solution -> output should remain unchanged.",
+                inHex: `A=I, b=[${bVals}], x0=[${x0Vals}]`,
+                expectedHex: `[${await harness.fromFloat(expected0)}, ${await harness.fromFloat(expected1)}]`,
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "[3,4]",
-                outDec: `[${formatScaledInt(x0Int)}, ${formatScaledInt(x1Int)}]`,
+                expectedDec: `[${formatScaledInt(expected0)}, ${formatScaledInt(expected1)}]`,
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}]`,
                 gas,
             });
         });
@@ -524,34 +525,21 @@ describe("LinearSolversHarness", function () {
             t++;
 
             const n = 2n;
+            
+            const A_vals = [0n, 1n, 1n, 1n]; // Matrix with explicit Zero on diagonal at (0,0)
+            const A = await Promise.all(A_vals.map(v => harness.qFromInt(v)));
 
-            const A = [
-                await harness.qFromInt(0), await harness.qFromInt(1),
-                await harness.qFromInt(1), await harness.qFromInt(1),
-            ];
-
-            const b = [
-                await harness.qFromInt(1),
-                await harness.qFromInt(1),
-            ];
-
-            const x0 = [
-                await harness.qFromInt(0),
-                await harness.qFromInt(0),
-            ];
-
+            const b = [await harness.qFromInt(1), await harness.qFromInt(1)];
+            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
             const tol = await harness.qFromInt(0);
-            const maxIter = 10n;
 
-            await expect(
-                harness.jacobi(n, A, b, x0, maxIter, tol)
-            ).to.be.reverted;
+            await expect(harness.jacobi(n, A, b, x0, 10n, tol)).to.be.reverted; // Could be specific string if known
 
             printBlockRegular({
                 t,
                 method: "Jacobi",
-                explanation: "Zero diagonal causes division-by-zero revert.",
-                inHex: "A has zero diagonal",
+                explanation: "Zero element on diagonal (index 0,0) must trigger revert.",
+                inHex: `A=[[${A_vals[0]},${A_vals[1]}],[${A_vals[2]},${A_vals[3]}]] (Zero Diag)`,
                 expectedHex: "Revert",
                 outHex: "Revert",
                 expectedDec: "Revert",
@@ -564,36 +552,36 @@ describe("LinearSolversHarness", function () {
             t++;
 
             const n = 1n;
+            const valA = 2n;
+            const valB = 8n;
 
-            const A = [await harness.qFromInt(2)];
-            const b = [await harness.qFromInt(8)];
-            const x0 = [await harness.qFromInt(0)];
+            const expectedVal = (valB * SCALE) / valA; // 1 iteration of 1D Jacobi is exactly b/A
 
+            const A = [await harness.qFromInt(valA)];
+            const b = [await harness.qFromInt(valB)];
+            const x0 = [await harness.qFromInt(0)]; // Start at 0
             const tol = await harness.qFromInt(0);
-            const maxIter = 1n;
+            const maxIter = 1n; // Force single step
 
             const args = [n, A, b, x0, maxIter, tol];
-
             await touchGas(harness, "jacobi", args);
             const gas = await estimateGas(harness, "jacobi", args);
 
             const [x, iters] = await harness.jacobi(n, A, b, x0, maxIter, tol);
+            const actualVal = await harness.toFloat(x[0]);
 
-            const xInt = await harness.toFloat(x[0]);
-
-            // Single Jacobi step: x = b / a = 4
-            expect(xInt / SCALE).to.equal(4n);
             expect(iters).to.equal(1n);
+            expectClose(actualVal, expectedVal, TOL_DIRECT, "Single iteration value mismatch");
 
             printBlockRegular({
                 t,
                 method: "Jacobi",
-                explanation: "Jacobi performs exactly one iteration when maxIter=1.",
-                inHex: "A=[2], b=[8]",
-                expectedHex: await harness.qFromInt(4),
+                explanation: "maxIter=1 must return result of first update step.",
+                inHex: `A=[${valA}], b=[${valB}], maxIter=1`,
+                expectedHex: await harness.fromFloat(expectedVal),
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "4",
-                outDec: formatScaledInt(xInt),
+                expectedDec: formatScaledInt(expectedVal),
+                outDec: formatScaledInt(actualVal),
                 gas,
             });
         });
