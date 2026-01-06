@@ -531,7 +531,7 @@ describe("LinearSolversHarness", function () {
             const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
             const tol = await harness.qFromInt(0);
 
-            await expect(harness.jacobi(n, A, b, x0, 10n, tol)).to.be.reverted; // Could be specific string if known
+            await expect(harness.jacobi(n, A, b, x0, 10n, tol)).to.be.reverted;
 
             printBlockRegular({
                 t,
@@ -759,9 +759,7 @@ describe("LinearSolversHarness", function () {
             const tol = await harness.qFromInt(0);
             const maxIter = 5n;
 
-            await expect(
-                harness.gaussSeidel(n, A, b, x0, maxIter, tol)
-            ).to.be.reverted;
+            await expect(harness.gaussSeidel(n, A, b, x0, maxIter, tol)).to.be.reverted;
 
             printBlockRegular({
                 t,
@@ -894,13 +892,12 @@ describe("LinearSolversHarness", function () {
             });
         });
 
-        it("Test 22: 3D upper-triangular system (residual check)", async function () {
+        it("Test 22: 3D upper-triangular system (Residual Verification)", async function () {
             t++;
             const n = 3n;
-            // Define Raw Inputs
             const A_raw = [
                 2n, 1n, 1n,
-                0n, 3n, 1n,
+                0n, 3n, 1n, 
                 0n, 0n, 4n
             ];
             const b_raw = [5n, 4n, 8n];
@@ -910,19 +907,17 @@ describe("LinearSolversHarness", function () {
 
             const x = await harness.gaussianElimination(n, A, b);
 
-            // Calculate |Ax - b| and verify Ax = b.
             const x_vals = await Promise.all(x.map(v => harness.toFloat(v)));
-
             
-            const r0 = (2n * x_vals[0] + 1n * x_vals[1] + 1n * x_vals[2]) / SCALE - 5n * SCALE; // Row 0: 2x + y + z - 5
-            const r1 = (3n * x_vals[1] + 1n * x_vals[2]) / SCALE - 4n * SCALE;                  // Row 1: 3y + z - 4
-            const r2 = (4n * x_vals[2]) / SCALE - 8n * SCALE;                                   // Row 2: 4z - 8
+            const r0 = (2n * x_vals[0] + 1n * x_vals[1] + 1n * x_vals[2]) - (5n * SCALE); // Row 0: 2x + y + z - 5
+            const r1 = (3n * x_vals[1] + 1n * x_vals[2]) - (4n * SCALE);                  // Row 1: 3y + z - 4
+            const r2 = (4n * x_vals[2]) - (8n * SCALE);                                   // Row 2: 4z - 8
 
             const abs = (v: bigint) => v < 0n ? -v : v;
-
-            expect(abs(r0)).to.be.below(TOL_DIRECT);
-            expect(abs(r1)).to.be.below(TOL_DIRECT);
-            expect(abs(r2)).to.be.below(TOL_DIRECT);
+            
+            expect(abs(r0)).to.be.below(TOL_DIRECT, "Row 0 residual too high");
+            expect(abs(r1)).to.be.below(TOL_DIRECT, "Row 1 residual too high");
+            expect(abs(r2)).to.be.below(TOL_DIRECT, "Row 2 residual too high");
 
             printBlockRegular({
                 t,
@@ -1136,9 +1131,7 @@ describe("LinearSolversHarness", function () {
                 await harness.qFromInt(1), await harness.qFromInt(2),
             ];
 
-            await expect(
-                harness.luDecomposition(n, A)
-            ).to.be.reverted;
+            await expect(harness.luDecomposition(n, A)).to.be.reverted;
         });
 
         it("Test 30: Zero matrix", async function () {
@@ -1151,9 +1144,7 @@ describe("LinearSolversHarness", function () {
                 await harness.qFromInt(0), await harness.qFromInt(0),
             ];
 
-            await expect(
-                harness.luDecomposition(n, A)
-            ).to.be.reverted;
+            await expect(harness.luDecomposition(n, A)).to.be.reverted;
         });
     });
 });
