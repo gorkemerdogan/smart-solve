@@ -616,7 +616,8 @@ describe("LinearSolversHarness", function () {
             expect(iters).to.be.lessThanOrEqual(2n);
 
             printBlockRegular({
-                t, method: "Gauss–Seidel",
+                t,
+                method: "Gauss–Seidel",
                 explanation: "1D identity system converges immediately.",
                 inHex: `A=[${valA}], b=[${valB}]`,
                 expectedHex: await harness.fromFloat(expectedVal),
@@ -658,7 +659,8 @@ describe("LinearSolversHarness", function () {
             expectClose(x1Int, x1Exp, TOL_ITERATIVE);
 
             printBlockRegular({
-                t, method: "Gauss–Seidel",
+                t,
+                method: "Gauss–Seidel",
                 explanation: "2×2 diagonally dominant system verifying convergence to analytical point.",
                 inHex: "A=[[4,1],[2,3]], b=[1,2]",
                 expectedHex: `[${await harness.fromFloat(x0Exp)}, ${await harness.fromFloat(x1Exp)}]`,
@@ -694,7 +696,8 @@ describe("LinearSolversHarness", function () {
             const out1 = formatScaledInt(await harness.toFloat(x[1]));
 
             printBlockRegular({
-                t, method: "Gauss–Seidel",
+                t,
+                method: "Gauss–Seidel",
                 explanation: "Output must remain at x0 if x0 is already the solution.",
                 inHex: "A=2I, b=[4,6], x0=[2,3]",
                 expectedHex: `[${x0[0]}, ${x0[1]}]`,
@@ -729,7 +732,8 @@ describe("LinearSolversHarness", function () {
             expectClose(x0Int, expectedVal, TOL_DIRECT);
 
             printBlockRegular({
-                t, method: "Gauss–Seidel",
+                t,
+                method: "Gauss–Seidel",
                 explanation: "Signed math check with negative coefficients.",
                 inHex: "A=[-2], b=[-8]",
                 expectedHex: await harness.fromFloat(expectedVal),
@@ -795,173 +799,141 @@ describe("LinearSolversHarness", function () {
 
     describe("Section 4: Gaussian Elimination", function () {
 
-        // ------------------------------------------------------------
-        //  Normal Cases
-        // ------------------------------------------------------------
-
         it("Test 19: 1D trivial system A=[1], b=[7]", async function () {
             t++;
-
             const n = 1n;
+            const valA = 1n;
+            const valB = 7n;
+            const expectedVal = (valB * SCALE) / valA;
 
-            const A = [await harness.qFromInt(1)];
-            const b = [await harness.qFromInt(7)];
-
+            const A = [await harness.qFromInt(valA)];
+            const b = [await harness.qFromInt(valB)];
             const args = [n, A, b];
 
             await touchGas(harness, "gaussianElimination", args);
             const gas = await estimateGas(harness, "gaussianElimination", args);
 
             const x = await harness.gaussianElimination(n, A, b);
+            const actualVal = await harness.toFloat(x[0]);
 
-            const x0Int = await harness.toFloat(x[0]);
-            expect(x0Int / SCALE).to.equal(7n);
+            expectClose(actualVal, expectedVal, TOL_DIRECT);
 
             printBlockRegular({
                 t,
                 method: "Gaussian Elimination",
-                explanation: "1D exact system.",
-                inHex: "A=[1], b=[7]",
-                expectedHex: await harness.qFromInt(7),
+                explanation: "1D exact system check.",
+                inHex: `A=[${valA}], b=[${valB}]`,
+                expectedHex: await harness.fromFloat(expectedVal),
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "7",
-                outDec: formatScaledInt(x0Int),
+                expectedDec: formatScaledInt(expectedVal),
+                outDec: formatScaledInt(actualVal),
                 gas,
             });
         });
 
         it("Test 20: 2D identity matrix", async function () {
             t++;
-
             const n = 2n;
+            // A = I, so x = b
+            const bVals = [3n, -4n];
 
-            const A = [
-                await harness.qFromInt(1), await harness.qFromInt(0),
-                await harness.qFromInt(0), await harness.qFromInt(1),
-            ];
-
-            const b = [
-                await harness.qFromInt(3),
-                await harness.qFromInt(-4),
-            ];
-
-            const args = [n, A, b];
-
-            await touchGas(harness, "gaussianElimination", args);
-            const gas = await estimateGas(harness, "gaussianElimination", args);
+            const A = [await harness.qFromInt(1), await harness.qFromInt(0), await harness.qFromInt(0), await harness.qFromInt(1)];
+            const b = await Promise.all(bVals.map(v => harness.qFromInt(v)));
 
             const x = await harness.gaussianElimination(n, A, b);
 
-            const x0 = await harness.toFloat(x[0]);
-            const x1 = await harness.toFloat(x[1]);
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
 
-            expect(x0 / SCALE).to.equal(3n);
-            expect(x1 / SCALE).to.equal(-4n);
+            expectClose(actual0, bVals[0] * SCALE, TOL_DIRECT);
+            expectClose(actual1, bVals[1] * SCALE, TOL_DIRECT);
 
             printBlockRegular({
                 t,
                 method: "Gaussian Elimination",
                 explanation: "Identity matrix should return b directly.",
                 inHex: "A=I, b=[3,-4]",
-                expectedHex: "[3,-4]",
+                expectedHex: `[${b[0]}, ${b[1]}]`,
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "[3,-4]",
-                outDec: `[${formatScaledInt(x0)}, ${formatScaledInt(x1)}]`,
-                gas,
+                expectedDec: `[${bVals.join(", ")}]`,
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}]`,
+                gas: await estimateGas(harness, "gaussianElimination", [n, A, b]),
             });
         });
 
-        it("Test 21: 2D general solvable system", async function () {
+        it("Test 21: 2D general solvable system (Calculated Expectation)", async function () {
             t++;
-
-            // A = [[2,1],[5,7]], b=[11,13]
-            // Solution: x=[7,-3]
             const n = 2n;
+            const m = [[2n, 1n], [5n, 7n]];
+            const bVals = [11n, 13n];
 
-            const A = [
-                await harness.qFromInt(2), await harness.qFromInt(1),
-                await harness.qFromInt(5), await harness.qFromInt(7),
-            ];
+            const det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+            const x0Exp = (bVals[0] * m[1][1] - bVals[1] * m[0][1]) * SCALE / det;
+            const x1Exp = (m[0][0] * bVals[1] - m[1][0] * bVals[0]) * SCALE / det;
 
-            const b = [
-                await harness.qFromInt(11),
-                await harness.qFromInt(13),
-            ];
-
-            const args = [n, A, b];
-
-            await touchGas(harness, "gaussianElimination", args);
-            const gas = await estimateGas(harness, "gaussianElimination", args);
+            const A = await Promise.all([2n, 1n, 5n, 7n].map(v => harness.qFromInt(v)));
+            const b = await Promise.all(bVals.map(v => harness.qFromInt(v)));
 
             const x = await harness.gaussianElimination(n, A, b);
+            const x0Int = await harness.toFloat(x[0]);
+            const x1Int = await harness.toFloat(x[1]);
 
-            const x0 = await harness.toFloat(x[0]);
-            const x1 = await harness.toFloat(x[1]);
-
-            expect(x0 / SCALE).to.equal(7n);
-            expect(x1 / SCALE).to.equal(-3n);
+            expectClose(x0Int, x0Exp, TOL_DIRECT, "x0 mismatch");
+            expectClose(x1Int, x1Exp, TOL_DIRECT, "x1 mismatch");
 
             printBlockRegular({
                 t,
                 method: "Gaussian Elimination",
                 explanation: "Standard 2×2 solvable system.",
                 inHex: "A=[[2,1],[5,7]], b=[11,13]",
-                expectedHex: "[7,-3]",
+                expectedHex: `[${await harness.fromFloat(x0Exp)}, ${await harness.fromFloat(x1Exp)}]`,
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "[7,-3]",
-                outDec: `[${formatScaledInt(x0)}, ${formatScaledInt(x1)}]`,
-                gas,
+                expectedDec: `[${formatScaledInt(x0Exp)}, ${formatScaledInt(x1Exp)}]`,
+                outDec: `[${formatScaledInt(x0Int)}, ${formatScaledInt(x1Int)}]`,
+                gas: await estimateGas(harness, "gaussianElimination", [n, A, b]),
             });
         });
 
         it("Test 22: 3D upper-triangular system (residual check)", async function () {
             t++;
-
             const n = 3n;
-
-            const A = [
-                await harness.qFromInt(2), await harness.qFromInt(1), await harness.qFromInt(1),
-                await harness.qFromInt(0), await harness.qFromInt(3), await harness.qFromInt(1),
-                await harness.qFromInt(0), await harness.qFromInt(0), await harness.qFromInt(4),
+            // Define Raw Inputs
+            const A_raw = [
+                2n, 1n, 1n,
+                0n, 3n, 1n,
+                0n, 0n, 4n
             ];
+            const b_raw = [5n, 4n, 8n];
 
-            const b = [
-                await harness.qFromInt(5),
-                await harness.qFromInt(4),
-                await harness.qFromInt(8),
-            ];
-
-            const args = [n, A, b];
-
-            await touchGas(harness, "gaussianElimination", args);
-            const gas = await estimateGas(harness, "gaussianElimination", args);
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+            const b = await Promise.all(b_raw.map(v => harness.qFromInt(v)));
 
             const x = await harness.gaussianElimination(n, A, b);
 
-            const xs = await Promise.all(x.map(v => harness.toFloat(v)));
+            // Calculate |Ax - b| and verify Ax = b.
+            const x_vals = await Promise.all(x.map(v => harness.toFloat(v)));
 
-            // Residuals (scaled)
-            const r0 = 2n * xs[0] + 1n * xs[1] + 1n * xs[2] - 5n * SCALE;
-            const r1 = 3n * xs[1] + 1n * xs[2] - 4n * SCALE;
-            const r2 = 4n * xs[2] - 8n * SCALE;
+            
+            const r0 = (2n * x_vals[0] + 1n * x_vals[1] + 1n * x_vals[2]) / SCALE - 5n * SCALE; // Row 0: 2x + y + z - 5
+            const r1 = (3n * x_vals[1] + 1n * x_vals[2]) / SCALE - 4n * SCALE;                  // Row 1: 3y + z - 4
+            const r2 = (4n * x_vals[2]) / SCALE - 8n * SCALE;                                   // Row 2: 4z - 8
 
             const abs = (v: bigint) => v < 0n ? -v : v;
-            const TOL = 10n * SCALE;
 
-            expect(abs(r0)).to.be.below(TOL);
-            expect(abs(r1)).to.be.below(TOL);
-            expect(abs(r2)).to.be.below(TOL);
+            expect(abs(r0)).to.be.below(TOL_DIRECT);
+            expect(abs(r1)).to.be.below(TOL_DIRECT);
+            expect(abs(r2)).to.be.below(TOL_DIRECT);
 
             printBlockRegular({
                 t,
                 method: "Gaussian Elimination",
-                explanation: "Upper-triangular system verified via residual Ax − b ≈ 0.",
-                inHex: "Upper triangular A",
-                expectedHex: "|Ax − b| < tol",
+                explanation: "3x3 Upper-triangular system verified via residual |Ax - b| < epsilon.",
+                inHex: "Upper Triangular Matrix",
+                expectedHex: "Residual ≈ 0",
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "residual ≈ 0",
-                outDec: xs.map(formatScaledInt).join(", "),
-                gas,
+                expectedDec: "Residual < 1e-10",
+                outDec: "Pass",
+                gas: await estimateGas(harness, "gaussianElimination", [n, A, b]),
             });
         });
 
@@ -970,26 +942,16 @@ describe("LinearSolversHarness", function () {
 
             const n = 2n;
 
-            // Rows are linearly dependent
-            const A = [
-                await harness.qFromInt(1), await harness.qFromInt(2),
-                await harness.qFromInt(2), await harness.qFromInt(4),
-            ];
+            const A = await Promise.all([1n, 2n, 2n, 4n].map(v => harness.qFromInt(v)));
+            const b = await Promise.all([3n, 6n].map(v => harness.qFromInt(v)));
 
-            const b = [
-                await harness.qFromInt(3),
-                await harness.qFromInt(6),
-            ];
-
-            await expect(
-                harness.gaussianElimination(n, A, b)
-            ).to.be.reverted;
+            await expect(harness.gaussianElimination(n, A, b)).to.be.reverted;
 
             printBlockRegular({
                 t,
                 method: "Gaussian Elimination",
                 explanation: "Singular matrix should revert (zero pivot).",
-                inHex: "rank-deficient A",
+                inHex: "A=[[1,2],[2,4]] (Rank Deficient)",
                 expectedHex: "Revert",
                 outHex: "Revert",
                 expectedDec: "Revert",
@@ -998,55 +960,42 @@ describe("LinearSolversHarness", function () {
             });
         });
 
-        it("Test 24: Zero pivot requiring row swap (partial pivoting)", async function () {
+        it("Test 24: Zero pivot requiring row swap (Partial Pivoting)", async function () {
             t++;
 
             const n = 2n;
+            const m = [[0n, 1n], [2n, 3n]];
+            const bVals = [1n, 5n];
 
-            // First pivot is zero, but system is solvable
-            const A = [
-                await harness.qFromInt(0), await harness.qFromInt(1),
-                await harness.qFromInt(2), await harness.qFromInt(3),
-            ];
+            const det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+            const x0Exp = (bVals[0] * m[1][1] - bVals[1] * m[0][1]) * SCALE / det;
+            const x1Exp = (m[0][0] * bVals[1] - m[1][0] * bVals[0]) * SCALE / det;
 
-            const b = [
-                await harness.qFromInt(1),
-                await harness.qFromInt(5),
-            ];
-
-            const args = [n, A, b];
-
-            await touchGas(harness, "gaussianElimination", args);
-            const gas = await estimateGas(harness, "gaussianElimination", args);
+            const A = await Promise.all([0n, 1n, 2n, 3n].map(v => harness.qFromInt(v)));
+            const b = await Promise.all(bVals.map(v => harness.qFromInt(v)));
 
             const x = await harness.gaussianElimination(n, A, b);
+            const x0Int = await harness.toFloat(x[0]);
+            const x1Int = await harness.toFloat(x[1]);
 
-            const x0 = await harness.toFloat(x[0]);
-            const x1 = await harness.toFloat(x[1]);
-
-            // Solution: x=[1,1]
-            expect(x0 / SCALE).to.equal(1n);
-            expect(x1 / SCALE).to.equal(1n);
+            expectClose(x0Int, x0Exp, TOL_DIRECT, "x0 mismatch after swap");
+            expectClose(x1Int, x1Exp, TOL_DIRECT, "x1 mismatch after swap");
 
             printBlockRegular({
                 t,
                 method: "Gaussian Elimination",
-                explanation: "Zero pivot handled via row swapping.",
-                inHex: "A=[[0,1],[2,3]]",
-                expectedHex: "[1,1]",
+                explanation: "Pivot check. A[0,0]=0 requires swapping with R1.",
+                inHex: "A=[[0,1],[2,3]], b=[1,5]",
+                expectedHex: `[${await harness.fromFloat(x0Exp)}, ${await harness.fromFloat(x1Exp)}]`,
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "[1,1]",
-                outDec: `[${formatScaledInt(x0)}, ${formatScaledInt(x1)}]`,
-                gas,
+                expectedDec: `[${formatScaledInt(x0Exp)}, ${formatScaledInt(x1Exp)}]`,
+                outDec: `[${formatScaledInt(x0Int)}, ${formatScaledInt(x1Int)}]`,
+                gas: await estimateGas(harness, "gaussianElimination", [n, A, b]),
             });
         });
     });
 
     describe("Section 5: LU Decomposition", function () {
-
-        // ------------------------------------------------------------
-        //  Regular Cases
-        // ------------------------------------------------------------
 
         it("Test 25: 2×2 simple matrix", async function () {
             t++;
