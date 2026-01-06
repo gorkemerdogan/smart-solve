@@ -12,7 +12,7 @@ type LinearSolversHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
     toFloat(q: string): Promise<bigint>;
-    
+
     gradientDescentLeastSquares(m: bigint, n: bigint, Adata: string[], bdata: string[], x0data: string[], alpha: string, maxIter: bigint, tol: string): Promise<[string[], bigint]>;
     jacobi(n: bigint, Adata: string[], bdata: string[], x0data: string[], maxIter: bigint, tolDiff: string): Promise<[string[], bigint]>;
     gaussSeidel(n: bigint, Adata: string[], bdata: string[], x0data: string[], maxIter: bigint, tolDiff: string): Promise<[string[], bigint]>;
@@ -129,15 +129,15 @@ describe("LinearSolversHarness", function () {
             t++;
             const valA = 1n;
             const valB = 5n;
-            
-            const expectedVal = (valB * SCALE) / valA; 
+
+            const expectedVal = (valB * SCALE) / valA;
 
             const A = [await harness.qFromInt(valA)];
             const b = [await harness.qFromInt(valB)];
             const x0 = [await harness.qFromInt(0)];
             const alpha = await harness.qFromInt(1);
             const tol = await harness.qFromInt(0);
-            
+
             const args = [1n, 1n, A, b, x0, alpha, 10n, tol];
             await touchGas(harness, "gradientDescentLeastSquares", args);
             const gas = await estimateGas(harness, "gradientDescentLeastSquares", args);
@@ -185,7 +185,7 @@ describe("LinearSolversHarness", function () {
                 method: "Gradient Descent",
                 explanation: "Should converge to 4 for 1D scaled.",
                 inHex: `A=[${valA}], b=[${valB}]`,
-                expectedHex: await harness.qFromInt(4), 
+                expectedHex: await harness.qFromInt(4),
                 outHex: x[0],
                 expectedDec: formatScaledInt(expectedVal),
                 outDec: formatScaledInt(actualVal),
@@ -204,7 +204,7 @@ describe("LinearSolversHarness", function () {
             const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
 
             const [x] = await harness.gradientDescentLeastSquares(2n, 2n, A, b, x0, await harness.qFromInt(1), 10n, await harness.qFromInt(0));
-            
+
             const actual0 = await harness.toFloat(x[0]);
             const actual1 = await harness.toFloat(x[1]);
 
@@ -303,7 +303,7 @@ describe("LinearSolversHarness", function () {
             const actualVal = await harness.toFloat(x[0]);
 
             expect(actualVal).to.equal(expectedVal);
-        
+
             // If JS shows gradient is 0, iterations must be 0
             if (initialGrad === 0n) {
                 expect(iters).to.equal(0n, "Should terminate immediately with zero gradient");
@@ -346,7 +346,7 @@ describe("LinearSolversHarness", function () {
                 const grad = aJS * (aJS * xJS - bJS);
                 xJS = xJS - lrJS * grad;
             }
-            
+
             const expectedVal = BigInt(Math.round(xJS * Number(SCALE)));
 
             const A = [await harness.qFromInt(valA)];
@@ -523,7 +523,7 @@ describe("LinearSolversHarness", function () {
             t++;
 
             const n = 2n;
-            
+
             const A_vals = [0n, 1n, 1n, 1n]; // Matrix with explicit Zero on diagonal at (0,0)
             const A = await Promise.all(A_vals.map(v => harness.qFromInt(v)));
 
@@ -642,7 +642,7 @@ describe("LinearSolversHarness", function () {
             const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
 
             const tol = await harness.qFromFrac(1, 1_000_000_000_000n); // 1e-12
-            const maxIter = 200n;  
+            const maxIter = 200n;
 
             const args = [n, A, b, x0, maxIter, tol];
 
@@ -672,7 +672,7 @@ describe("LinearSolversHarness", function () {
         it("Test 14: Already converged initial guess", async function () {
             t++;
             const bVals = [4n, 6n];
-            const x0Vals = [2n, 3n]; 
+            const x0Vals = [2n, 3n];
 
             const A = [await harness.qFromInt(2), await harness.qFromInt(0), await harness.qFromInt(0), await harness.qFromInt(2)];
             const b = await Promise.all(bVals.map(v => harness.qFromInt(v)));
@@ -725,7 +725,7 @@ describe("LinearSolversHarness", function () {
 
             const [x] = await harness.gaussSeidel(1n, A, b, x0, maxIter, tol);
             const x0Int = await harness.toFloat(x[0]);
-            
+
             expectClose(x0Int, expectedVal, TOL_DIRECT);
 
             printBlockRegular({
