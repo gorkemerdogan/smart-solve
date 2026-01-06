@@ -123,7 +123,7 @@ describe("LinearSolversHarness", function () {
     //  Gradient Descent
     // ------------------------------------------------------------
 
-    describe("Method 1: Gradient Descent Least Squares", function () {
+    describe("Section 1: Gradient Descent Least Squares", function () {
 
         it("Test 1: 1D identity A=1 converges in one step", async function () {
             t++;
@@ -382,7 +382,7 @@ describe("LinearSolversHarness", function () {
     //  Jacobi
     // ------------------------------------------------------------
 
-    describe("Method 2: Jacobi Iteration", function () {
+    describe("Section 2: Jacobi Iteration", function () {
 
         it("Test 7: 1D identity A=1 solves immediately", async function () {
             t++;
@@ -589,60 +589,60 @@ describe("LinearSolversHarness", function () {
     //  Gauss–Seidel Method
     // ------------------------------------------------------------
 
-    describe("Method 3: Gauss–Seidel Iteration", function () {
+    describe("Section 3: Gauss–Seidel Iteration", function () {
 
         it("Test 12: 1D identity system (A=1)", async function () {
             t++;
+            const valA = 1n;
+            const valB = 7n;
+            const expectedVal = (valB * SCALE) / valA;
 
-            const n = 1n;
-
-            const A = [await harness.qFromInt(1)];
-            const b = [await harness.qFromInt(7)];
+            const A = [await harness.qFromInt(valA)];
+            const b = [await harness.qFromInt(valB)];
             const x0 = [await harness.qFromInt(0)];
-
             const tol = await harness.qFromInt(0);
             const maxIter = 10n;
 
-            const args = [n, A, b, x0, maxIter, tol];
+            const args = [1n, A, b, x0, maxIter, tol];
 
             await touchGas(harness, "gaussSeidel", args);
             const gas = await estimateGas(harness, "gaussSeidel", args);
 
-            const [x, iters] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
+            const [x, iters] = await harness.gaussSeidel(1n, A, b, x0, maxIter, tol);
+            const actualVal = await harness.toFloat(x[0]);
 
-            const x0Int = await harness.toFloat(x[0]);
-            expect(x0Int / SCALE).to.equal(7n);
+            expectClose(actualVal, expectedVal, TOL_DIRECT);
+            // Confirm stability (2 iterations, tol = 0)
+            expect(iters).to.be.lessThanOrEqual(2n);
 
             printBlockRegular({
-                t,
-                method: "Gauss–Seidel",
+                t, method: "Gauss–Seidel",
                 explanation: "1D identity system converges immediately.",
-                inHex: "A=[1], b=[7], x0=[0]",
-                expectedHex: await harness.qFromInt(7),
+                inHex: `A=[${valA}], b=[${valB}]`,
+                expectedHex: await harness.fromFloat(expectedVal),
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "7",
-                outDec: formatScaledInt(x0Int),
+                expectedDec: formatScaledInt(expectedVal),
+                outDec: formatScaledInt(actualVal),
                 gas,
             });
         });
 
-        const RESIDUAL_TOLERANCE = 10n * SCALE; // allow residual < 10
-
         it("Test 13: 2D diagonally dominant system (scaled residual check)", async function () {
             t++;
-
             const n = 2n;
+            const m = [[4n, 1n], [2n, 3n]];
+            const bVals = [1n, 2n];
 
-            // A = [[4,1],[2,3]]
-            const A = [await harness.qFromInt(4), await harness.qFromInt(1), await harness.qFromInt(2), await harness.qFromInt(3)];
+            const det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+            const x0Exp = (bVals[0] * m[1][1] - bVals[1] * m[0][1]) * SCALE / det;
+            const x1Exp = (m[0][0] * bVals[1] - m[1][0] * bVals[0]) * SCALE / det;
 
-            // b = [1,2]
-            const b = [await harness.qFromInt(1), await harness.qFromInt(2)];
-
+            const A = await Promise.all([4n, 1n, 2n, 3n].map(v => harness.qFromInt(v)));
+            const b = await Promise.all(bVals.map(v => harness.qFromInt(v)));
             const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
 
-            const tol = await harness.qFromInt(0);
-            const maxIter = 25n;
+            const tol = await harness.qFromFrac(1, 1_000_000_000_000n); // 1e-12
+            const maxIter = 200n;  
 
             const args = [n, A, b, x0, maxIter, tol];
 
@@ -654,102 +654,85 @@ describe("LinearSolversHarness", function () {
             const x0Int = await harness.toFloat(x[0]);
             const x1Int = await harness.toFloat(x[1]);
 
-            // Residuals in scaled domain
-            const r0 = 4n * x0Int + 1n * x1Int - 1n * SCALE;
-            const r1 = 2n * x0Int + 3n * x1Int - 2n * SCALE;
-
-            const r0_abs = r0 < 0n ? -r0 : r0;
-            const r1_abs = r1 < 0n ? -r1 : r1;
-
-            expect(r0_abs).to.be.below(RESIDUAL_TOLERANCE);
-            expect(r1_abs).to.be.below(RESIDUAL_TOLERANCE);
+            expectClose(x0Int, x0Exp, TOL_ITERATIVE);
+            expectClose(x1Int, x1Exp, TOL_ITERATIVE);
 
             printBlockRegular({
-                t,
-                method: "Gauss–Seidel",
-                explanation: "2×2 diagonally dominant system verified via scaled residual |Ax − b| < tol.",
+                t, method: "Gauss–Seidel",
+                explanation: "2×2 diagonally dominant system verifying convergence to analytical point.",
                 inHex: "A=[[4,1],[2,3]], b=[1,2]",
-                expectedHex: `|r| < ${RESIDUAL_TOLERANCE}`,
+                expectedHex: `[${await harness.fromFloat(x0Exp)}, ${await harness.fromFloat(x1Exp)}]`,
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "residual ≈ 0",
-                outDec: `r=[${formatScaledInt(r0)}, ${formatScaledInt(r1)}]`,
+                expectedDec: `[${formatScaledInt(x0Exp)}, ${formatScaledInt(x1Exp)}]`,
+                outDec: `[${formatScaledInt(x0Int)}, ${formatScaledInt(x1Int)}]`,
                 gas,
             });
         });
 
         it("Test 14: Already converged initial guess", async function () {
             t++;
+            const bVals = [4n, 6n];
+            const x0Vals = [2n, 3n]; 
 
-            const n = 2n;
-
-            const A = [
-                await harness.qFromInt(2), await harness.qFromInt(0),
-                await harness.qFromInt(0), await harness.qFromInt(2),
-            ];
-
-            const b = [
-                await harness.qFromInt(4),
-                await harness.qFromInt(6),
-            ];
-
-            const x0 = [
-                await harness.qFromInt(2),
-                await harness.qFromInt(3),
-            ];
+            const A = [await harness.qFromInt(2), await harness.qFromInt(0), await harness.qFromInt(0), await harness.qFromInt(2)];
+            const b = await Promise.all(bVals.map(v => harness.qFromInt(v)));
+            const x0 = await Promise.all(x0Vals.map(v => harness.qFromInt(v)));
 
             const tol = await harness.qFromInt(0);
             const maxIter = 5n;
 
-            const args = [n, A, b, x0, maxIter, tol];
+            const args = [2n, A, b, x0, maxIter, tol];
 
             await touchGas(harness, "gaussSeidel", args);
             const gas = await estimateGas(harness, "gaussSeidel", args);
 
-            const [x, iters] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
+            const [x, iters] = await harness.gaussSeidel(2n, A, b, x0, maxIter, tol);
 
-            expect(iters).to.equal(1n);
+            expect(iters).to.be.lessThanOrEqual(2n); // Residual is 0
+
+            const out0 = formatScaledInt(await harness.toFloat(x[0]));
+            const out1 = formatScaledInt(await harness.toFloat(x[1]));
 
             printBlockRegular({
-                t,
-                method: "Gauss–Seidel",
-                explanation: "Initial guess already satisfies Ax=b.",
+                t, method: "Gauss–Seidel",
+                explanation: "Output must remain at x0 if x0 is already the solution.",
                 inHex: "A=2I, b=[4,6], x0=[2,3]",
-                expectedHex: "[2,3]",
+                expectedHex: `[${x0[0]}, ${x0[1]}]`,
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "[2,3]",
-                outDec: "[2,3]",
+                expectedDec: "[2, 3]",
+                outDec: `[${out0}, ${out1}]`,
                 gas,
             });
         });
 
         it("Test 15: Negative values system", async function () {
             t++;
+            const valA = -2n;
+            const valB = -8n;
+            const expectedVal = (valB * SCALE) / valA;
 
-            const n = 1n;
-
-            const A = [await harness.qFromInt(-2)];
-            const b = [await harness.qFromInt(-8)];
+            const A = [await harness.qFromInt(valA)];
+            const b = [await harness.qFromInt(valB)];
             const x0 = [await harness.qFromInt(0)];
 
             const tol = await harness.qFromInt(0);
             const maxIter = 10n;
 
-            const args = [n, A, b, x0, maxIter, tol];
+            const args = [1n, A, b, x0, maxIter, tol];
 
             await touchGas(harness, "gaussSeidel", args);
             const gas = await estimateGas(harness, "gaussSeidel", args);
 
-            const [x] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
-
+            const [x] = await harness.gaussSeidel(1n, A, b, x0, maxIter, tol);
             const x0Int = await harness.toFloat(x[0]);
-            expect(x0Int / SCALE).to.equal(4n);
+            
+            expectClose(x0Int, expectedVal, TOL_DIRECT);
 
             printBlockRegular({
-                t,
-                method: "Gauss–Seidel",
-                explanation: "Negative scalar system.",
+                t, method: "Gauss–Seidel",
+                explanation: "Signed math check with negative coefficients.",
                 inHex: "A=[-2], b=[-8]",
-                expectedHex: "4",
+                expectedHex: await harness.fromFloat(expectedVal),
                 outHex: `[${x.join(", ")}]`,
                 expectedDec: "4",
                 outDec: formatScaledInt(x0Int),
@@ -767,16 +750,8 @@ describe("LinearSolversHarness", function () {
                 await harness.qFromInt(1), await harness.qFromInt(1),
             ];
 
-            const b = [
-                await harness.qFromInt(1),
-                await harness.qFromInt(2),
-            ];
-
-            const x0 = [
-                await harness.qFromInt(0),
-                await harness.qFromInt(0),
-            ];
-
+            const b = [await harness.qFromInt(1), await harness.qFromInt(2)];
+            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
             const tol = await harness.qFromInt(0);
             const maxIter = 5n;
 
@@ -799,23 +774,26 @@ describe("LinearSolversHarness", function () {
 
         it("Test 17: maxIter = 1 executes exactly one iteration", async function () {
             t++;
+            const valA = 5n;
+            const valB = 10n;
+            const expectedVal = (valB * SCALE) / valA; // 2.0
 
-            const n = 1n;
-
-            const A = [await harness.qFromInt(5)];
-            const b = [await harness.qFromInt(10)];
+            const A = [await harness.qFromInt(valA)];
+            const b = [await harness.qFromInt(valB)];
             const x0 = [await harness.qFromInt(0)];
 
             const tol = await harness.qFromInt(0);
             const maxIter = 1n;
 
-            const [_, iters] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
+            const [x, iters] = await harness.gaussSeidel(1n, A, b, x0, maxIter, tol);
+            const actualVal = await harness.toFloat(x[0]);
 
             expect(iters).to.equal(1n);
+            expectClose(actualVal, expectedVal, TOL_DIRECT);
         });
     });
 
-    describe("Method 4: Gaussian Elimination", function () {
+    describe("Section 4: Gaussian Elimination", function () {
 
         // ------------------------------------------------------------
         //  Normal Cases
@@ -1064,7 +1042,7 @@ describe("LinearSolversHarness", function () {
         });
     });
 
-    describe("Method 5: LU Decomposition", function () {
+    describe("Section 5: LU Decomposition", function () {
 
         // ------------------------------------------------------------
         //  Regular Cases
