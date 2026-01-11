@@ -72,7 +72,7 @@ const fmtHexArr = (arr: string[]) => `[${arr.join(", ")}]`;
 //  Test Suite
 // ------------------------------------------------------------
 
-describe("MatrixMaster (library) : determinant & inverse over ABDK quad", function () {
+describe("MatrixMaster : Determinant & Inverse", function () {
     let harness: MatrixMasterHarness;
     let t = 0;
 
@@ -86,19 +86,13 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
         harness.qFromInt(BigInt(n));
 
     // ------------------------------------------------------------
-    //  Section 1: Determinant
+    //  Section 9: Determinant
     // ------------------------------------------------------------
 
-    describe("Section 1: determinant (det)", function () {
+    describe("Section 9: Determinant (det)", function () {
         it("Test 1: small known 2x2 determinant", async function () {
             t++;
-            // A = [[1,2],[3,4]] -> det = -2
-            const A = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(3),
-                await qInt(4),
-            ];
+            const A = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
 
             await touchGas(harness, "detHarness", [2n, 2n, A]);
             const gas = await estimateGas(harness, "detHarness", [2n, 2n, A]);
@@ -110,7 +104,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             printBlockMatrix({
                 t,
                 method: "detHarness",
-                explanation: "Runs LU-based determinant on a simple 2x2 matrix with a known closed-form value.",
+                explanation: "Runs LU-based determinant on a 2x2 matrix.",
                 gas,
                 shapeIn: "2x2",
                 shapeOut: "scalar",
@@ -121,13 +115,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
         it("Test 2: singular matrix returns 0", async function () {
             t++;
-            // Rows linearly dependent: [[1,2],[2,4]] -> det = 0
-            const A = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(2),
-                await qInt(4),
-            ];
+            const A = [await qInt(1), await qInt(2), await qInt(2), await qInt(4)];
 
             await touchGas(harness, "detHarness", [2n, 2n, A]);
             const gas = await estimateGas(harness, "detHarness", [2n, 2n, A]);
@@ -139,7 +127,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             printBlockMatrix({
                 t,
                 method: "detHarness",
-                explanation: "Detects linear dependence in rows and returns an exact zero determinant.",
+                explanation: "Detects linear dependence (Singular Matrix).",
                 gas,
                 shapeIn: "2x2",
                 shapeOut: "scalar",
@@ -150,13 +138,8 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
         it("Test 3: pivoting matrix requiring row swap", async function () {
             t++;
-            // A = [[0,1],[1,0]] -> det = -1, and requires pivot swap
-            const A = [
-                await qInt(0),
-                await qInt(1),
-                await qInt(1),
-                await qInt(0),
-            ];
+
+            const A = [await qInt(0), await qInt(1), await qInt(1), await qInt(0)];
 
             await touchGas(harness, "detHarness", [2n, 2n, A]);
             const gas = await estimateGas(harness, "detHarness", [2n, 2n, A]);
@@ -168,7 +151,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             printBlockMatrix({
                 t,
                 method: "detHarness",
-                explanation: "Forces LU pivoting via row swap and verifies determinant sign tracking.",
+                explanation: "Forces LU pivoting (row swap) and verifies sign flip.",
                 gas,
                 shapeIn: "2x2",
                 shapeOut: "scalar",
@@ -179,25 +162,15 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
 
         it("Test 4: non-square matrix reverts", async function () {
             t++;
-            const A = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(3),
-                await qInt(4),
-                await qInt(5),
-                await qInt(6),
-            ]; // 2x3
-
-            await touchGas(harness, "detHarness", [2n, 3n, A]);
-            const gas = await estimateGas(harness, "detHarness", [2n, 3n, A]);
+            const A = [await qInt(1), await qInt(2), await qInt(3), await qInt(4), await qInt(5), await qInt(6)];
 
             await expect(harness.detHarness(2n, 3n, A)).to.be.revertedWith("MatrixMaster: matrix must be square");
 
             printBlockMatrix({
                 t,
                 method: "detHarness",
-                explanation: "Confirms determinant is only defined for n×n matrices and rejects rectangular input.",
-                gas,
+                explanation: "Rejects rectangular input.",
+                gas: "Revert",
                 shapeIn: "2x3",
                 shapeOut: "revert",
                 inHex: fmtHexArr(A),
@@ -219,7 +192,7 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             printBlockMatrix({
                 t,
                 method: "detHarness",
-                explanation: "Checks 1x1 case where det([a]) = a exactly.",
+                explanation: "det([a]) = a",
                 gas,
                 shapeIn: "1x1",
                 shapeOut: "scalar",
@@ -243,11 +216,11 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             printBlockMatrix({
                 t,
                 method: "detHarness",
-                explanation: "Computes det(I_n) for n=3 and verifies it equals one as expected.",
+                explanation: "det(Identity) = 1",
                 gas,
-                shapeIn: `${I.rows}x${I.cols}`,
+                shapeIn: "3x3",
                 shapeOut: "scalar",
-                inHex: fmtHexArr(I.data),
+                inHex: "Identity",
                 outHex: `det=${det}`,
             });
         });
@@ -267,11 +240,11 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             printBlockMatrix({
                 t,
                 method: "detHarness",
-                explanation: "Confirms that a 3x3 zero matrix has a determinant exactly equal to zero.",
+                explanation: "det(ZeroMatrix) = 0",
                 gas,
-                shapeIn: `${Z.rows}x${Z.cols}`,
+                shapeIn: "3x3",
                 shapeOut: "scalar",
-                inHex: fmtHexArr(Z.data),
+                inHex: "Zeros",
                 outHex: `det=${det}`,
             });
         });
@@ -280,15 +253,9 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             t++;
             // A = [[2,1,2],[0,3,4],[0,0,4]]; det = 2*3*4 = 24
             const A = [
-                await qInt(2),
-                await qInt(1),
-                await qInt(2),
-                await qInt(0),
-                await qInt(3),
-                await qInt(4),
-                await qInt(0),
-                await qInt(0),
-                await qInt(4),
+                await qInt(2), await qInt(1), await qInt(2),
+                await qInt(0), await qInt(3), await qInt(4),
+                await qInt(0), await qInt(0), await qInt(4),
             ];
 
             await touchGas(harness, "detHarness", [3n, 3n, A]);
@@ -301,62 +268,61 @@ describe("MatrixMaster (library) : determinant & inverse over ABDK quad", functi
             printBlockMatrix({
                 t,
                 method: "detHarness",
-                explanation: "Runs determinant on an upper triangular matrix and checks it equals the product of its diagonal.",
+                explanation: "Verifies det = product(diagonal) for triangular matrix.",
                 gas,
-                shapeIn: "3x3 (upper triangular)",
+                shapeIn: "3x3 (triangular)",
                 shapeOut: "scalar",
                 inHex: fmtHexArr(A),
                 outHex: `det=${det}`,
             });
         });
 
-        it("Test 9: near-singular matrix with tiny pivot yields small but non-zero determinant", async function () {
+        it("Test 9: near-singular matrix with tiny pivot", async function () {
             t++;
-            // Construct epsilon = 1 / 1000 in quad
             const one = await qInt(1);
-            const eps = await harness.qFromFrac(1n, 1000n);
+            const eps = await harness.qFromFrac(1n, 1000n); // 0.001
 
-            // Build 1 + eps via 1x1 addHarness
-            const onePlusEpsMat = asMatrix(
-                await harness.addHarness(1n, 1n, [one], 1n, 1n, [eps]),
-            );
+            // 1 + eps
+            const onePlusEpsMat = asMatrix(await harness.addHarness(1n, 1n, [one], 1n, 1n, [eps]));
             const onePlusEps = onePlusEpsMat.data[0];
 
-            // A = [[1, 1],
-            //      [1, 1+eps]]
+            // A = [[1, 1], [1, 1+eps]] -> det = eps
             const A = [one, one, one, onePlusEps];
 
             await touchGas(harness, "detHarness", [2n, 2n, A]);
             const gas = await estimateGas(harness, "detHarness", [2n, 2n, A]);
             const det = await harness.detHarness(2n, 2n, A);
 
-            const zeroQ = await qInt(0);
-            const zeroBI = BigInt(zeroQ);
-            const detBI = BigInt(det);
-            const oneBI = BigInt(one);
+            // Convert to standard JS numbers (floats)
+            const detNum = Number(await harness.toFloat(det));
+            const epsNum = Number(await harness.toFloat(eps));
 
-            // For this construction, det(A) ≈ eps: strictly positive & much smaller than 1
-            expect(detBI).to.be.gt(zeroBI);
-            expect(detBI).to.be.lt(oneBI);
+            // Define tolerance range
+            const delta = 0.000001;
+            const min = epsNum - delta;
+            const max = epsNum + delta;
+
+            // Use within for safe floating-point comparison
+            expect(detNum).to.be.within(min, max);
 
             printBlockMatrix({
                 t,
                 method: "detHarness",
-                explanation: "Uses A=[[1,1],[1,1+eps]] with eps<<1 and checks determinant is small but non-zero, exercising tiny pivot handling.",
+                explanation: "Near-singular matrix returns small non-zero determinant.",
                 gas,
                 shapeIn: "2x2 (near-singular)",
                 shapeOut: "scalar",
-                inHex: fmtHexArr(A),
-                outHex: `det=${det}, eps=${eps}`,
+                inHex: `eps=${eps}`,
+                outHex: `det=${det}`,
             });
         });
     });
 
     // ------------------------------------------------------------
-    //  Section 2: Inverse
+    //  Section 10: Inverse
     // ------------------------------------------------------------
 
-    describe("Section 2: inverse", function () {
+    describe("Section 10: inverse", function () {
         it("Test 10: 2x2 upper-triangular with det=1, A·A^-1 = I", async function () {
             t++;
             // A = [[1,1],[0,1]]; inverse = [[1,-1],[0,1]] all integers
