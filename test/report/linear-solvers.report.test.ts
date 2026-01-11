@@ -203,7 +203,14 @@ describe("LinearSolversHarness", function () {
             const b = [await harness.qFromInt(bVals[0]), await harness.qFromInt(bVals[1])];
             const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
 
-            const [x] = await harness.gradientDescentLeastSquares(2n, 2n, A, b, x0, await harness.qFromInt(1), 10n, await harness.qFromInt(0));
+            const stepSize = await harness.qFromInt(1);
+            const maxItr = 10n;
+            const tol = await harness.qFromInt(0);
+
+            await touchGas(harness, "gradientDescentLeastSquares", [2n, 2n, A, b, x0, stepSize, maxItr, tol]);
+            const gas = await estimateGas(harness, "gradientDescentLeastSquares", [2n, 2n, A, b, x0, stepSize, maxItr, tol]);
+
+            const [x] = await harness.gradientDescentLeastSquares(2n, 2n, A, b, x0, stepSize, maxItr, tol);
 
             const actual0 = await harness.toFloat(x[0]);
             const actual1 = await harness.toFloat(x[1]);
@@ -211,12 +218,10 @@ describe("LinearSolversHarness", function () {
             expectClose(actual0, expectedVec[0], TOL_ITERATIVE);
             expectClose(actual1, expectedVec[1], TOL_ITERATIVE);
 
-            const gas = await estimateGas(harness, "gradientDescentLeastSquares", [2n, 2n, A, b, x0, await harness.qFromInt(1), 10n, await harness.qFromInt(0)]);
-
             printBlockRegular({
                 t,
                 method: "Gradient Descent",
-                explanation: "Result matches input b for 2D Identity.",
+                explanation: "Result matches input b for 2D Identity system (I*x = b).",
                 inHex: "A=I, b=[3,-7]",
                 expectedHex: `[${b[0]}, ${b[1]}]`,
                 outHex: `[${x.join(", ")}]`,
@@ -778,7 +783,7 @@ describe("LinearSolversHarness", function () {
             t++;
             const valA = 5n;
             const valB = 10n;
-            const expectedVal = (valB * SCALE) / valA; // 2.0
+            const expectedVal = (valB * SCALE) / valA; // 2.0 scaled
 
             const A = [await harness.qFromInt(valA)];
             const b = [await harness.qFromInt(valB)];
@@ -787,11 +792,26 @@ describe("LinearSolversHarness", function () {
             const tol = await harness.qFromInt(0);
             const maxIter = 1n;
 
+            await touchGas(harness, "gaussSeidel", [1n, A, b, x0, maxIter, tol]);
+            const gas = await estimateGas(harness, "gaussSeidel", [1n, A, b, x0, maxIter, tol]);
+
             const [x, iters] = await harness.gaussSeidel(1n, A, b, x0, maxIter, tol);
             const actualVal = await harness.toFloat(x[0]);
 
             expect(iters).to.equal(1n);
             expectClose(actualVal, expectedVal, TOL_DIRECT);
+
+            printBlockRegular({
+                t,
+                method: "Gauss-Seidel",
+                explanation: "Verifies boundary condition: solver stops immediately after exactly one iteration.",
+                inHex: `A=[${A[0]}], b=[${b[0]}], maxIter=1`,
+                expectedHex: `[${await harness.qFromInt(2)}]`,
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "[2.0]",
+                outDec: `[${formatScaledInt(actualVal)}]`,
+                gas,
+            });
         });
     });
 
@@ -832,11 +852,13 @@ describe("LinearSolversHarness", function () {
         it("Test 19: 2D identity matrix", async function () {
             t++;
             const n = 2n;
-            // A = I, so x = b
             const bVals = [3n, -4n];
 
             const A = [await harness.qFromInt(1), await harness.qFromInt(0), await harness.qFromInt(0), await harness.qFromInt(1)];
             const b = await Promise.all(bVals.map(v => harness.qFromInt(v)));
+
+            await touchGas(harness, "gaussianElimination", [n, A, b]);
+            const gas = await estimateGas(harness, "gaussianElimination", [n, A, b]);
 
             const x = await harness.gaussianElimination(n, A, b);
 
@@ -855,7 +877,7 @@ describe("LinearSolversHarness", function () {
                 outHex: `[${x.join(", ")}]`,
                 expectedDec: `[${bVals.join(", ")}]`,
                 outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}]`,
-                gas: await estimateGas(harness, "gaussianElimination", [n, A, b]),
+                gas,
             });
         });
 
@@ -871,6 +893,9 @@ describe("LinearSolversHarness", function () {
 
             const A = await Promise.all([2n, 1n, 5n, 7n].map(v => harness.qFromInt(v)));
             const b = await Promise.all(bVals.map(v => harness.qFromInt(v)));
+
+            await touchGas(harness, "gaussianElimination", [n, A, b]);
+            const gas = await estimateGas(harness, "gaussianElimination", [n, A, b]);
 
             const x = await harness.gaussianElimination(n, A, b);
             const x0Int = await harness.toFloat(x[0]);
@@ -888,7 +913,7 @@ describe("LinearSolversHarness", function () {
                 outHex: `[${x.join(", ")}]`,
                 expectedDec: `[${formatScaledInt(x0Exp)}, ${formatScaledInt(x1Exp)}]`,
                 outDec: `[${formatScaledInt(x0Int)}, ${formatScaledInt(x1Int)}]`,
-                gas: await estimateGas(harness, "gaussianElimination", [n, A, b]),
+                gas,
             });
         });
 
@@ -897,7 +922,7 @@ describe("LinearSolversHarness", function () {
             const n = 3n;
             const A_raw = [
                 2n, 1n, 1n,
-                0n, 3n, 1n, 
+                0n, 3n, 1n,
                 0n, 0n, 4n
             ];
             const b_raw = [5n, 4n, 8n];
@@ -905,16 +930,19 @@ describe("LinearSolversHarness", function () {
             const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
             const b = await Promise.all(b_raw.map(v => harness.qFromInt(v)));
 
+            await touchGas(harness, "gaussianElimination", [n, A, b]);
+            const gas = await estimateGas(harness, "gaussianElimination", [n, A, b]);
+
             const x = await harness.gaussianElimination(n, A, b);
 
             const x_vals = await Promise.all(x.map(v => harness.toFloat(v)));
-            
-            const r0 = (2n * x_vals[0] + 1n * x_vals[1] + 1n * x_vals[2]) - (5n * SCALE); // Row 0: 2x + y + z - 5
-            const r1 = (3n * x_vals[1] + 1n * x_vals[2]) - (4n * SCALE);                  // Row 1: 3y + z - 4
-            const r2 = (4n * x_vals[2]) - (8n * SCALE);                                   // Row 2: 4z - 8
+
+            const r0 = (2n * x_vals[0] + 1n * x_vals[1] + 1n * x_vals[2]) - (5n * SCALE);
+            const r1 = (3n * x_vals[1] + 1n * x_vals[2]) - (4n * SCALE);
+            const r2 = (4n * x_vals[2]) - (8n * SCALE);
 
             const abs = (v: bigint) => v < 0n ? -v : v;
-            
+
             expect(abs(r0)).to.be.below(TOL_DIRECT, "Row 0 residual too high");
             expect(abs(r1)).to.be.below(TOL_DIRECT, "Row 1 residual too high");
             expect(abs(r2)).to.be.below(TOL_DIRECT, "Row 2 residual too high");
@@ -928,7 +956,7 @@ describe("LinearSolversHarness", function () {
                 outHex: `[${x.join(", ")}]`,
                 expectedDec: "Residual < 1e-10",
                 outDec: "Pass",
-                gas: await estimateGas(harness, "gaussianElimination", [n, A, b]),
+                gas,
             });
         });
 
@@ -969,6 +997,9 @@ describe("LinearSolversHarness", function () {
             const A = await Promise.all([0n, 1n, 2n, 3n].map(v => harness.qFromInt(v)));
             const b = await Promise.all(bVals.map(v => harness.qFromInt(v)));
 
+            await touchGas(harness, "gaussianElimination", [n, A, b]);
+            const gas = await estimateGas(harness, "gaussianElimination", [n, A, b]);
+
             const x = await harness.gaussianElimination(n, A, b);
             const x0Int = await harness.toFloat(x[0]);
             const x1Int = await harness.toFloat(x[1]);
@@ -979,13 +1010,13 @@ describe("LinearSolversHarness", function () {
             printBlockRegular({
                 t,
                 method: "Gaussian Elimination",
-                explanation: "Pivot check. A[0,0]=0 requires swapping with R1.",
+                explanation: "Pivot check: A[0,0]=0 requires swapping Row 0 with Row 1 to avoid division by zero.",
                 inHex: "A=[[0,1],[2,3]], b=[1,5]",
                 expectedHex: `[${await harness.fromFloat(x0Exp)}, ${await harness.fromFloat(x1Exp)}]`,
                 outHex: `[${x.join(", ")}]`,
                 expectedDec: `[${formatScaledInt(x0Exp)}, ${formatScaledInt(x1Exp)}]`,
                 outDec: `[${formatScaledInt(x0Int)}, ${formatScaledInt(x1Int)}]`,
-                gas: await estimateGas(harness, "gaussianElimination", [n, A, b]),
+                gas,
             });
         });
     });
@@ -1051,6 +1082,9 @@ describe("LinearSolversHarness", function () {
             const A_raw = [4n, 3n, 6n, 3n];
             const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
 
+            await touchGas(harness, "luDecomposition", [n, A]);
+            const gas = await estimateGas(harness, "luDecomposition", [n, A]);
+
             const [L, U] = await harness.luDecomposition(n, A);
 
             // Verification
@@ -1070,13 +1104,13 @@ describe("LinearSolversHarness", function () {
             printBlockRegular({
                 t,
                 method: "LU Decomposition",
-                explanation: "Verifying A = L * U.",
+                explanation: "Verifying the decomposition property A = L * U for a 2x2 system.",
                 inHex: "A=[[4,3],[6,3]]",
                 expectedHex,
                 outHex,
                 expectedDec,
                 outDec,
-                gas: await estimateGas(harness, "luDecomposition", [n, A]),
+                gas,
             });
 
             expectMatrixSimilar(Number(n), LU_product, As, TOL_DIRECT);
@@ -1190,13 +1224,13 @@ describe("LinearSolversHarness", function () {
             const LU_product = multiplyMatrices(3, Ls, Us);
 
             const expectedHex = `L (Identity):\n${formatMat(L)}`;
-            const outHex =      `U (Identity):\n${formatMat(U)}`;
+            const outHex = `U (Identity):\n${formatMat(U)}`;
 
             const expectedDec = `Original A: [${As.map(v => formatScaledInt(v)).join(", ")}]`;
-            const outDec =      `Rec A':    [${LU_product.map(v => formatScaledInt(v)).join(", ")}]`;
+            const outDec = `Rec A':    [${LU_product.map(v => formatScaledInt(v)).join(", ")}]`;
 
             printBlockRegular({
-                t, 
+                t,
                 method: "LU Decomposition",
                 explanation: "Both L and U should be Identity matrices.",
                 inHex: "A=I (3x3)",
