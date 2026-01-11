@@ -1219,7 +1219,8 @@ describe("LinearSolversHarness", function () {
             await expect(harness.luDecomposition(n, A)).to.be.reverted;
 
             printBlockRegular({
-                t, method: "LU Decomposition",
+                t,
+                method: "LU Decomposition",
                 explanation: "Singular matrix (Det=0) reverts",
                 inHex: "A=[[2,4],[1,2]]",
                 expectedHex: "Revert",
@@ -1239,7 +1240,8 @@ describe("LinearSolversHarness", function () {
             await expect(harness.luDecomposition(n, A)).to.be.reverted;
 
             printBlockRegular({
-                t, method: "LU Decomposition",
+                t,
+                method: "LU Decomposition",
                 explanation: "Zero matrix: Immediate pivot failure.",
                 inHex: "A=[[0,0],[0,0]]",
                 expectedHex: "Revert",
