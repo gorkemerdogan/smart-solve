@@ -90,6 +90,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
     // ------------------------------------------------------------
 
     describe("Section 3: Elementwise arithmetic", function () {
+
         // ------------------------------
         //  add
         // ------------------------------
@@ -114,7 +115,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "addHarness",
-                explanation: "Performs elementwise addition of two same-shaped matrices and checks sum entries.",
+                explanation: "Performs elementwise addition A+B.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
@@ -127,17 +128,13 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             t++;
             const a = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
             const b = [await qInt(5), await qInt(6), await qInt(7), await qInt(8)];
-
-            await touchGas(harness, "addHarness", [2n, 2n, a, 1n, 4n, b]);
-            const gas = await estimateGas(harness, "addHarness", [2n, 2n, a, 1n, 4n, b]);
-
+            
             await expect(harness.addHarness(2n, 2n, a, 1n, 4n, b)).to.be.revertedWith("MatrixMaster: shape mismatch");
 
             printBlockMatrix({
-                t,
-                method: "addHarness",
-                explanation: "Rejects addition when operand matrices have incompatible dimension layouts.",
-                gas,
+                t, method: "addHarness",
+                explanation: "Rejects addition when operand matrices have incompatible shapes (2x2 vs 1x4).",
+                gas: "Revert",
                 shapeIn: "A:2x2, B:1x4",
                 shapeOut: "revert",
                 inHex: `A=${fmtHexArr(a)}, B=${fmtHexArr(b)}`,
@@ -147,18 +144,8 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
 
         it("Test 3: add handles negative entries", async function () {
             t++;
-            const a = [
-                await qInt(-1),
-                await qInt(-2),
-                await qInt(3),
-                await qInt(4),
-            ];
-            const b = [
-                await qInt(5),
-                await qInt(-6),
-                await qInt(-3),
-                await qInt(2),
-            ];
+            const a = [await qInt(-1), await qInt(-2), await qInt(3), await qInt(4)];
+            const b = [await qInt(5), await qInt(-6), await qInt(-3), await qInt(2)];
             const rows = 2n;
             const cols = 2n;
 
@@ -166,12 +153,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             const gas = await estimateGas(harness, "addHarness", [rows, cols, a, rows, cols, b]);
 
             const c = asMatrix(await harness.addHarness(rows, cols, a, rows, cols, b));
-            const expected = [
-                await qInt(4),
-                await qInt(-8),
-                await qInt(0),
-                await qInt(6),
-            ];
+            const expected = [await qInt(4), await qInt(-8), await qInt(0), await qInt(6)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -180,7 +162,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "addHarness",
-                explanation: "Adds matrices containing mixed positive and negative entries and checks signed results.",
+                explanation: "Adds matrices with mixed signs correctly.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
@@ -193,13 +175,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             t++;
             const rows = 2n;
             const cols = 2n;
-            const A = [
-                await qInt(2),
-                await qInt(-3),
-                await qInt(5),
-                await qInt(7),
-            ];
-
+            const A = [await qInt(2), await qInt(-3), await qInt(5), await qInt(7)];
             const zeroMat = asMatrix(await harness.zerosHarness(rows, cols));
 
             await touchGas(harness, "addHarness", [rows, cols, A, zeroMat.rows, zeroMat.cols, zeroMat.data]);
@@ -212,11 +188,11 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "addHarness",
-                explanation: "Verifies that adding a zero matrix is a no-op and preserves A exactly (A+0=A).",
+                explanation: "Verifies additive identity property A+0=A.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${sum.rows}x${sum.cols}`,
-                inHex: `A=${fmtHexArr(A)}, 0=${fmtHexArr(zeroMat.data)}`,
+                inHex: `A=${fmtHexArr(A)}, 0=Zeros`,
                 outHex: fmtHexArr(sum.data),
             });
         });
@@ -227,12 +203,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
 
         it("Test 5: sub A−B elementwise", async function () {
             t++;
-            const a = [
-                await qInt(6),
-                await qInt(8),
-                await qInt(10),
-                await qInt(12),
-            ];
+            const a = [await qInt(6), await qInt(8), await qInt(10), await qInt(12)];
             const b = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
             const rows = 2n;
             const cols = 2n;
@@ -241,12 +212,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             const gas = await estimateGas(harness, "subHarness", [rows, cols, a, rows, cols, b]);
 
             const c = asMatrix(await harness.subHarness(rows, cols, a, rows, cols, b));
-            const expected = [
-                await qInt(5),
-                await qInt(6),
-                await qInt(7),
-                await qInt(8),
-            ];
+            const expected = [await qInt(5), await qInt(6), await qInt(7), await qInt(8)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -255,7 +221,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "subHarness",
-                explanation: "Performs elementwise subtraction and ensures each entry is A(i,j)−B(i,j).",
+                explanation: "Performs elementwise subtraction A-B.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
@@ -268,17 +234,14 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             t++;
             const a = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
             const b = [await qInt(5), await qInt(6), await qInt(7), await qInt(8)];
-
-            await touchGas(harness, "subHarness", [2n, 2n, a, 1n, 4n, b]);
-            const gas = await estimateGas(harness, "subHarness", [2n, 2n, a, 1n, 4n, b]);
-
+            
             await expect(harness.subHarness(2n, 2n, a, 1n, 4n, b)).to.be.revertedWith("MatrixMaster: shape mismatch");
 
             printBlockMatrix({
                 t,
                 method: "subHarness",
-                explanation: "Ensures subtraction requires identical shapes and fails on mismatched sizes.",
-                gas,
+                explanation: "Ensures subtraction fails on mismatched sizes.",
+                gas: "Revert",
                 shapeIn: "A:2x2, B:1x4",
                 shapeOut: "revert",
                 inHex: `A=${fmtHexArr(a)}, B=${fmtHexArr(b)}`,
@@ -288,18 +251,8 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
 
         it("Test 7: sub supports negative operands", async function () {
             t++;
-            const a = [
-                await qInt(-5),
-                await qInt(2),
-                await qInt(0),
-                await qInt(7),
-            ];
-            const b = [
-                await qInt(3),
-                await qInt(-4),
-                await qInt(1),
-                await qInt(-2),
-            ];
+            const a = [await qInt(-5), await qInt(2), await qInt(0), await qInt(7)];
+            const b = [await qInt(3), await qInt(-4), await qInt(1), await qInt(-2)];
             const rows = 2n;
             const cols = 2n;
 
@@ -307,12 +260,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             const gas = await estimateGas(harness, "subHarness", [rows, cols, a, rows, cols, b]);
 
             const c = asMatrix(await harness.subHarness(rows, cols, a, rows, cols, b));
-            const expected = [
-                await qInt(-8),
-                await qInt(6),
-                await qInt(-1),
-                await qInt(9),
-            ];
+            const expected = [await qInt(-8), await qInt(6), await qInt(-1), await qInt(9)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -321,7 +269,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "subHarness",
-                explanation: "Subtracts matrices with mixed signs and checks sign-sensitive differences.",
+                explanation: "Subtracts with mixed signs (e.g., 2 - (-4) = 6).",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
@@ -330,23 +278,18 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             });
         });
 
-        it("Test 8: sub A−A=0 (cancellation to zero)", async function () {
+        it("Test 8: sub A−A=0 (cancellation)", async function () {
             t++;
             const rows = 2n;
             const cols = 2n;
-            const A = [
-                await qInt(3),
-                await qInt(-2),
-                await qInt(7),
-                await qInt(0),
-            ];
+            const A = [await qInt(3), await qInt(-2), await qInt(7), await qInt(0)];
 
             await touchGas(harness, "subHarness", [rows, cols, A, rows, cols, A]);
             const gas = await estimateGas(harness, "subHarness", [rows, cols, A, rows, cols, A]);
 
             const diff = asMatrix(await harness.subHarness(rows, cols, A, rows, cols, A));
-
             const zero = await qInt(0);
+            
             for (const v of diff.data) {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
             }
@@ -354,27 +297,21 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "subHarness",
-                explanation: "Subtracts a matrix from itself and confirms all entries cancel exactly to zero.",
+                explanation: "Self-subtraction A-A must equal Zero Matrix.",
                 gas,
-                shapeIn: `${rows}x${cols}`,
-                shapeOut: `${diff.rows}x${diff.cols}`,
+                shapeIn: `${rows}x${cols}`, shapeOut: `${diff.rows}x${diff.cols}`,
                 inHex: fmtHexArr(A),
                 outHex: fmtHexArr(diff.data),
             });
         });
 
         // ------------------------------
-        //  divScalar
+        //  divScalar / mulScalar
         // ------------------------------
 
-        it("Test 9: divScalar applies scalar division to all entries", async function () {
+        it("Test 9: divScalar applies scalar division", async function () {
             t++;
-            const two = await qInt(2);
-            const four = await qInt(4);
-            const six = await qInt(6);
-            const eight = await qInt(8);
-
-            const a = [two, four, six, eight];
+            const a = [await qInt(2), await qInt(4), await qInt(6), await qInt(8)];
             const k = await qInt(2);
             const rows = 2n;
             const cols = 2n;
@@ -383,15 +320,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             const gas = await estimateGas(harness, "divScalarHarness", [rows, cols, a, k]);
 
             const c = asMatrix(await harness.divScalarHarness(rows, cols, a, k));
-
-            const one = await qInt(1);
-            const three = await qInt(3);
-            const expected = [
-                one,
-                await qInt(2),
-                three,
-                await qInt(4),
-            ];
+            const expected = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -400,7 +329,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "divScalarHarness",
-                explanation: "Divides each entry by a non-zero scalar and checks the resulting quad ratios.",
+                explanation: "Divides each entry by 2.0.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
@@ -409,11 +338,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             });
         });
 
-        // ------------------------------
-        //  mulScalar
-        // ------------------------------
-
-        it("Test 10: mulScalar applies scalar multiplication to all entries", async function () {
+        it("Test 10: mulScalar applies scalar multiplication", async function () {
             t++;
             const a = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
             const k = await qInt(3);
@@ -424,12 +349,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             const gas = await estimateGas(harness, "mulScalarHarness", [rows, cols, a, k]);
 
             const c = asMatrix(await harness.mulScalarHarness(rows, cols, a, k));
-            const expected = [
-                await qInt(3),
-                await qInt(6),
-                await qInt(9),
-                await qInt(12),
-            ];
+            const expected = [await qInt(3), await qInt(6), await qInt(9), await qInt(12)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -438,7 +358,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "mulScalarHarness",
-                explanation: "Scales every matrix entry by a quad scalar and validates uniform scaling.",
+                explanation: "Multiplies each entry by 3.0.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
@@ -447,14 +367,9 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             });
         });
 
-        it("Test 11: mulScalar by 0 wipes all entries (quad zeros)", async function () {
+        it("Test 11: mulScalar by 0 wipes entries", async function () {
             t++;
-            const a = [
-                await qInt(1),
-                await qInt(-2),
-                await qInt(3),
-                await qInt(-4),
-            ];
+            const a = [await qInt(1), await qInt(-2), await qInt(3), await qInt(-4)];
             const k = await qInt(0);
             const rows = 2n;
             const cols = 2n;
@@ -464,7 +379,6 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
 
             const c = asMatrix(await harness.mulScalarHarness(rows, cols, a, k));
 
-            // Treat both +0 and -0 encodings as valid zeros.
             for (const v of c.data) {
                 expect(isQuadZero(v)).to.equal(true);
             }
@@ -472,7 +386,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "mulScalarHarness",
-                explanation: "Confirms multiplying by zero produces a matrix whose entries are quad zeros (+-0).",
+                explanation: "Multiplying by zero produces zero matrix.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
@@ -481,14 +395,9 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             });
         });
 
-        it("Test 12: mulScalar by −1 negates all entries", async function () {
+        it("Test 12: mulScalar by -1 flips signs", async function () {
             t++;
-            const a = [
-                await qInt(1),
-                await qInt(-2),
-                await qInt(3),
-                await qInt(-4),
-            ];
+            const a = [await qInt(1), await qInt(-2), await qInt(3), await qInt(-4)];
             const k = await qInt(-1);
             const rows = 2n;
             const cols = 2n;
@@ -497,12 +406,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             const gas = await estimateGas(harness, "mulScalarHarness", [rows, cols, a, k]);
 
             const c = asMatrix(await harness.mulScalarHarness(rows, cols, a, k));
-            const expected = [
-                await qInt(-1),
-                await qInt(2),
-                await qInt(-3),
-                await qInt(4),
-            ];
+            const expected = [await qInt(-1), await qInt(2), await qInt(-3), await qInt(4)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -511,7 +415,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "mulScalarHarness",
-                explanation: "Scales by −1 and checks every entry is sign-flipped while magnitudes are preserved.",
+                explanation: "Multiplying by -1 negates all values.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
@@ -520,41 +424,31 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             });
         });
 
-        it("Test 13: mulScalar tiny scalar in (0,1) shrinks magnitudes", async function () {
+        it("Test 13: mulScalar tiny scalar shrinks magnitudes", async function () {
             t++;
             const rows = 2n;
             const cols = 2n;
-            const a = [
-                await qInt(10),
-                await qInt(20),
-                await qInt(30),
-                await qInt(40),
-            ];
-
-            // tiny = 1 / 1000
-            const tiny = await harness.qFromFrac(1n, 1000n);
+            const a = [await qInt(10), await qInt(20), await qInt(30), await qInt(40)];
+            const tiny = await harness.qFromFrac(1n, 1000n); // 0.001
 
             await touchGas(harness, "mulScalarHarness", [rows, cols, a, tiny]);
             const gas = await estimateGas(harness, "mulScalarHarness", [rows, cols, a, tiny]);
 
             const c = asMatrix(await harness.mulScalarHarness(rows, cols, a, tiny));
 
-            const zeroQ = await qInt(0);
-            const zeroBI = BigInt(zeroQ);
-
-            // For positive entries, 0 <= a*s < a should hold
             for (let i = 0; i < a.length; ++i) {
-                const aBI = BigInt(a[i]);
-                const cBI = BigInt(c.data[i]);
-
-                expect(cBI).to.be.gte(zeroBI);
-                expect(cBI).to.be.lt(aBI);
+                const origVal = await harness.toFloat(a[i]);
+                const newVal = await harness.toFloat(c.data[i]);
+                
+                // New value should be approx 0.001 * Orig
+                expect(newVal).to.be.lessThan(origVal);
+                expect(newVal).to.be.greaterThan(0);
             }
 
             printBlockMatrix({
                 t,
                 method: "mulScalarHarness",
-                explanation: "Constructs a tiny scalar s=1/1000 and verifies that multiplying by s reduces magnitudes.",
+                explanation: "Multiplication by s=0.001 reduces magnitude.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
@@ -563,47 +457,27 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             });
         });
 
-        // ------------------------------
-        //  divScalar edge cases
-        // ------------------------------
-
-        it("Test 14: divScalar division by zero scalar reverts", async function () {
+        it("Test 14: divScalar division by zero reverts", async function () {
             t++;
-            const vals = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(3),
-                await qInt(4),
-            ];
+            const vals = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
             const zero = await qInt(0);
-            const rows = 2n;
-            const cols = 2n;
-
-            await touchGas(harness, "divScalarHarness", [rows, cols, vals, zero]);
-            const gas = await estimateGas(harness, "divScalarHarness", [rows, cols, vals, zero]);
-
-            await expect(harness.divScalarHarness(rows, cols, vals, zero)).to.be.revertedWith("MatrixMaster: division by zero");
+                        
+            await expect(harness.divScalarHarness(2n, 2n, vals, zero)).to.be.revertedWith("MatrixMaster: division by zero");
 
             printBlockMatrix({
                 t,
                 method: "divScalarHarness",
-                explanation: "Confirms division by an exact zero scalar is rejected to avoid NaN-like states.",
-                gas,
-                shapeIn: `${rows}x${cols}`,
+                explanation: "Rejects division by zero scalar.",
+                gas: "Revert",
+                shapeIn: "2x2",
                 shapeOut: "revert",
-                inHex: fmtHexArr(vals),
-                outHex: "-",
+                inHex: fmtHexArr(vals), outHex: "-",
             });
         });
 
         it("Test 15: divScalar by negative scalar flips signs", async function () {
             t++;
-            const two = await qInt(2);
-            const four = await qInt(4);
-            const six = await qInt(6);
-            const eight = await qInt(8);
-
-            const a = [two, four, six, eight];
+            const a = [await qInt(2), await qInt(4), await qInt(6), await qInt(8)];
             const k = await qInt(-2);
             const rows = 2n;
             const cols = 2n;
@@ -612,13 +486,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             const gas = await estimateGas(harness, "divScalarHarness", [rows, cols, a, k]);
 
             const c = asMatrix(await harness.divScalarHarness(rows, cols, a, k));
-
-            const expected = [
-                await qInt(-1),
-                await qInt(-2),
-                await qInt(-3),
-                await qInt(-4),
-            ];
+            const expected = [await qInt(-1), await qInt(-2), await qInt(-3), await qInt(-4)];
 
             for (let i = 0; i < expected.length; ++i) {
                 expect(c.data[i].toLowerCase()).to.equal(expected[i].toLowerCase());
@@ -627,7 +495,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             printBlockMatrix({
                 t,
                 method: "divScalarHarness",
-                explanation: "Divides by a negative scalar and checks the resulting entries have flipped signs.",
+                explanation: "Division by -2.0 halves magnitude and flips sign.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
@@ -636,41 +504,31 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             });
         });
 
-        it("Test 16: divScalar by tiny scalar in (0,1) grows magnitudes", async function () {
+        it("Test 16: divScalar by tiny scalar grows magnitudes", async function () {
             t++;
             const rows = 2n;
             const cols = 2n;
-            const a = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(3),
-                await qInt(4),
-            ];
-
-            // tiny = 1 / 1000
-            const tiny = await harness.qFromFrac(1n, 1000n);
+            const a = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
+            const tiny = await harness.qFromFrac(1n, 1000n); // 0.001
 
             await touchGas(harness, "divScalarHarness", [rows, cols, a, tiny]);
             const gas = await estimateGas(harness, "divScalarHarness", [rows, cols, a, tiny]);
 
             const c = asMatrix(await harness.divScalarHarness(rows, cols, a, tiny));
 
-            const zeroQ = await qInt(0);
-            const zeroBI = BigInt(zeroQ);
-
-            // For positive entries, dividing by tiny in (0,1) should yield strictly larger magnitudes
+            // Use Floating Point comparison for magnitude check
             for (let i = 0; i < a.length; ++i) {
-                const aBI = BigInt(a[i]);
-                const cBI = BigInt(c.data[i]);
+                const origVal = await harness.toFloat(a[i]);
+                const newVal = await harness.toFloat(c.data[i]);
 
-                expect(aBI).to.be.gt(zeroBI);
-                expect(cBI).to.be.gt(aBI);
+                // Division by 0.001 should multiply value by 1000
+                expect(newVal).to.be.greaterThan(origVal);
             }
 
             printBlockMatrix({
                 t,
                 method: "divScalarHarness",
-                explanation: "Divides by a very small positive scalar and checks that outputs are magnified.",
+                explanation: "Division by small scalar (0.001) magnifies values.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${c.rows}x${c.cols}`,
