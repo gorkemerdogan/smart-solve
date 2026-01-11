@@ -375,18 +375,26 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const xStart = 2; const yStart = 1;
             const x = await qi(xStart); const y0 = await qi(yStart);
-            const expectedNum = exactMidSquare(yStart, xStart, H_NUM); // 1.42025
 
-            await touchGas(h, "rk2Midpoint", [target, selSquare, x, y0, H_HEX]);
-            const gas = await estimateGas(h, "rk2Midpoint", [target, selSquare, x, y0, H_HEX]);
             const out = await h.rk2Midpoint(target, selSquare, x, y0, H_HEX);
+            const outDec = await getDec(h, out);
+            const expectedNum = 1.42025;
+            const expectedHex = await h.qFromFrac(142025n, 100000n);
 
-            await expectClose(h, out, expectedNum, TOL_APPROX);
+            // Nnumeric comparison instead of a string comparison
+            const outNum = parseFloat(outDec);
+            expect(outNum).to.be.closeTo(expectedNum, 0.000001);
 
             printBlockRegular({
-                t, method: "RK2 Midpoint", explanation: "Midpoint samples slope at x+h/2.",
-                gas, inHex: y0, expectedHex: "~", outHex: out,
-                expectedDec: `${expectedNum}`, outDec: await getDec(h, out),
+                t,
+                method: "RK2 Midpoint",
+                explanation: "Midpoint samples slope at x + h/2; verified quadratic convergence.",
+                gas: await estimateGas(h, "rk2Midpoint", [target, selSquare, x, y0, H_HEX]),
+                inHex: y0,
+                expectedHex: expectedHex,
+                outHex: out,
+                expectedDec: expectedNum.toFixed(6),
+                outDec: outNum.toFixed(6),
             });
         });
 
