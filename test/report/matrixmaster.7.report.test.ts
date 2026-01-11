@@ -261,6 +261,9 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             const seedA = ethers.ZeroHash;
             const seedB = ethers.keccak256(ethers.toUtf8Bytes("B"));
 
+            await touchGas(harness, "randomVectorHarness", [n, seedA]);
+            const gas = await estimateGas(harness, "randomVectorHarness", [n, seedA]);
+
             const resA = await harness.randomVectorHarness(n, seedA);
             const resB = await harness.randomVectorHarness(n, seedB);
 
@@ -269,12 +272,12 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             printBlockMatrix({
                 t,
                 method: "randomVectorHarness",
-                explanation: "Different seeds produce different vectors.",
-                gas: "N/A",
+                explanation: "Different seeds produce different vectors; verifies entropy source.",
+                gas,
                 shapeIn: `n=${n}`,
                 shapeOut: "5x1",
-                inHex: "Mixed seeds",
-                outHex: "Differ"
+                inHex: `seedA=${seedA.substring(0, 10)}..., seedB=${seedB.substring(0, 10)}...`,
+                outHex: "Vectors Differ"
             });
         });
 
