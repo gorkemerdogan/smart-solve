@@ -81,7 +81,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
     // ------------------------------------------------------------
 
     describe("Section 1: Creation", function () {
-        
+
         it("Test 1: Zeros (2x3)", async function () {
             t++;
             const rows = 2n;
@@ -127,7 +127,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             expect(m.data.length).to.equal(total);
 
             const zero = await qInt(0);
-            
+
             // Check first, last, and random middle
             expect(m.data[0].toLowerCase()).to.equal(zero.toLowerCase());
             expect(m.data[total - 1].toLowerCase()).to.equal(zero.toLowerCase());
@@ -271,7 +271,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
         it("Test 7: From Diagonal (empty revert)", async function () {
             t++;
             const diag: string[] = [];
-            
+
             await expect(harness.fromDiagonalHarness(diag)).to.be.revertedWith(
                 "MatrixMaster: empty diagonal",
             );
@@ -375,7 +375,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             const m2 = asMatrix(await harness.randomMatrixHarness(rows, cols, seed2));
 
             const same = m1.data.every((v, i) => v === m2.data[i]);
-            
+
             // Verify Divergence
             expect(same).to.equal(false);
 
@@ -391,36 +391,35 @@ describe("MatrixMaster — Creation & Element Access", function () {
             });
         });
 
-        it("Test 11: Random Matrix (Range [0,1))", async function () {
+        it("Test 11: Random Matrix (Range [0,1) Precision Check)", async function () {
             t++;
             const rows = 3n;
             const cols = 3n;
             const seed = ethers.keccak256(ethers.toUtf8Bytes("range-check"));
 
-            await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
-            const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
-
             const m = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
-            const zeroQ = await qInt(0);
-            const oneQ = await qInt(1);
-            const zeroBI = BigInt(zeroQ);
-            const oneBI = BigInt(oneQ);
+
+            const oneScaled = await harness.toFloat(await harness.qFromInt(1));
 
             for (const v of m.data) {
-                const bi = BigInt(v);
-                expect(bi).to.be.gte(zeroBI);
-                expect(bi).to.be.lt(oneBI);
+                const val = await harness.toFloat(v);
+
+                // Perform the range check against the scaled limits
+                expect(val).to.be.at.least(0, `Value ${val} should not be negative`);
+                expect(val).to.be.below(oneScaled, `Value ${val} must be < 1.0 (Scaled: ${oneScaled})`);
             }
+
+            const sampleHex = m.data.slice(0, 3).map(h => h.substring(0, 10) + "...").join(", ");
 
             printBlockMatrix({
                 t,
                 method: "randomMatrixHarness",
-                explanation: "Samples a 3×3 random matrix and enforces every encoded quad lies in [0,1).",
-                gas,
+                explanation: `Verified entries are in [0, 1.0) relative to scale ${oneScaled}.`,
+                gas: await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]),
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m.rows}x${m.cols}`,
                 inHex: `seed=${seed}`,
-                outHex: fmtHexArr(m.data),
+                outHex: sampleHex,
             });
         });
 
