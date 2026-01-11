@@ -340,27 +340,27 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             const seed = ethers.ZeroHash;
             const tol = await harness.qFromFrac(1n, 1000n);
 
+            // Calculate gas first
+            await touchGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
+            const gas = await estimateGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
+
             const [lambda, xRows, xCols, xData] = await harness.powerIterationHarness(2n, 2n, A, seed, tol);
 
             const rawLambda = Number(await harness.toFloat(lambda));
             const actualValue = rawLambda / DIVISOR;
-            const target = 5.0;
 
-            // Compare
-            const diff = Math.abs(actualValue - target);
-            expect(diff <= 0.01, `Expected ~5.0, got ${actualValue} (raw: ${rawLambda})`).to.be.true;
-
-            await touchGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
+            const diff = Math.abs(actualValue - 5.0);
+            expect(diff <= 0.01).to.be.true;
 
             printBlockMatrix({
                 t,
                 method: "powerIterationHarness",
                 explanation: "Dominant eigenvalue ~5 for Diag(5,2).",
-                gas: "Handled",
+                gas,
                 shapeIn: "2x2",
                 shapeOut: "Eigenpair",
                 inHex: `A=${fmtHexArr(A)}`,
-                outHex: `λ=${actualValue}`
+                outHex: `λ=${actualValue.toFixed(4)}`
             });
         });
 
@@ -370,24 +370,25 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             const seed = ethers.ZeroHash;
             const tol = await harness.qFromFrac(1n, 1000n);
 
+            await touchGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
+            const gas = await estimateGas(harness, "powerIterationHarness", [2n, 2n, A, seed, tol]);
+
             const [lambda] = await harness.powerIterationHarness(2n, 2n, A, seed, tol);
 
             const rawLambda = Number(await harness.toFloat(lambda));
             const actualValue = rawLambda / DIVISOR;
-            const target = 4.0;
 
-            const diff = Math.abs(actualValue - target);
-            expect(diff <= 0.01, `Expected ~4.0, got ${actualValue} (raw: ${rawLambda})`).to.be.true;
+            expect(Math.abs(actualValue - 4.0) <= 0.01).to.be.true;
 
             printBlockMatrix({
                 t,
                 method: "powerIterationHarness",
                 explanation: "Symmetric [[3,1],[1,3]] -> Eigenvalue ~4.",
-                gas: "Handled",
+                gas,
                 shapeIn: "2x2",
                 shapeOut: "Eigenpair",
                 inHex: `A=${fmtHexArr(A)}`,
-                outHex: `λ=${actualValue}`
+                outHex: `λ=${actualValue.toFixed(4)}`
             });
         });
 
@@ -401,24 +402,25 @@ describe("MatrixMaster (library) : norm, random, convergence, power iteration ov
             const seed = ethers.ZeroHash;
             const tol = await harness.qFromFrac(1n, 1000n);
 
+            await touchGas(harness, "powerIterationHarness", [3n, 3n, A, seed, tol]);
+            const gas = await estimateGas(harness, "powerIterationHarness", [3n, 3n, A, seed, tol]);
+
             const [lambda] = await harness.powerIterationHarness(3n, 3n, A, seed, tol);
 
             const rawLambda = Number(await harness.toFloat(lambda));
             const actualValue = rawLambda / DIVISOR;
-            const target = 3.0;
 
-            const diff = Math.abs(actualValue - target);
-            expect(diff <= 0.01, `Expected ~3.0, got ${actualValue} (raw: ${rawLambda})`).to.be.true;
+            expect(Math.abs(actualValue - 3.0) <= 0.01).to.be.true;
 
             printBlockMatrix({
                 t,
                 method: "powerIterationHarness",
                 explanation: "Upper triangular -> Eigenvalue ~3.",
-                gas: "Handled",
+                gas,
                 shapeIn: "3x3",
                 shapeOut: "Eigenpair",
                 inHex: `A=${fmtHexArr(A)}`,
-                outHex: `λ=${actualValue}`
+                outHex: `λ=${actualValue.toFixed(4)}`
             });
         });
     });
