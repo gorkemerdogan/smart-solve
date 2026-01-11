@@ -999,7 +999,6 @@ describe("LinearSolversHarness", function () {
          * @param n Dimension of the square matrix (n × n).
          * @param A_contract Flattened matrix A as returned
          * @param msg Contextual message used for debugging or test identification.
-         *
          * @return L Lower-triangular matrix (bytes16[])
          * @return U Upper-triangular matrix (bytes16[])
          */
@@ -1019,10 +1018,8 @@ describe("LinearSolversHarness", function () {
 
         /**
          * @notice Formats a contract-encoded matrix into a readable string
-         *
          * @param n Matrix dimension (n × n).
          * @param M_hex Flattened matrix encoded as bytes16 hex strings.
-         *
          * @return String representation of the matrix values in scaled-integer form.
          */
         async function formatMatrixForReport(n: number, M_hex: string[]): Promise<string> {
@@ -1033,9 +1030,7 @@ describe("LinearSolversHarness", function () {
 
         /**
          * @notice Formats a flattened matrix into a readable grid layout.
-         *
          * @param arr Flattened matrix data in row-major order.
-         *
          * @return Multi-line formatted string for 2×2 or 3×3 matrices
          */
         const formatMat = (arr: any[]) => {
@@ -1075,7 +1070,7 @@ describe("LinearSolversHarness", function () {
             printBlockRegular({
                 t,
                 method: "LU Decomposition",
-                explanation: "Verifying A = L * U. Input matrix A is decomposed, then reconstructed in JS to ensure zero data loss.",
+                explanation: "Verifying A = L * U.",
                 inHex: "A=[[4,3],[6,3]]",
                 expectedHex,
                 outHex,
@@ -1118,7 +1113,7 @@ describe("LinearSolversHarness", function () {
             printBlockRegular({
                 t,
                 method: "LU Decomposition",
-                explanation: "3x3 Diagonally Dominant. L*U reconstruction must match original matrix A.",
+                explanation: "L*U reconstruction must match original matrix A. (3x3)",
                 inHex: "A=[[10,2,1],[2,8,1],[1,1,5]]",
                 expectedHex,
                 outHex,
@@ -1161,7 +1156,7 @@ describe("LinearSolversHarness", function () {
             printBlockRegular({
                 t,
                 method: "LU Decomposition",
-                explanation: "Upper Triangular Matrix. L must be Identity, U must equal A.",
+                explanation: "L must be Identity, U must equal A.",
                 inHex: `A=[[2,3,4],[0,5,6],[0,0,7]]`,
                 expectedHex,
                 outHex,
@@ -1203,7 +1198,7 @@ describe("LinearSolversHarness", function () {
             printBlockRegular({
                 t, 
                 method: "LU Decomposition",
-                explanation: "Identity Matrix. Both L and U should be Identity matrices.",
+                explanation: "Both L and U should be Identity matrices.",
                 inHex: "A=I (3x3)",
                 expectedHex,
                 outHex,
@@ -1225,7 +1220,7 @@ describe("LinearSolversHarness", function () {
 
             printBlockRegular({
                 t, method: "LU Decomposition",
-                explanation: "Singular matrix (Det=0). Must revert due to zero pivot.",
+                explanation: "Singular matrix (Det=0) reverts",
                 inHex: "A=[[2,4],[1,2]]",
                 expectedHex: "Revert",
                 outHex: "Revert",
@@ -1245,7 +1240,7 @@ describe("LinearSolversHarness", function () {
 
             printBlockRegular({
                 t, method: "LU Decomposition",
-                explanation: "Zero matrix. Immediate pivot failure.",
+                explanation: "Zero matrix: Immediate pivot failure.",
                 inHex: "A=[[0,0],[0,0]]",
                 expectedHex: "Revert",
                 outHex: "Revert",
