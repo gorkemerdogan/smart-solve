@@ -99,12 +99,20 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
         harness.qFromInt(BigInt(n));
 
     // ------------------------------------------------------------
-    //  Section 1: Sparse Matrix Creation
+    //  Section 14: Sparse Matrix Creation
     // ------------------------------------------------------------
 
-    describe("Section 1: Sparse Matrix Creation", function () {
+    // Helper to format CSR output for reports
+    function fmtCSR(rowPtr: bigint[], colInd: bigint[], values: string[]) {
+        const valCount = values.length;
+        // Show first few values for brevity if long
+        const shortVals = values.slice(0, 3).map(v => v.substring(0, 8) + "..").join(", ");
+        return `CSR(nnz=${valCount}) rowPtr=[${rowPtr}], colInd=[${colInd}], vals=[${shortVals}${valCount > 3 ? "..." : ""}]`;
+    }
 
-        it("Test 1: create sparse matrix (3x4)", async function () {
+    describe("Section 14: Sparse Matrix Creation", function () {
+
+        it("Test 1: create sparse zero matrix (3x4)", async function () {
             t++;
             const rows = 3n, cols = 4n;
 
@@ -118,7 +126,7 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
             printBlockMatrix({
                 t,
                 method: "createZeroSparseHarness",
-                explanation: "Sparse zero matrix creation.",
+                explanation: "Creates an empty 3x4 CSR matrix (all zeros).",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${r}x${c} (CSR)`,
@@ -133,13 +141,12 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
 
             await touchGas(harness, "createZeroSparseHarness", [rows, cols]);
             const gas = await estimateGas(harness, "createZeroSparseHarness", [rows, cols]);
-
             const [r, c, rowPtr, colInd, values] = await harness.createZeroSparseHarness(rows, cols);
 
             printBlockMatrix({
                 t,
                 method: "createZeroSparseHarness",
-                explanation: "Sparse zero matrix creation (1x1).",
+                explanation: "Creates minimal 1x1 sparse zero matrix.",
                 gas,
                 shapeIn: "1x1",
                 shapeOut: `${r}x${c} (CSR)`,
@@ -150,21 +157,20 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
 
         it("Test 3: create zero sparse with zero rows reverts", async function () {
             t++;
-
             const rows = 0n;
             const cols = 3n;
 
-            await expect(harness.createZeroSparseHarness(rows, cols)).to.be.reverted;
+            await expect(harness.createZeroSparseHarness(rows, cols)).to.be.revertedWith("MatrixMaster: invalid sparse shape");
 
             printBlockMatrix({
                 t,
                 method: "createZeroSparseHarness",
-                explanation: "Reverts when rows = 0 for sparse zero matrix creation.",
-                gas: "n/a",
+                explanation: "Reverts on invalid dimension (rows=0).",
+                gas: "Revert",
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: "revert",
                 inHex: `rows=${rows}, cols=${cols}`,
-                outHex: "revert"
+                outHex: "-"
             });
         });
 
@@ -179,7 +185,7 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
             printBlockMatrix({
                 t,
                 method: "createIdentitySparseHarness",
-                explanation: "Sparse identity matrix creation.",
+                explanation: "Creates 3x3 Identity matrix in CSR format.",
                 gas,
                 shapeIn: "3x3",
                 shapeOut: `${r}x${c} (CSR)`,
@@ -194,13 +200,12 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
 
             await touchGas(harness, "createIdentitySparseHarness", [n]);
             const gas = await estimateGas(harness, "createIdentitySparseHarness", [n]);
-
             const [r, c, rowPtr, colInd, values] = await harness.createIdentitySparseHarness(n);
 
             printBlockMatrix({
                 t,
                 method: "createIdentitySparseHarness",
-                explanation: "Sparse identity matrix creation (1x1).",
+                explanation: "Creates 1x1 Identity (single value 1.0).",
                 gas,
                 shapeIn: "1x1",
                 shapeOut: `${r}x${c} (CSR)`,
@@ -211,19 +216,19 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
 
         it("Test 6: create identity sparse with n=0 reverts", async function () {
             t++;
-
             const n = 0n;
-            await expect(harness.createIdentitySparseHarness(n)).to.be.reverted;
+
+            await expect(harness.createIdentitySparseHarness(n)).to.be.revertedWith("MatrixMaster: n = 0");
 
             printBlockMatrix({
                 t,
                 method: "createIdentitySparseHarness",
-                explanation: "Reverts when n = 0 for sparse identity matrix creation.",
-                gas: "n/a",
+                explanation: "Reverts on invalid dimension (n=0).",
+                gas: "Revert",
                 shapeIn: `${n}x${n}`,
                 shapeOut: "revert",
                 inHex: `n=${n}`,
-                outHex: "revert"
+                outHex: "-"
             });
         });
 
@@ -238,16 +243,16 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
             printBlockMatrix({
                 t,
                 method: "createDiagonalSparseHarness",
-                explanation: "Sparse diagonal matrix creation.",
+                explanation: "Creates 3x3 Diagonal matrix from array.",
                 gas,
                 shapeIn: "diag[3]",
                 shapeOut: `${r}x${c} (CSR)`,
-                inHex: `diag=${JSON.stringify(diag)}`,
+                inHex: `diag=[1,2,3]`,
                 outHex: fmtCSR(rowPtr, colInd, values)
             });
         });
 
-        it("Test 8: create sparse diagonal matrix with 1 element ([5])", async function () {
+        it("Test 8: create sparse diagonal matrix with 1 element", async function () {
             t++;
             const diag = [await qInt(5)];
 
@@ -258,18 +263,17 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
             printBlockMatrix({
                 t,
                 method: "createDiagonalSparseHarness",
-                explanation: "Sparse diagonal matrix creation (1 element).",
+                explanation: "Creates 1x1 Diagonal matrix.",
                 gas,
                 shapeIn: "diag[1]",
                 shapeOut: `${r}x${c} (CSR)`,
-                inHex: `diag=${JSON.stringify(diag)}`,
+                inHex: `diag=[5]`,
                 outHex: fmtCSR(rowPtr, colInd, values)
             });
         });
 
         it("Test 9: empty diag reverts", async function () {
             t++;
-
             const diag: string[] = [];
 
             await expect(harness.createDiagonalSparseHarness(diag)).to.be.reverted;
@@ -277,20 +281,20 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
             printBlockMatrix({
                 t,
                 method: "createDiagonalSparseHarness",
-                explanation: "Reverts when diagonal array is empty for sparse diagonal matrix creation.",
-                gas: "n/a",
+                explanation: "Reverts on empty input array.",
+                gas: "Revert",
                 shapeIn: "0x0",
                 shapeOut: "revert",
                 inHex: "diag=[]",
-                outHex: "revert"
+                outHex: "-"
             });
         });
 
-        it("Test 10: create sparse matrix from COO triplets", async function () {
+        it("Test 10: create sparse matrix from COO triplets (Sorted)", async function () {
             t++;
             const rowInd = [0n, 1n];
             const colInd = [0n, 1n];
-            const values = [await qInt(1), await qInt(2)];
+            const values = [await qInt(1), await qInt(2)]; // Identity-like
 
             await touchGas(harness, "createSparseFromTripletsHarness", [2n, 2n, rowInd, colInd, values]);
             const gas = await estimateGas(harness, "createSparseFromTripletsHarness", [2n, 2n, rowInd, colInd, values]);
@@ -299,11 +303,11 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
             printBlockMatrix({
                 t,
                 method: "createSparseFromTripletsHarness",
-                explanation: "Sparse matrix from COO triplets.",
+                explanation: "Converts COO triplets to CSR format.",
                 gas,
-                shapeIn: "2x2",
+                shapeIn: "2x2 (COO)",
                 shapeOut: `${r}x${c} (CSR)`,
-                inHex: `rowInd=${stringify(rowInd)}, colInd=${stringify(colInd)}, values=${stringify(values)}`,
+                inHex: `COO[2]`,
                 outHex: fmtCSR(rowPtr, outColInd, outValues)
             });
         });
@@ -311,8 +315,8 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
         it("Test 11: create sparse matrix from unsorted COO input", async function () {
             t++;
             const rowInd = [1n, 0n];
-            const colInd = [0n, 1n];
-            const values = [await qInt(3), await qInt(4)];
+            const colInd = [1n, 0n];
+            const values = [await qInt(4), await qInt(3)];
 
             await touchGas(harness, "createSparseFromTripletsHarness", [2n, 2n, rowInd, colInd, values]);
             const gas = await estimateGas(harness, "createSparseFromTripletsHarness", [2n, 2n, rowInd, colInd, values]);
@@ -321,44 +325,42 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
             printBlockMatrix({
                 t,
                 method: "createSparseFromTripletsHarness",
-                explanation: "Sparse matrix from unsorted COO input.",
+                explanation: "Converts unsorted COO input (1,1) then (0,0).",
                 gas,
-                shapeIn: "2x2",
+                shapeIn: "2x2 (Unsorted COO)",
                 shapeOut: `${r}x${c} (CSR)`,
-                inHex: `rowInd=${stringify(rowInd)}, colInd=${stringify(colInd)}, values=${stringify(values)}`,
+                inHex: `COO[2]`,
                 outHex: fmtCSR(rowPtr, outColInd, outValues)
             });
         });
 
         it("Test 12: length mismatch reverts", async function () {
             t++;
-
-            const rows = 2n;
-            const cols = 2n;
+            const rows = 2n, cols = 2n;
             const rowInd = [0n];
-            const colInd = [0n, 1n]; // length mismatch
+            const colInd = [0n, 1n]; // mismatch
             const values = [await qInt(1)];
 
-            await expect(harness.createSparseFromTripletsHarness(rows, cols, rowInd, colInd, values)).to.be.reverted;
+            await expect(harness.createSparseFromTripletsHarness(rows, cols, rowInd, colInd, values)).to.be.revertedWith("MatrixMaster: triplet length mismatch");
 
             printBlockMatrix({
                 t,
                 method: "createSparseFromTripletsHarness",
-                explanation: "Reverts when triplet array lengths do not match.",
-                gas: "n/a",
-                shapeIn: `${rows}x${cols}`,
+                explanation: "Reverts on mismatched COO array lengths.",
+                gas: "Revert",
+                shapeIn: "2x2",
                 shapeOut: "revert",
-                inHex: `rowInd=${rowInd}, colInd=${colInd}, values=${stringify(values)}`,
-                outHex: "revert"
+                inHex: "Mismatch",
+                outHex: "-"
             });
         });
     });
 
     // ------------------------------------------------------------
-    //  Section 2: Sparse Matrix - Vector Multiplication
+    //  Section 15: Sparse Matrix - Vector Multiplication
     // ------------------------------------------------------------
 
-    describe("Section 2: Sparse Matrix - Vector Multiplication", function () {
+    describe("Section 15: Sparse Matrix - Vector Multiplication", function () {
 
         it("Test 13: multiply identity matrix (3x3) by vector [1, 2, 3]", async function () {
             t++;
@@ -631,8 +633,8 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
             const [aRows, aCols, _rowPtr, _colInd, _values] = await harness.createSparseFromTripletsHarness(rows, cols, rowInd, colInd, values);
 
             const rowPtr = [..._rowPtr];
-            const cInd   = [..._colInd];
-            const vals   = [..._values];
+            const cInd = [..._colInd];
+            const vals = [..._values];
 
             /**
              * Dense vector x (10x1)
