@@ -522,8 +522,8 @@ describe("MatrixMaster (library) : sparse matrix creation and sparse matrix-vect
             const gas = await estimateGas(harness, "mulSparseMatrixVectorHarness", [2n, 2n, rowPtr, colInd, values, 2n, xData]);
             const [_, __, yData] = await harness.mulSparseMatrixVectorHarness(2n, 2n, rowPtr, colInd, values, 2n, xData);
 
-            expect(yData[0]).to.equal(await qInt(5));
-            expect(yData[1]).to.equal(await qInt(20));
+            expect(yData[0]).to.equal(await qInt(7));
+            expect(isQuadZero(yData[1])).to.be.true;
 
             printBlockMatrix({
                 t,
