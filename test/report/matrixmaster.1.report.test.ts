@@ -397,6 +397,9 @@ describe("MatrixMaster — Creation & Element Access", function () {
             const cols = 3n;
             const seed = ethers.keccak256(ethers.toUtf8Bytes("range-check"));
 
+            await touchGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+            const gas = await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]);
+
             const m = asMatrix(await harness.randomMatrixHarness(rows, cols, seed));
 
             const oneScaled = await harness.toFloat(await harness.qFromInt(1n));
@@ -415,7 +418,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 t,
                 method: "randomMatrixHarness",
                 explanation: `Verified entries are in [0, 1.0) relative to scale ${oneScaled}.`,
-                gas: await estimateGas(harness, "randomMatrixHarness", [rows, cols, seed]),
+                gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${m.rows}x${m.cols}`,
                 inHex: `seed=${seed}`,
@@ -551,8 +554,8 @@ describe("MatrixMaster — Creation & Element Access", function () {
             const vals = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
             const rows = 2n;
             const cols = 2n;
-            
-            await expect(harness.getHarness(rows, cols, vals, 2n, 0n), ).to.be.revertedWith("MatrixMaster: index out of bounds");
+
+            await expect(harness.getHarness(rows, cols, vals, 2n, 0n)).to.be.revertedWith("MatrixMaster: index out of bounds");
 
             printBlockMatrix({
                 t,
@@ -565,7 +568,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
                 outHex: "-",
             });
 
-            await expect(harness.getHarness(rows, cols, vals, 0n, 2n), ).to.be.revertedWith("MatrixMaster: index out of bounds");
+            await expect(harness.getHarness(rows, cols, vals, 0n, 2n)).to.be.revertedWith("MatrixMaster: index out of bounds");
 
             printBlockMatrix({
                 t,
@@ -637,7 +640,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
             }
 
             const row = 7n;
-            const col = 3n; 
+            const col = 3n;
             const expectedIdx = Number(row * cols + col);
 
             await touchGas(harness, "getHarness", [rows, cols, vals, row, col]);
@@ -746,7 +749,7 @@ describe("MatrixMaster — Creation & Element Access", function () {
 
             const out = asMatrix(await harness.setHarness(rows, cols, init, row, col, one));
             const readBack = await harness.getHarness(out.rows, out.cols, out.data, row, col);
-            
+
             expect(readBack.toLowerCase()).to.equal(one.toLowerCase());
 
             printBlockMatrix({
