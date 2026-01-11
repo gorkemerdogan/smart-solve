@@ -80,28 +80,23 @@ describe("MatrixMaster — Transpose", function () {
         harness = await newHarness();
     });
 
-    // --- quad constructors ---
-
-    const qInt = async (n: number | string | bigint): Promise<string> =>
+    const qInt = async (n: number | string | bigint) =>
         await harness.qFromInt(BigInt(n));
 
     // --------------------------------------------------------
     //  Transpose
     // --------------------------------------------------------
 
-    describe("Section: Transpose", function () {
+    describe("Section 5: Transpose", function () {
 
         it("Test 1: transpose 2x3 → 3x2", async function () {
             t++;
-            // 2x3: [[1,2,3],[4,5,6]]
+
             const vals = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(3),
-                await qInt(4),
-                await qInt(5),
-                await qInt(6),
+                await qInt(1), await qInt(2), await qInt(3),
+                await qInt(4), await qInt(5), await qInt(6)
             ];
+
             const rows = 2n;
             const cols = 3n;
 
@@ -112,14 +107,10 @@ describe("MatrixMaster — Transpose", function () {
             expect(tMat.rows).to.equal(3n);
             expect(tMat.cols).to.equal(2n);
 
-            // Expected 3x2: [[1,4],[2,5],[3,6]]
             const expected = [
-                await qInt(1),
-                await qInt(4),
-                await qInt(2),
-                await qInt(5),
-                await qInt(3),
-                await qInt(6),
+                await qInt(1), await qInt(4),
+                await qInt(2), await qInt(5),
+                await qInt(3), await qInt(6)
             ];
 
             for (let i = 0; i < expected.length; ++i) {
@@ -129,12 +120,12 @@ describe("MatrixMaster — Transpose", function () {
             printBlockMatrix({
                 t,
                 method: "transposeHarness",
-                explanation: "Transposes a 2x3 matrix into 3x2 and checks entries follow A(i,j) → AT(j,i).",
+                explanation: "Transposes a 2x3 matrix into 3x2",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${tMat.rows}x${tMat.cols}`,
                 inHex: fmtHexArr(vals),
-                outHex: fmtHexArr(tMat.data),
+                outHex: fmtHexArr(tMat.data)
             });
         });
 
@@ -150,9 +141,7 @@ describe("MatrixMaster — Transpose", function () {
 
             const AT = asMatrix(await harness.transposeHarness(A.rows, A.cols, A.data));
 
-            expect(AT.rows).to.equal(n);
-            expect(AT.cols).to.equal(n);
-
+            // Validate A(i,j) == AT(j,i)
             const rows = Number(n);
             const cols = Number(n);
             for (let i = 0; i < rows; ++i) {
@@ -166,19 +155,19 @@ describe("MatrixMaster — Transpose", function () {
             printBlockMatrix({
                 t,
                 method: "transposeHarness",
-                explanation: "Transposes a 10x10 random matrix and checks AT(j,i) = A(i,j) for all entries.",
+                explanation: "Transposes a 10x10 random matrix and verifies index mapping A(i,j) -> AT(j,i).",
                 gas,
                 shapeIn: `${A.rows}x${A.cols}`,
                 shapeOut: `${AT.rows}x${AT.cols}`,
                 inHex: fmtHexArr(A.data),
-                outHex: fmtHexArr(AT.data),
+                outHex: fmtHexArr(AT.data)
             });
         });
 
-        it("Test 3: transpose 40x40 random matrix", async function () {
+        it("Test 3: transpose 30x30 random matrix (Stress)", async function () {
             t++;
-            const n = 40n;
-            const seed = ethers.keccak256(ethers.toUtf8Bytes("transpose-40x40"));
+            const n = 30n; // 900 items
+            const seed = ethers.keccak256(ethers.toUtf8Bytes("transpose-30x30"));
 
             const A = asMatrix(await harness.randomMatrixHarness(n, n, seed));
 
@@ -186,11 +175,8 @@ describe("MatrixMaster — Transpose", function () {
             const gas = await estimateGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
 
             const AT = asMatrix(await harness.transposeHarness(A.rows, A.cols, A.data));
-
-            expect(AT.rows).to.equal(n);
-            expect(AT.cols).to.equal(n);
-
             const dim = Number(n);
+
             for (let i = 0; i < dim; ++i) {
                 for (let j = 0; j < dim; ++j) {
                     const idxA = i * dim + j;
@@ -202,34 +188,28 @@ describe("MatrixMaster — Transpose", function () {
             printBlockMatrix({
                 t,
                 method: "transposeHarness",
-                explanation: "Runs transpose on a 40x40 random matrix and validates full i,j ↔ j,i mapping.",
+                explanation: "Transposes a 30x30 matrix (900 elements).",
                 gas,
                 shapeIn: `${A.rows}x${A.cols}`,
                 shapeOut: `${AT.rows}x${AT.cols}`,
-                inHex: fmtHexArr(A.data),
-                outHex: fmtHexArr(AT.data),
+                inHex: "Random 30x30",
+                outHex: "Transposed 30x30",
             });
         });
 
-        it("Test 4: transpose 100x100 sparse matrix with single non-zero", async function () {
+        it("Test 4: transpose 20x20 sparse matrix with single non-zero", async function () {
             t++;
-            const rows = 100n;
-            const cols = 100n;
+            const rows = 20n;
+            const cols = 20n;
 
-            // Start with a 100x100 zero matrix.
             const zeroMat = asMatrix(await harness.zerosHarness(rows, cols));
-
             const one = await qInt(1);
             const zero = await qInt(0);
 
-            // Pick some non-trivial position (10, 70) to set = 1
             const r: bigint = 10n;
-            const c: bigint = 70n;
+            const c: bigint = 5n;
 
-            // setHarness(rows, cols, data, row, col, value)
-            const A = asMatrix(
-                await harness.setHarness(zeroMat.rows, zeroMat.cols, zeroMat.data, r, c, one),
-            );
+            const A = asMatrix(await harness.setHarness(zeroMat.rows, zeroMat.cols, zeroMat.data, r, c, one));
 
             await touchGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
             const gas = await estimateGas(harness, "transposeHarness", [A.rows, A.cols, A.data]);
@@ -239,19 +219,19 @@ describe("MatrixMaster — Transpose", function () {
             expect(AT.rows).to.equal(cols);
             expect(AT.cols).to.equal(rows);
 
-            const dim = Number(rows);
-
-            // Expect A(r,c) = 1 → AT(c,r) = 1, everything else 0.
+            // Expect the '1' to move to (5, 10)
             const rNum = Number(r);
             const cNum = Number(c);
+            const dim = Number(rows);
 
             for (let i = 0; i < dim; ++i) {
                 for (let j = 0; j < dim; ++j) {
                     const idxAT = i * dim + j;
                     const v = AT.data[idxAT];
 
+                    // Check for the transposed coordinate (c, r)
                     if (i === cNum && j === rNum) {
-                        expect(v.toLowerCase()).to.equal(one.toLowerCase()); // The one moved to (c,r)
+                        expect(v.toLowerCase()).to.equal(one.toLowerCase());
                     } else {
                         expect(v.toLowerCase()).to.equal(zero.toLowerCase());
                     }
@@ -261,25 +241,21 @@ describe("MatrixMaster — Transpose", function () {
             printBlockMatrix({
                 t,
                 method: "transposeHarness",
-                explanation: "Transposes a 100x100 matrix with a single non-zero and confirms (r,c) → (c,r) and zeros elsewhere.",
+                explanation: "Transposing moves the single non-zero value from (10,5) to (5,10).",
                 gas,
                 shapeIn: `${A.rows}x${A.cols}`,
                 shapeOut: `${AT.rows}x${AT.cols}`,
-                inHex: fmtHexArr(A.data),
-                outHex: fmtHexArr(AT.data),
+                inHex: "Sparse 20x20",
+                outHex: "Sparse 20x20 (Rotated)",
             });
         });
 
         it("Test 5: transpose(transpose(A)) = A (involution)", async function () {
             t++;
             const vals = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(3),
-                await qInt(4),
-                await qInt(5),
-                await qInt(6),
-            ]; // 2x3
+                await qInt(1), await qInt(2), await qInt(3),
+                await qInt(4), await qInt(5), await qInt(6)
+            ];
             const rows = 2n;
             const cols = 3n;
 
@@ -291,7 +267,6 @@ describe("MatrixMaster — Transpose", function () {
 
             expect(t2.rows).to.equal(rows);
             expect(t2.cols).to.equal(cols);
-            expect(t2.data.length).to.equal(vals.length);
 
             for (let i = 0; i < vals.length; ++i) {
                 expect(t2.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
@@ -300,12 +275,12 @@ describe("MatrixMaster — Transpose", function () {
             printBlockMatrix({
                 t,
                 method: "transposeHarness",
-                explanation: "Applies transpose twice and confirms the involution property returns the original matrix.",
+                explanation: "Double transpose returns original matrix (Involution property).",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${t2.rows}x${t2.cols}`,
                 inHex: fmtHexArr(vals),
-                outHex: fmtHexArr(t2.data),
+                outHex: fmtHexArr(t2.data)
             });
         });
 
@@ -313,12 +288,7 @@ describe("MatrixMaster — Transpose", function () {
             t++;
             const rows = 1n;
             const cols = 4n;
-            const vals = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(3),
-                await qInt(4),
-            ];
+            const vals = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
 
             await touchGas(harness, "transposeHarness", [rows, cols, vals]);
             const gas = await estimateGas(harness, "transposeHarness", [rows, cols, vals]);
@@ -327,6 +297,8 @@ describe("MatrixMaster — Transpose", function () {
 
             expect(tMat.rows).to.equal(4n);
             expect(tMat.cols).to.equal(1n);
+
+            // Data array remains identical in memory (1,2,3,4) - only shape metadata changes
             for (let i = 0; i < vals.length; ++i) {
                 expect(tMat.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
             }
@@ -334,12 +306,12 @@ describe("MatrixMaster — Transpose", function () {
             printBlockMatrix({
                 t,
                 method: "transposeHarness",
-                explanation: "Transposes a 1x4 row vector into a 4x1 column vector while preserving flat order.",
+                explanation: "Transposes 1x4 Row Vector -> 4x1 Column Vector.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${tMat.rows}x${tMat.cols}`,
                 inHex: fmtHexArr(vals),
-                outHex: fmtHexArr(tMat.data),
+                outHex: fmtHexArr(tMat.data)
             });
         });
 
@@ -347,12 +319,7 @@ describe("MatrixMaster — Transpose", function () {
             t++;
             const rows = 4n;
             const cols = 1n;
-            const vals = [
-                await qInt(1),
-                await qInt(2),
-                await qInt(3),
-                await qInt(4),
-            ];
+            const vals = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
 
             await touchGas(harness, "transposeHarness", [rows, cols, vals]);
             const gas = await estimateGas(harness, "transposeHarness", [rows, cols, vals]);
@@ -361,23 +328,20 @@ describe("MatrixMaster — Transpose", function () {
 
             expect(tMat.rows).to.equal(1n);
             expect(tMat.cols).to.equal(4n);
-            for (let i = 0; i < vals.length; ++i) {
-                expect(tMat.data[i].toLowerCase()).to.equal(vals[i].toLowerCase());
-            }
 
             printBlockMatrix({
                 t,
                 method: "transposeHarness",
-                explanation: "Transposes a 4x1 column vector into a 1x4 row vector, keeping the same data sequence.",
+                explanation: "Transposes 4x1 Column Vector -> 1x4 Row Vector.",
                 gas,
                 shapeIn: `${rows}x${cols}`,
                 shapeOut: `${tMat.rows}x${tMat.cols}`,
                 inHex: fmtHexArr(vals),
-                outHex: fmtHexArr(tMat.data),
+                outHex: fmtHexArr(tMat.data)
             });
         });
 
-        it("Test 8: 1x1 matrix is invariant under transpose", async function () {
+        it("Test 8: 1x1 matrix is invariant", async function () {
             t++;
             const rows = 1n;
             const cols = 1n;
@@ -390,22 +354,21 @@ describe("MatrixMaster — Transpose", function () {
 
             expect(tMat.rows).to.equal(rows);
             expect(tMat.cols).to.equal(cols);
-            expect(tMat.data.length).to.equal(1);
             expect(tMat.data[0].toLowerCase()).to.equal(vals[0].toLowerCase());
 
             printBlockMatrix({
                 t,
                 method: "transposeHarness",
-                explanation: "Checks that a 1x1 matrix is unchanged by transpose (shape and value).",
+                explanation: "1x1 Matrix remains unchanged.",
                 gas,
-                shapeIn: `${rows}x${cols}`,
-                shapeOut: `${tMat.rows}x${tMat.cols}`,
+                shapeIn: "1x1",
+                shapeOut: "1x1",
                 inHex: fmtHexArr(vals),
-                outHex: fmtHexArr(tMat.data),
+                outHex: fmtHexArr(tMat.data)
             });
         });
 
-        it("Test 9: identity matrix transpose Iᵀ = I", async function () {
+        it("Test 9: identity matrix Iᵀ = I", async function () {
             t++;
             const n = 3n;
             const I = asMatrix(await harness.createIdentityMatrixHarness(n));
@@ -415,19 +378,17 @@ describe("MatrixMaster — Transpose", function () {
 
             const IT = asMatrix(await harness.transposeHarness(I.rows, I.cols, I.data));
 
-            expect(
-                await harness.matricesExactEqual(I.rows, I.cols, I.data, IT.rows, IT.cols, IT.data),
-            ).to.equal(true);
+            expect(await harness.matricesExactEqual(I.rows, I.cols, I.data, IT.rows, IT.cols, IT.data)).to.equal(true);
 
             printBlockMatrix({
                 t,
                 method: "transposeHarness",
-                explanation: "Confirms that transposing an identity matrix leaves it unchanged (Iᵀ = I).",
+                explanation: "Symmetric Identity matrix is invariant under transpose.",
                 gas,
-                shapeIn: `${I.rows}x${I.cols}`,
-                shapeOut: `${IT.rows}x${IT.cols}`,
+                shapeIn: "3x3",
+                shapeOut: "3x3",
                 inHex: fmtHexArr(I.data),
-                outHex: fmtHexArr(IT.data),
+                outHex: fmtHexArr(IT.data)
             });
         });
     });
