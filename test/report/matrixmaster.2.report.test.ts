@@ -128,7 +128,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             t++;
             const a = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
             const b = [await qInt(5), await qInt(6), await qInt(7), await qInt(8)];
-            
+
             await expect(harness.addHarness(2n, 2n, a, 1n, 4n, b)).to.be.revertedWith("MatrixMaster: shape mismatch");
 
             printBlockMatrix({
@@ -234,7 +234,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             t++;
             const a = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
             const b = [await qInt(5), await qInt(6), await qInt(7), await qInt(8)];
-            
+
             await expect(harness.subHarness(2n, 2n, a, 1n, 4n, b)).to.be.revertedWith("MatrixMaster: shape mismatch");
 
             printBlockMatrix({
@@ -289,7 +289,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
 
             const diff = asMatrix(await harness.subHarness(rows, cols, A, rows, cols, A));
             const zero = await qInt(0);
-            
+
             for (const v of diff.data) {
                 expect(v.toLowerCase()).to.equal(zero.toLowerCase());
             }
@@ -439,7 +439,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             for (let i = 0; i < a.length; ++i) {
                 const origVal = await harness.toFloat(a[i]);
                 const newVal = await harness.toFloat(c.data[i]);
-                
+
                 // New value should be approx 0.001 * Orig
                 expect(newVal).to.be.lessThan(origVal);
                 expect(newVal).to.be.greaterThan(0);
@@ -461,7 +461,7 @@ describe("MatrixMaster — Elementwise arithmetic", function () {
             t++;
             const vals = [await qInt(1), await qInt(2), await qInt(3), await qInt(4)];
             const zero = await qInt(0);
-                        
+
             await expect(harness.divScalarHarness(2n, 2n, vals, zero)).to.be.revertedWith("MatrixMaster: division by zero");
 
             printBlockMatrix({
