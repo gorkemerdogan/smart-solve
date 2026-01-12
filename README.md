@@ -16,50 +16,78 @@
 ## Feature Breakdown
 
 ### 1. Matrix Operations (`MatrixMaster.sol`)
-A robust engine for dense and sparse matrix manipulation.
-* **Creation:** Zeros, Ones, Identity, Random, Diagonal, Sparse.
-* **Access & Manipulation:** Transpose, Slicing, Element Access.
-* **Basic Arithmetic:** Addition, Subtraction, Scalar Multiplication, Scalar Division.
-* **Advanced Arithmetic:** Matrix Multiplication, Inversion.
+* **Creation:** Zeros, Ones, Identity, Diagonal, deterministic pseudo-random matrices (seeded).
+* **Sparse Support:** CSR matrices including zero, identity, diagonal, and COO-to-CSR conversion.
+* **Access & Manipulation:** Element access and mutation (row-major layout).
+* **Reshape & Slicing:** Contiguous submatrix extraction and shape-preserving reshape.
+* **Transformations:** Matrix transpose.
+* **Elementwise Arithmetic:** Addition, subtraction, scalar multiplication, scalar division.
+* **Multiplication:** Matrix–matrix, matrix–vector, sparse matrix–vector (CSR).
+* **Vector Ops:** Dot product, Euclidean norm, normalization, convergence checks.
+* **Determinant:** LU-based determinant with partial pivoting.
+* **Inversion:** Gauss–Jordan elimination for square matrices.
+* **Eigen Analysis:** Dominant eigenvalue and eigenvector via power iteration.
 
-### 2. Linear Solvers & Optimization
-Methods for solving systems of equations and finding optimal values.
-* **Direct Solvers:** Gaussian Elimination, LU Decomposition.
-* **Iterative Solvers:** Jacobi’s Method, Gauss-Seidel Method.
-* **Optimization:** Gradient Descent.
+### 2. Linear Solvers & Optimization (`LinearSolvers.sol`)
+* **Direct Solvers:** Gaussian elimination with partial pivoting.
+* **LU Decomposition:** Doolittle LU factorization (no pivoting).
+* **Iterative Solvers:** Jacobi and Gauss–Seidel methods.
+* **Least Squares:** Fixed-step gradient descent.
 
-### 3. Calculus Layer
-* **Differentiation:** Finite Forward Difference, Finite Backward Difference, Finite Centered Difference.
-* **Integration:** Trapezoidal Rule, Simpson’s 1/3 Rule, Simpson’s 3/8 Rule.
+### 3. Numerical Differentiation (`Differentiation.sol`)
+* **Methods:** Forward difference, backward difference, and centered difference schemes.
+* **Accuracy:** First-order O(h) for forward/backward differences, second-order O(h²) for centered difference.
+* **Step Size Control:** User-defined step size with global configuration fallback and safe default.
 
-### 4. Solvers & Polynomials
-* **ODE Solvers:** Euler’s Method, Runge-Kutta Methods (RK2, RK4).
-* **Root Finding:** Bisection Method, Newton-Raphson Method, Secant Method.
-* **Polynomials:** Horner’s Method, Power Iteration.
+### 4. Numerical Integration (`Integration.sol`)
+* **Methods:** Composite trapezoidal rule, Simpson’s 1/3 rule, and Simpson’s 3/8 rule.
+* **Accuracy:** Second-order accuracy for trapezoidal rule, fourth-order accuracy for Simpson-based rules under smooth integrands.
+* **Validation:** Enforces method-specific constraints (even 'n' for Simpson 1/3, 'n % 3 == 0' for Simpson 3/8).
 
-### 5. Trigonometry Stack
-High-stability transcendental functions with range reduction.
-* **Primary:** Sin, Cos, Tan, Cot.
-* **Inverse:** Asin, Acos, Atan.
+### 5. Ordinary Differential Equation (ODE) Solvers (`ODESolver.sol`)
+* **Methods:** Euler’s method, RK2 (Midpoint), RK2 (Heun / Improved Euler), and classical RK4.
+* **Accuracy:** First-order accuracy for Euler, second-order accuracy for RK2 methods, and fourth-order accuracy for RK4.
+* **Design Scope:** Single-step integrators intended for deterministic on-chain simulation and controlled step advancement.
+
+### 6. Polynomial Utilities (`Polynomial.sol`)
+* **Evaluation:** Polynomial evaluation using Horner’s method, including optimized evaluation for monic polynomials.
+* **Derivatives:** Exact polynomial derivative computation and combined evaluation.
+* **Algebraic Operations:** Coefficient-wise addition, subtraction, scalar multiplication, and polynomial multiplication via convolution.
+* **Integration:** Exact computation of the indefinite integral polynomial with configurable constant of integration.
+* **Division:** Synthetic division by linear factors of the form \((x - r)\), returning quotient and remainder.
+* **Utilities:** Degree computation, trailing-zero trimming, and canonical zero-polynomial handling.
+
+### 7. Root Finding (`RootFinding.sol`)
+* **Methods:** Bisection, Newton–Raphson (analytic derivative), and Secant (derivative-free).
+  * Bisection enforces sign change on the initial interval.  
+  * Newton method guards against zero derivatives.  
+  * Secant method guards against zero slope between iterates.
+* **Convergence Control:** User-specified tolerance with global configuration fallback and enforced minimum tolerance.
+
+### 8. Trigonometry Stack (`Trigonometry.sol`)
+* **Methods:** sin, cos, tan, cot, arcsin, arccos, and arctan, internally routed through dedicated sine/cosine, tangent/cotangent, and inverse-trigonometry modules.
+* **Design Scope:** Deterministic, pure-function trigonometric primitives intended for on-chain numerical analysis, optimization, differential equations, and geometric algorithms.
 
 ---
 
 ## System Architecture
 
-The system uses a tiered approach to ensure code reusability and bypass the EVM contract size limit.
+SMART-SOLVE is structured as a layered numerical stack designed to maximize code reuse, numerical precision, and EVM bytecode efficiency while enabling advanced scientific computation on-chain.
+The architecture separates core floating-point arithmetic, numerical constants, and high-level numerical algorithms, ensuring that heavy quad-precision logic is compiled once and reused across all modules.
+
+---
 
 ### Core Math Layer
-* **`MathLib.sol`**: Foundation for `bytes16` arithmetic.
-* **`QuadConstants.sol`**: Mathematical constants ($\pi$, $e$, $\ln(2)$, $\ln(10)$, Zero, One, Epsilon).
 
-### Facets (Diamond API)
-Facets expose the libraries to external users/contracts.
-* `MatrixMasterFacet.sol`
-* `LinearSolversFacet.sol`
-* `DifferentiationFacet.sol`
-* `IntegrationFacet.sol`
-* `ODESolverFacet.sol`
-* `TrigonometryFacet.sol`
+This layer provides the numerical foundation for the entire system and is the only place where raw ABDK quad logic is directly referenced.
+
+* **`MathLib.sol`**  
+  Thin public-call wrapper around `ABDKMathQuad` exposing IEEE-754 binary128 (`bytes16`) operations such as add, sub, zero checks, absolute value, and integer <-> quad conversions.
+  All numerical libraries call `MathLib` instead of inlining ABDK logic, drastically reducing bytecode size and preventing EVM contract size limit violations.
+
+* **`QuadConstants.sol`**  
+  Centralized repository of high-precision constants and tolerances including π, π/2, rational helpers (1/2, 1/6), and predefined epsilons (1e-6 → 1e-30).
+  Provides a single authoritative source for numerical thresholds and avoids duplicated or inconsistent constants.
 
 ---
 
@@ -121,7 +149,7 @@ SMART-SOLVE is engineered for environments where standard `uint256` fixed-point 
 
 ---
 
-## 📜 License
+## License
 
 Distributed under the **MIT License**.
 
