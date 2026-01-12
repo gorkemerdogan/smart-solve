@@ -1,76 +1,104 @@
 
-# Smart-Solve 🧮✨
-
-Smart-Solve is a modular **Diamond Standard (EIP-2535)** project for numerical methods on Ethereum.  
-It combines **core diamond facets** with **numeric libraries** (fixed-point & floating-point) and a clean storage architecture for upgradeability.
+# Smart-Solve
+**SMART-SOLVE** is a high-precision numerical computing suite for the Ethereum Virtual Machine (EVM). It implements **IEEE-754 quadruple precision** arithmetic within a modular **Diamond Standard (EIP-2535)** architecture, enabling complex scientific, engineering, and deterministic simulations on-chain.
 
 ---
 
-## Project Structuref
+## Key Features
+
+* **Quadruple Precision:** Full IEEE-754 binary128 implementation using `bytes16` (~34 decimal digits).
+* **Deterministic Execution:** Identical results across all EVM-compatible nodes for verifiable research.
+* **Comprehensive Math Suite:** Advanced calculus, linear algebra, and iterative solvers.
+* **Stateless Libraries:** Optimized numerical logic decoupled from storage.
+
+---
+
+## Feature Breakdown
+
+### 1. Matrix Operations (`MatrixMaster.sol`)
+A robust engine for dense and sparse matrix manipulation.
+* **Creation:** Zeros, Ones, Identity, Random, Diagonal, Sparse.
+* **Access & Manipulation:** Transpose, Slicing, Element Access.
+* **Basic Arithmetic:** Addition, Subtraction, Scalar Multiplication, Scalar Division.
+* **Advanced Arithmetic:** Matrix Multiplication, Inversion.
+
+### 2. Linear Solvers & Optimization
+Methods for solving systems of equations and finding optimal values.
+* **Direct Solvers:** Gaussian Elimination, LU Decomposition.
+* **Iterative Solvers:** Jacobi’s Method, Gauss-Seidel Method.
+* **Optimization:** Gradient Descent.
+
+### 3. Calculus Layer
+* **Differentiation:** Finite Forward Difference, Finite Backward Difference, Finite Centered Difference.
+* **Integration:** Trapezoidal Rule, Simpson’s 1/3 Rule, Simpson’s 3/8 Rule.
+
+### 4. Solvers & Polynomials
+* **ODE Solvers:** Euler’s Method, Runge-Kutta Methods (RK2, RK4).
+* **Root Finding:** Bisection Method, Newton-Raphson Method, Secant Method.
+* **Polynomials:** Horner’s Method, Power Iteration.
+
+### 5. Trigonometry Stack
+High-stability transcendental functions with range reduction.
+* **Primary:** Sin, Cos, Tan, Cot.
+* **Inverse:** Asin, Acos, Atan.
+
+---
+
+## System Architecture
+
+The system uses a tiered approach to ensure code reusability and bypass the EVM contract size limit.
+
+### Core Math Layer
+* **`MathLib.sol`**: Foundation for `bytes16` arithmetic.
+* **`QuadConstants.sol`**: Mathematical constants ($\pi$, $e$, $\ln(2)$, $\ln(10)$, Zero, One, Epsilon).
+
+### Facets (Diamond API)
+Facets expose the libraries to external users/contracts.
+* `MatrixMasterFacet.sol`
+* `LinearSolversFacet.sol`
+* `DifferentiationFacet.sol`
+* `IntegrationFacet.sol`
+* `ODESolverFacet.sol`
+* `TrigonometryFacet.sol`
+
+---
+
+## Project Structure
+
+```text
 contracts/
-├── facets/                 # Diamond “entrypoints” (external APIs)
-│   ├── core/               # Core diamond management facets
-│   │   ├── DiamondCutFacet.sol      # Upgrade facet (add/replace/remove functions)
-│   │   ├── DiamondLoupeFacet.sol    # Query facet (list current facets/selectors)
-│   │   └── OwnershipFacet.sol       # Ownership control (owner + transferOwnership)
-│   └── numeric/             # Domain-specific facets
-│       └── NumericConfigFacet.sol   # Config facet (eps tolerance, max iterations)
+├── facets/
+│   ├── core/              # Diamond management (Cut, Loupe, Ownership)
+│   │   ...
+│   ├── numeric/
+│   │   ├── DifferentiationFacet.sol
+│   │   ├── IntegrationFacet.sol
+│   │   ├── LinearSolversFacet.sol
+│   │   ├── MatrixMasterFacet.sol
+│   │   ├── NumericConfigFacet.sol
+│   │   ├── ODESolverFacet.sol
+│   │   ├── PolynomialFacet.sol
+│   │   ├── RootFindingFacet.sol
+│   │   └── TrigonometryFacet.sol
 │
-├── interfaces/              # External-facing interfaces (EIP-2535 + ERCs)
-│   ├── IDiamondCut.sol
-│   ├── IDiamondLoupe.sol
-│   ├── IERC165.sol
-│   └── IERC173.sol
-│
-├── libraries/               # Stateless helper libraries
-│   ├── numeric/             # Math backends
-│   │   ├── AbdkQuad.sol         # High-precision floating-point (ABDKMathQuad)
-│   │   ├── FixedPoint.sol       # Fixed-point math (PRBMath SD59x18 style)
-│   │   ├── PolynomialFixed.sol  # Polynomial evaluation in fixed-point
-│   │   └── Scalar.sol           # Scalar utilities (abs, clamp, nearlyEqual, etc.)
-│   └── LibSmartSolve.sol        # Core diamond helper functions
-│
-├── storagelibs/             # Libraries that define Diamond Storage layouts
-│   └── LibNumericConfig.sol    # Storage for eps + maxIter config
-│
-├── SmartSolve.sol           # The Diamond contract root (proxy entrypoint)
-
-**How to Run**
-*Compile*
-npx hardhat compile
-*Test*
-npx hardhat test
-*Run a Local Node*
-npx hardhat node
-*Deploy Locally*
-npx hardhat run scripts/deploy.ts --network localhost
-
-**Core Concepts**
-*Diamond (SmartSolve.sol):*
-Acts as the central proxy. Delegates calls to facets, while all storage lives in one place.
-
-*Facets:*
-Modular “controllers” that can be added/removed/upgraded via diamondCut.
-
-*Libraries:*
-Contain pure functions (no state). For example:
-- FixedPoint.sol → gas-efficient math with 18-decimal precision.
-- AbdkQuad.sol → high-precision math for demonstrations.
-- Scalar.sol → common numeric utilities like clamp or nearlyEqual.
-
-*Storage Libraries:*
-Define layouts for persistent variables. Example: LibNumericConfig manages global tolerances (eps) and iteration limits (maxIter).
-
-**Use Case**
-Smart-Solve enables on-chain experiments with root-finding, polynomial evaluation, numerical integration, ODE solving, and matrix operations, using two math backends:
-- Fixed-point → efficient, practical for Ethereum.
-- Floating-point (ABDKMathQuad) → high precision, useful for research & comparisons.
-
-**Roadmap**
-- Core diamond setup (cut, loupe, ownership)
-- Numeric config facet
-- Fixed-point & ABDK libraries
-- Add polynomial differentiation & integration facets
-- Add root-finding methods (Bisection, Newton-Raphson)
-- Add ODE solvers (Euler, RK4)
-- Add matrix methods (Gaussian elimination, multiplication, power iteration)
+├── interfaces/
+│   │   ...                # EIP-2535 and Custom Interfaces
+├── libraries/
+│   ├── numeric/
+│   │   ├── Differentiation.sol
+│   │   ├── Integration.sol
+│   │   ├── LinearSolvers.sol
+│   │   ├── MatrixMaster.sol
+│   │   ├── ODESolver.sol
+│   │   ├── Polynomial.sol
+│   │   └── RootFinding.sol
+│   │
+│   ├── trigonometry/
+│   │   ├── Trigonometry.sol
+│   │   ├── TrigonometryArc.sol
+│   │   ├── TrigonometrySinCos.sol
+│   │   └── TrigonometryTanCot.sol
+│   │
+│   ├── LibSmartSolve.sol
+│   ├── MathLib.sol        # Math library depends on ABDKMathQuad
+│   └── QuadConstants.sol  # Math constants
