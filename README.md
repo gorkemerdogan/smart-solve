@@ -102,3 +102,39 @@ contracts/
 │   ├── LibSmartSolve.sol
 │   ├── MathLib.sol        # Math library depends on ABDKMathQuad
 │   └── QuadConstants.sol  # Math constants
+│   │   ...
+```
+## Precision & Performance
+
+SMART-SOLVE is engineered for environments where standard `uint256` fixed-point math is insufficient. By implementing the IEEE-754 standard, we provide floating-point capabilities directly on the EVM.
+
+### Technical Specifications
+
+| Parameter | Specification | Details |
+| :--- | :--- | :--- |
+| **Standard** | IEEE-754 binary128 | Quadruple precision floating-point format |
+| **Storage Type** | `bytes16` | Compact representation for stack efficiency |
+| **Precision** | ~34 Decimal Digits | High-fidelity scientific significand |
+
+> [!WARNING]
+> **Gas Profile**: Computation in quad-precision is intensive. Operations like `Matrix Inversion` or `RK4 Integration` are optimized for **Correctness** and **Reproducibility** rather than low-cost DeFi swaps. Use this suite for high-value simulations, research, and engineering logic where accuracy is non-negotiable.
+
+---
+
+## 📜 License
+
+Distributed under the **MIT License**.
+
+```text
+Copyright (c) 2026 SMART-SOLVE
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+```
