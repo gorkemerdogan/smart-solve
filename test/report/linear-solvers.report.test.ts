@@ -947,15 +947,18 @@ describe("LinearSolversHarness", function () {
             expect(abs(r1)).to.be.below(TOL_DIRECT, "Row 1 residual too high");
             expect(abs(r2)).to.be.below(TOL_DIRECT, "Row 2 residual too high");
 
+            const xDec = x_vals.map(v => formatScaledInt(v)).join(", ");
+            const resDec = `Residuals: [${formatScaledInt(r0)}, ${formatScaledInt(r1)}, ${formatScaledInt(r2)}]`;
+
             printBlockRegular({
                 t,
                 method: "Gaussian Elimination",
-                explanation: "3x3 Upper-triangular system verified via residual |Ax - b| < epsilon.",
+                explanation: "3x3 Upper-triangular system verification.",
                 inHex: "Upper Triangular Matrix",
                 expectedHex: "Residual ≈ 0",
                 outHex: `[${x.join(", ")}]`,
-                expectedDec: "Residual < 1e-10",
-                outDec: "Pass",
+                expectedDec: "x ≈ [1.0, 0.666, 2.0]",
+                outDec: `x: [${xDec}]\n${resDec}`,
                 gas,
             });
         });
