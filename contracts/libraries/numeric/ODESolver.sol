@@ -47,8 +47,10 @@ library ODESolver {
     // ------------------------------------------------------------
 
     /**
-     * @notice One Euler step y_{n+1} = y_n + h * f(x_n, y_n)
-     * @dev Minimal stability; fast. Best for small h.
+     * @notice One Euler step
+     *         
+     *  y_{n+1} = y_n + h * f(x_n, y_n)
+     * 
      * @param target Address implementing f(x,y)
      * @param selectorF Selector for f(x,y)
      * @param x Current x
@@ -147,8 +149,6 @@ library ODESolver {
      *  k4 = f(x + h,       y + h*k3)
      *
      *  y_{n+1} = y + (h/6)*(k1 + 2*k2 + 2*k3 + k4)
-     *
-     * Most accurate single-step explicit method.
      *
      * @param target Address implementing f(x,y)
      * @param selectorF Selector for f(x,y)
