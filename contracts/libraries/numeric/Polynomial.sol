@@ -99,7 +99,6 @@ library Polynomial {
         }
     }
 
-
     /**
      * @notice Computes coefficient-wise polynomial addition.
      *         Missing terms are treated as zero. Returns a zero polynomial when both inputs are empty.
@@ -220,11 +219,7 @@ library Polynomial {
      * @return px     Value of the polynomial p(x).
      * @return dpx    Value of the derivative p’(x).
      */
-    function evaluateWithDerivative(bytes16[] memory coeffs, bytes16 x)
-        internal
-        pure
-        returns (bytes16 px, bytes16 dpx)
-    {
+    function evaluateWithDerivative(bytes16[] memory coeffs, bytes16 x) internal pure returns (bytes16 px, bytes16 dpx) {
         px = QZERO;
         dpx = QZERO;
         if (coeffs.length == 0) return (px, dpx);
