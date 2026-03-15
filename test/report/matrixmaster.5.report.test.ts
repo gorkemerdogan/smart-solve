@@ -6,9 +6,8 @@ import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
- * @notice Provides comprehensive utilities for matrix operations using the ABDK bytes16/quad fixed-point math type.
- *         Tests cover core linear algebra multiplication operations: matrix multiplication,
- *         matrix–vector multiplication, and dot product.
+ * @notice Test suite validating MatrixMaster linear algebra multiplication operations using ABDK quad precision,
+ *         including matrix–matrix multiplication, matrix–vector multiplication, and dot product.
  */
 
 // ------------------------------------------------------------

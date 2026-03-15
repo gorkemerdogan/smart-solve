@@ -6,8 +6,8 @@ import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
- * @notice Provides comprehensive utilities for matrix operations using the ABDK bytes16/quad fixed-point math type.
- *         Tests covers functions for manipulating the structure and dimensions of matrices: slice & reshape
+ * @notice Test suite validating MatrixMaster structural matrix operations using ABDK quad precision (bytes16),
+ *         covering submatrix extraction (slice) and dimensional transformation (reshape).
  */
 
 // ------------------------------------------------------------

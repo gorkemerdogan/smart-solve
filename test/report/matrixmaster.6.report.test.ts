@@ -6,8 +6,7 @@ import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
- * @notice Provides comprehensive utilities for matrix operations using the ABDK bytes16/quad fixed-point math type.
- *         Tests implement determinant and inverse critical, critical for solving systems of equations and performing transformations.
+ * @notice Test suite validating MatrixMaster determinant and inverse operations using ABDK quad precision (bytes16).
  */
 
 // ------------------------------------------------------------

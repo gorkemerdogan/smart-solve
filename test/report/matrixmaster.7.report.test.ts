@@ -6,8 +6,9 @@ import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
- * @notice Provides comprehensive utilities for matrix operations using the ABDK bytes16/quad fixed-point math type.
- *         Tests covers essential vector utilities and numerical iterative methods: random vector, normalization, convergence, power iteration
+ * @notice Test suite validating MatrixMaster vector utilities and iterative numerical methods using ABDK quad precision,
+ *         covering Euclidean norm computation, vector normalization, deterministic random vector generation, convergence
+ *         detection between vectors, and the power iteration algorithm for estimating dominant eigenvalues and eigenvectors.
  */
 
 // ------------------------------------------------------------

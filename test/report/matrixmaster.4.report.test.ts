@@ -6,8 +6,8 @@ import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
- * @notice Provides comprehensive utilities for matrix operations using the ABDK bytes16/quad fixed-point math type.
- *         Tests cover the transpose operation, which swaps the rows and columns of a matrix.
+ * @notice Provides comprehensive utilities for verifying correct row–column swapping across rectangular and 
+ *         quare matrices, large random matrices, sparse matrices, vectors, and identity matrices.
  */
 
 // ------------------------------------------------------------

@@ -6,8 +6,8 @@ import { touchGas, estimateGas, printBlockMatrix } from "../test-utils";
 
 /**
  * @title  MatrixMaster: Matrix Library using ABDK Math Quad (bytes16)
- * @notice Provides comprehensive utilities for matrix operations using the ABDK bytes16/quad fixed-point math type.
- *         Tests covers sparse matrix creations and sparse matrix-vector multiplication
+ * @notice Test suite validating MatrixMaster sparse matrix utilities using ABDK quad precision, covering CSR-based
+ *         sparse matrix construction (zero, identity, diagonal, and COO triplet conversion) and sparse matrix–vector multiplication.
  */
 
 // ------------------------------------------------------------
