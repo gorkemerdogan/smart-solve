@@ -99,12 +99,12 @@ library SteepestDescent {
 
             z0 = _norm2(z);
 
-            // zero gradient => possible local minimum
-            if (MathLib.cmp(z0, zero) == 0) {
+            // Near-zero gradient or objective => convergence
+            if (MathLib.cmp(z0, tolEff) <= 0 || MathLib.cmp(MathLib.abs(g1), tolEff) <= 0) {
                 r.x = x;
                 r.gx = g1;
                 r.iters = k - 1;
-                r.status = STATUS_ZERO_GRADIENT;
+                r.status = STATUS_SUCCESS;
                 return r;
             }
 
@@ -123,6 +123,16 @@ library SteepestDescent {
                 g3 = objective.g(trialX);
 
                 if (MathLib.cmp(alpha3, tolHalf) < 0) {
+
+                    // Near-zero convergence check
+                    if (MathLib.cmp(z0, tolEff) <= 0 || MathLib.cmp(MathLib.abs(g1), tolEff) <= 0) {
+                        r.x = x;
+                        r.gx = g1;
+                        r.iters = k - 1;
+                        r.status = STATUS_SUCCESS;
+                        return r;
+                    }
+
                     r.x = x;
                     r.gx = g1;
                     r.iters = k - 1;
