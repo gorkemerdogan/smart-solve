@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { MathLib } from "../libraries/MathLib.sol";
+import { QuadConstants as QC } from "../libraries/QuadConstants.sol";
 
 /**
  * @title LibNumericConfig
@@ -79,45 +80,48 @@ library LibNumericConfig {
 
     /**
      * @notice Get the global default tolerance.
-     *         Returns 1e-18 if uninitialized.
+     *         Returns DEFAULT_TOL if uninitialized.
      */
     function getTol() internal view returns (bytes16) {
         bytes16 t = cfg().tol;
         if (MathLib.cmp(t, MathLib.fromInt(0)) == 0) {
-             return MathLib.div(MathLib.fromInt(1), MathLib.fromInt(1000000000000000000));
+            return QC.DEFAULT_TOL();
         }
         return t;
     }
 
     /**
      * @notice Get the minimum allowable tolerance (Gas Guardrail).
-     *         Returns 1e-32 if uninitialized.
+     *         Returns DEFAULT_MIN_TOL if uninitialized.
      */
     function getMinTol() internal view returns (bytes16) {
         bytes16 t = cfg().minTol;
         if (MathLib.cmp(t, MathLib.fromInt(0)) == 0) {
-            return MathLib.div(MathLib.fromInt(1), MathLib.fromUInt(10**32));
+            return QC.DEFAULT_MIN_TOL();
         }
         return t;
     }
 
     /**
      * @notice Get the maximum number of iterations.
-     *         Returns 100 if uninitialized.
+     *         Returns DEFAULT_MAX_ITER if uninitialized.
      */
     function getMaxIter() internal view returns (uint256) {
         uint256 m = cfg().maxIter;
-        return m == 0 ? DEFAULT_MAX_ITER : m;
+        if (m == 0) {
+            return QC.DEFAULT_MAX_ITER;
+        }
+        return m;
     }
 
     /**
      * @notice Get the differentiation step size.
-     *         Returns 1e-8 if uninitialized.
+     *         Returns DEFAULT_DIFF_STEP if uninitialized.
      */
     function getDiffStep() internal view returns (bytes16) {
         bytes16 h = cfg().diffStep;
         if (MathLib.cmp(h, MathLib.fromInt(0)) == 0) {
-            return MathLib.div(MathLib.fromInt(1), MathLib.fromInt(100000000));
+            return QC.DEFAULT_DIFF_STEP();
         }
         return h;
     }
