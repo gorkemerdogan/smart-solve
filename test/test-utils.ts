@@ -148,6 +148,39 @@ export function printBlockRegular({t, method, explanation, gas, inHex = "-", exp
     console.log(logLines.join("\n"));
 }
 
+interface printBlockOptimizationData {
+    outDec?: string;
+    t: number; 
+    method: string; 
+    explanation: string; 
+    gas: bigint | number | string; 
+    x0?: string;
+    xFinal?: string;
+    gx?: string;
+    status?: string;
+    iters?: string;
+    extra?: string;
+}
+
+export function printBlockOptimization({t, method, explanation, gas, x0 = "-", xFinal = "-", gx = "-", status = "-", iters = "-", extra = "-"}: printBlockOptimizationData): void {
+    const sep = "-".repeat(60);
+    const logLines = [
+        sep,
+        `Test: ${t}`,
+        `Method: ${method}`,
+        `Explanation: ${explanation}`,
+        `Gas Usage: ${gas}`,
+        `Initial x: ${x0}`,
+        `Final x: ${xFinal}`,
+        `g(x_final): ${gx}`,
+        `Status: ${status}`,
+        `Iterations: ${iters}`,
+        `Extra: ${extra}`,
+        sep,
+    ];
+    console.log(logLines.join("\n"));
+}
+
 /**
  * @notice Formats a fixed-point BigInt into a human-readable decimal string.
  * @dev    Splits the value into integer and fractional parts. If the scale input is 0, 
