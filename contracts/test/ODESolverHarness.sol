@@ -61,6 +61,22 @@ contract ODESolverHarness {
             return x.mul(x);
     }
 
+    /**
+    * @notice Cubic polynomial slope: y' = x^3 + a*x^2 + b*x + c
+    * @param  x Input value.
+    * @return v Quad-precision polynomial evaluation.
+    */
+    function f_cubic_poly(bytes16 x, bytes16 /* y */) external pure returns (bytes16) {
+        bytes16 a = MathLib.fromInt(1); // 1.0
+        bytes16 b = MathLib.fromInt(2); // 2.0
+        bytes16 c = MathLib.fromInt(3); // 3.0
+
+        bytes16 x2 = x.mul(x);
+        bytes16 x3 = x2.mul(x);
+
+        return x3.add(a.mul(x2)).add(b.mul(x)).add(c);
+    }
+
     // ------------------------------------------------------------
     // Numerical helpers
     // ------------------------------------------------------------
@@ -112,5 +128,15 @@ contract ODESolverHarness {
         bytes16 qInt = MathLib.fromInt(scaledValue);
         bytes16 qScale = MathLib.fromUInt(SCALE);
         return MathLib.div(qInt, qScale);
+    }
+
+    /**
+     * @notice Computes a / b in quadruple precision.
+     * @param a First operand.
+     * @param b Second operand.
+     * @return Product of a and b.
+     */
+    function div(bytes16 a, bytes16 b) external pure returns (bytes16) {
+        return MathLib.div(a, b);
     }
 }

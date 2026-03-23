@@ -113,6 +113,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
     let selConst5: string;
     let selLinear: string;
     let selSquare: string;
+    let selPoly: string;
 
     const qi = async (x: number | bigint) => h.qFromInt(x);
     const qf = async (n: number | bigint, d: number | bigint) => h.qFromFrac(n, d);
@@ -137,6 +138,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         selConst5 = h.interface.getFunction("f_const5")!.selector;
         selLinear = h.interface.getFunction("f_linear")!.selector;
         selSquare = h.interface.getFunction("f_square")!.selector;
+        selPoly = h.interface.getFunction("f_cubic_poly")!.selector;
 
         QZERO = await h.fromFloat(0n);
         H_HEX = await h.qFromFrac(1, 10);
@@ -313,6 +315,39 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 outDec: "Reverted",
             });
         });
+
+        it("Test 8: One Euler step for cubic polynomial at x=0 (h=0.5)", async function () {
+            t++;
+
+            const x0 = QZERO;
+            const y0 = await qi(1);
+
+            const one = await qi(1);
+            const two = await qi(2);
+            const five = await qi(5);
+
+            const hStep = await h.div(one, two);     // 0.5
+            const expected = await h.div(five, two); // 2.5
+
+            await touchGas(h, "euler", [target, selPoly, x0, y0, hStep]);
+            const gas = await estimateGas(h, "euler", [target, selPoly, x0, y0, hStep]);
+
+            const out = await h.euler(target, selPoly, x0, y0, hStep);
+
+            expect(out).to.equal(expected);
+
+            printBlockRegular({
+                t,
+                method: "Euler (Single Step)",
+                explanation: "y1 = y0 + h*f(x0). For x0=0, y0=1, h=0.5 and f(0)=3 → y1=2.5.",
+                gas,
+                inHex: y0,
+                expectedHex: expected,
+                outHex: out,
+                expectedDec: "2.50",
+                outDec: fmt(await h.toFloat(out)),
+            });
+        });
     });
 
     // ---------------------------------------------------------===
@@ -321,7 +356,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
     describe("Section 2: RK2 Midpoint Method", function () {
 
-        it("Test 8: Constant ODE y' = 5 (exact)", async function () {
+        it("Test 9: Constant ODE y' = 5 (exact)", async function () {
             t++;
             const y0 = await qi(2);
             const expected = 2.5;
@@ -346,7 +381,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 9: Linear ODE y' = y", async function () {
+        it("Test 10: Linear ODE y' = y", async function () {
             t++;
             const y0 = await qi(10);
             const expected = 11.05; // 11.05
@@ -371,7 +406,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 10: Quadratic slope y'=x²", async function () {
+        it("Test 11: Quadratic slope y'=x²", async function () {
             t++;
             const xStart = 2; const yStart = 1;
             const x = await qi(xStart); const y0 = await qi(yStart);
@@ -398,7 +433,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 11: Zero step size", async function () {
+        it("Test 12: Zero step size", async function () {
             t++;
             const y0 = await qi(7);
 
@@ -421,7 +456,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 12: Negative step", async function () {
+        it("Test 13: Negative step", async function () {
             t++;
             const y0 = await qi(10);
             const expected = 9.5
@@ -446,7 +481,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 13: Zero step size (h=0)", async function () {
+        it("Test 14: Zero step size (h=0)", async function () {
             t++;
             const y0 = await qi(3);
 
@@ -469,7 +504,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 14: Invalid selector reverts", async function () {
+        it("Test 15: Invalid selector reverts", async function () {
             t++;
             await expect(
                 h.rk2Midpoint(target, "0xdeadbeef", QZERO, await qi(1), H_HEX)
@@ -494,7 +529,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
     describe("Section 3: RK2 Heun Method", function () {
 
-        it("Test 15: Constant ODE exact", async function () {
+        it("Test 16: Constant ODE exact", async function () {
             t++;
             const y0 = await qi(2);
             const expected = 2.5;
@@ -519,7 +554,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 16: Linear ODE y'=y", async function () {
+        it("Test 17: Linear ODE y'=y", async function () {
             t++;
             const yStart = 10;
             const y0 = await qi(yStart);
@@ -546,7 +581,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 17: Quadratic slope y'=x²", async function () {
+        it("Test 18: Quadratic slope y'=x²", async function () {
             t++;
             const xStart = 2; const yStart = 1;
             const x = await qi(xStart); const y0 = await qi(yStart);
@@ -573,7 +608,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 18: Zero step", async function () {
+        it("Test 19: Zero step", async function () {
             t++;
             const y0 = await qi(6);
 
@@ -596,7 +631,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 19: Negative step", async function () {
+        it("Test 20: Negative step", async function () {
             t++;
             const y0 = await qi(10);
             const expected = 9.5
@@ -621,7 +656,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 20: Zero step size (h=0)", async function () {
+        it("Test 21: Zero step size (h=0)", async function () {
             t++;
             const y0 = await qi(4);
 
@@ -644,7 +679,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 21: Invalid selector reverts", async function () {
+        it("Test 22: Invalid selector reverts", async function () {
             t++;
             await expect(
                 h.rk2Heun(target, "0xdeadbeef", QZERO, await qi(1), H_HEX)
@@ -669,7 +704,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
 
     describe("Section 4: RK4 Method", function () {
 
-        it("Test 22: Constant ODE exact", async function () {
+        it("Test 23: Constant ODE exact", async function () {
             t++;
             const y0 = await qi(2);
             const expected = 2.5;
@@ -694,7 +729,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 23: Linear ODE y'=y", async function () {
+        it("Test 24: Linear ODE y'=y", async function () {
             t++;
             const yStart = 10;
             const y0 = await qi(yStart);
@@ -721,7 +756,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 24: Quadratic slope y'=x²", async function () {
+        it("Test 25: Quadratic slope y'=x²", async function () {
             t++;
             const xStart = 2; const yStart = 1;
             const x = await qi(xStart); const y0 = await qi(yStart);
@@ -748,7 +783,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 25: Zero step", async function () {
+        it("Test 26: Zero step", async function () {
             t++;
             const y0 = await qi(5);
 
@@ -771,7 +806,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 26: Negative step", async function () {
+        it("Test 27: Negative step", async function () {
             t++;
             const y0 = await qi(10);
             const expected = 9.5
@@ -796,7 +831,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 27: Zero step size (h=0)", async function () {
+        it("Test 28: Zero step size (h=0)", async function () {
             t++;
             const y0 = await qi(3);
 
@@ -819,7 +854,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             });
         });
 
-        it("Test 28: Invalid selector reverts", async function () {
+        it("Test 29: Invalid selector reverts", async function () {
             t++;
             await expect(
                 h.rk4(target, "0xdeadbeef", QZERO, await qi(1), H_HEX)
