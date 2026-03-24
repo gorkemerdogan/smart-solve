@@ -24,33 +24,11 @@ type LinearSolversHarness = Contract & {
 //  Helpers
 // ------------------------------------------------------------
 
-function toBigIntArray(arr: number[]): bigint[] {
-    return arr.map((x) => BigInt(x));
-}
-
-// Convert Array<number> to Array<BigInt> scaled
-function toScaledArray(arr: number[]): bigint[] {
-    return arr.map(x => BigInt(Math.round(x * Number(SCALE))));
-}
-
 // Check if scalar values are close
 function expectClose(actual: bigint, expected: bigint, tol: bigint, msg: string = "") {
     let diff = actual - expected;
     if (diff < 0n) diff = -diff;
     expect(diff).to.be.below(tol, `${msg} | Expected ${expected}, got ${actual}, diff ${diff}`);
-}
-
-/// Helper to multiply A (n×n) by x (n×1) in JS for verification.
-function multiplyMatrixVector(n: number, A: bigint[], x: bigint[]): bigint[] {
-    const out: bigint[] = new Array(n).fill(0n);
-    for (let i = 0; i < n; ++i) {
-        let sum = 0n;
-        for (let j = 0; j < n; ++j) {
-            sum += A[i * n + j] * x[j];
-        }
-        out[i] = sum;
-    }
-    return out;
 }
 
 // Matrix Multiplication (A * B) / SCALE
@@ -71,15 +49,6 @@ function multiplyMatrices(n: number, A: bigint[], B: bigint[]): bigint[] {
 function expectMatrixSimilar(n: number, A: bigint[], B: bigint[], tol: bigint) {
     for (let i = 0; i < n * n; i++) {
         expectClose(A[i], B[i], tol, `Matrix mismatch at index ${i}`);
-    }
-}
-
-/// Helper to assert vector equality.
-function expectVecEq(actual: bigint[], expected: number[]) {
-    const expBig = toBigIntArray(expected);
-    expect(actual.length).to.equal(expBig.length);
-    for (let i = 0; i < expBig.length; ++i) {
-        expect(actual[i]).to.equal(expBig[i], `Vector element at index ${i} mismatch. Expected ${expBig[i]}, got ${actual[i]}`);
     }
 }
 
@@ -120,7 +89,7 @@ describe("LinearSolversHarness", function () {
     });
 
     // ------------------------------------------------------------
-    //  Gradient Descent
+    //  Gradient Descent (Least Squares)
     // ------------------------------------------------------------
 
     describe("Section 1: Gradient Descent Least Squares", function () {
@@ -815,6 +784,10 @@ describe("LinearSolversHarness", function () {
         });
     });
 
+    // ------------------------------------------------------------
+    //  Gaussian Elimination Method
+    // ------------------------------------------------------------
+
     describe("Section 4: Gaussian Elimination", function () {
 
         it("Test 18: 1D trivial system A=[1], b=[7]", async function () {
@@ -1025,42 +998,6 @@ describe("LinearSolversHarness", function () {
     });
 
     describe("Section 5: LU Decomposition", function () {
-
-        /**
-         * @notice Verifies correctness of an LU decomposition by reconstructing the
-         *         original matrix and comparing it against the input.
-         *
-         * @param n Dimension of the square matrix (n × n).
-         * @param A_contract Flattened matrix A as returned
-         * @param msg Contextual message used for debugging or test identification.
-         * @return L Lower-triangular matrix (bytes16[])
-         * @return U Upper-triangular matrix (bytes16[])
-         */
-        async function verifyLU(n: bigint, A_contract: string[], msg: string) {
-            const [L, U] = await harness.luDecomposition(n, A_contract);
-
-            const Ls = await Promise.all(L.map(v => harness.toFloat(v)));
-            const Us = await Promise.all(U.map(v => harness.toFloat(v)));
-            const As = await Promise.all(A_contract.map(v => harness.toFloat(v)));
-
-            const LU = multiplyMatrices(Number(n), Ls, Us); // Reconstruct A' = L * U
-
-            expectMatrixSimilar(Number(n), LU, As, TOL_DIRECT);
-
-            return { L, U };
-        }
-
-        /**
-         * @notice Formats a contract-encoded matrix into a readable string
-         * @param n Matrix dimension (n × n).
-         * @param M_hex Flattened matrix encoded as bytes16 hex strings.
-         * @return String representation of the matrix values in scaled-integer form.
-         */
-        async function formatMatrixForReport(n: number, M_hex: string[]): Promise<string> {
-            const vals = await Promise.all(M_hex.map(v => harness.toFloat(v)));
-            const str = vals.map(v => formatScaledInt(v)).join(", ");
-            return `[${str}]`;
-        }
 
         /**
          * @notice Formats a flattened matrix into a readable grid layout.
@@ -1288,5 +1225,188 @@ describe("LinearSolversHarness", function () {
                 gas: "N/A",
             });
         });
+    });
+
+    // ------------------------------------------------------------
+    //  Comparison
+    // ------------------------------------------------------------
+
+    describe("Section 6: Comparison for Direct Methods", function () {
+
+        /**
+         * @notice Formats a contract-encoded matrix into a readable string
+         * @param n Matrix dimension (n × n).
+         * @param M_hex Flattened matrix encoded as bytes16 hex strings.
+         * @return String representation of the matrix values in scaled-integer form.
+         */
+        async function formatMatrixForReport(n: number, M_hex: string[]): Promise<string> {
+            const vals = await Promise.all(M_hex.map(v => harness.toFloat(v)));
+            const str = vals.map(v => formatScaledInt(v)).join(", ");
+            return `[${str}]`;
+        }
+
+        it("Test 30: Shared Normal Scenario (Gaussian Elimination, 3x3 stable system)", async function () {
+            t++;
+            const n = 3n;
+
+            const A_raw = [
+                4n, 1n, 1n,
+                1n, 5n, 1n,
+                1n, 1n, 6n
+            ];
+
+            const expectedX = [1n, 2n, 3n];
+            const b_raw = [9n, 14n, 21n]; // A * [1,2,3]
+
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+            const b = await Promise.all(b_raw.map(v => harness.qFromInt(v)));
+
+            await touchGas(harness, "gaussianElimination", [n, A, b]);
+            const gas = await estimateGas(harness, "gaussianElimination", [n, A, b]);
+
+            const x = await harness.gaussianElimination(n, A, b);
+
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
+            const actual2 = await harness.toFloat(x[2]);
+
+            expectClose(actual0, expectedX[0] * SCALE, TOL_DIRECT, "x0 mismatch");
+            expectClose(actual1, expectedX[1] * SCALE, TOL_DIRECT, "x1 mismatch");
+            expectClose(actual2, expectedX[2] * SCALE, TOL_DIRECT, "x2 mismatch");
+
+            printBlockRegular({
+                t,
+                method: "Gaussian Elimination",
+                explanation: "Shared normal scenario: stable 3x3 diagonally dominant system with exact solution [1,2,3].",
+                inHex: "A=[[4,1,1],[1,5,1],[1,1,6]], b=[9,14,21]",
+                expectedHex: `[${await harness.qFromInt(1)}, ${await harness.qFromInt(2)}, ${await harness.qFromInt(3)}]`,
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "[1, 2, 3]",
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}, ${formatScaledInt(actual2)}]`,
+                gas,
+            });
+        });
+
+        it("Test 31: Shared Normal Scenario (LU, 3x3 stable reconstruction)", async function () {
+            t++;
+            const n = 3n;
+
+            const A_raw = [
+                4n, 1n, 1n,
+                1n, 5n, 1n,
+                1n, 1n, 6n
+            ];
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+
+            await touchGas(harness, "luDecomposition", [n, A]);
+            const gas = await estimateGas(harness, "luDecomposition", [n, A]);
+
+            const [L, U] = await harness.luDecomposition(n, A);
+
+            const Ls = await Promise.all(L.map(v => harness.toFloat(v)));
+            const Us = await Promise.all(U.map(v => harness.toFloat(v)));
+            const As = await Promise.all(A.map(v => harness.toFloat(v)));
+
+            const LU_product = multiplyMatrices(3, Ls, Us);
+
+            expectMatrixSimilar(3, LU_product, As, TOL_DIRECT);
+
+            printBlockRegular({
+                t,
+                method: "LU Decomposition",
+                explanation: "Shared normal scenario: 3x3 stable system, verified via L*U reconstruction.",
+                inHex: await formatMatrixForReport(3, A),
+                expectedHex: "Original A",
+                outHex: `L=${await formatMatrixForReport(3, L)}\nU=${await formatMatrixForReport(3, U)}`,
+                expectedDec: `Original A: ${await formatMatrixForReport(3, A)}`,
+                outDec: `Reconstructed A': [${LU_product.map(v => formatScaledInt(v)).join(", ")}]`,
+                gas,
+            });
+        });
+
+        it("Test 32: Shared Stress Scenario (Gaussian Elimination, row-swap pivot case)", async function () {
+            t++;
+            const n = 3n;
+
+            const A_raw = [
+                0n, 2n, 1n,
+                1n, 1n, 1n,
+                2n, 1n, 3n
+            ];
+
+            const expectedX = [1n, 2n, 3n];
+            const b_raw = [7n, 6n, 13n]; // A * [1,2,3]
+
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+            const b = await Promise.all(b_raw.map(v => harness.qFromInt(v)));
+
+            await touchGas(harness, "gaussianElimination", [n, A, b]);
+            const gas = await estimateGas(harness, "gaussianElimination", [n, A, b]);
+
+            const x = await harness.gaussianElimination(n, A, b);
+
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
+            const actual2 = await harness.toFloat(x[2]);
+
+            expectClose(actual0, expectedX[0] * SCALE, TOL_DIRECT, "x0 mismatch after pivot");
+            expectClose(actual1, expectedX[1] * SCALE, TOL_DIRECT, "x1 mismatch after pivot");
+            expectClose(actual2, expectedX[2] * SCALE, TOL_DIRECT, "x2 mismatch after pivot");
+
+            printBlockRegular({
+                t,
+                method: "Gaussian Elimination",
+                explanation: "Shared stress scenario: 3x3 system with zero leading pivot, forcing row swap before elimination.",
+                inHex: "A=[[0,2,1],[1,1,1],[2,1,3]], b=[7,6,13]",
+                expectedHex: `[${await harness.qFromInt(1)}, ${await harness.qFromInt(2)}, ${await harness.qFromInt(3)}]`,
+                outHex: `[${x.join(", ")}]`,
+                expectedDec: "[1, 2, 3]",
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}, ${formatScaledInt(actual2)}]`,
+                gas,
+            });
+        });
+
+        it("Test 33: Shared Stress Scenario (LU, 4x4 dense system)", async function () {
+            t++;
+            const n = 4n;
+
+            const A_raw = [
+                4n, 1n, 1n, 1n,
+                1n, 5n, 1n, 1n,
+                1n, 1n, 6n, 1n,
+                1n, 1n, 1n, 7n
+            ];
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+
+            await touchGas(harness, "luDecomposition", [n, A]);
+            const gas = await estimateGas(harness, "luDecomposition", [n, A]);
+
+            const [L, U] = await harness.luDecomposition(n, A);
+
+            const Ls = await Promise.all(L.map(v => harness.toFloat(v)));
+            const Us = await Promise.all(U.map(v => harness.toFloat(v)));
+            const As = await Promise.all(A.map(v => harness.toFloat(v)));
+
+            const LU_product = multiplyMatrices(4, Ls, Us);
+
+            expectMatrixSimilar(4, LU_product, As, TOL_DIRECT);
+
+            printBlockRegular({
+                t,
+                method: "LU Decomposition",
+                explanation: "Stress scenario: 4x4 diagonally dominant matrix to increase decomposition workload.",
+                inHex: await formatMatrixForReport(4, A),
+                expectedHex: "Original A",
+                outHex: `L size=${L.length}, U size=${U.length}`,
+                expectedDec: `Original A: ${await formatMatrixForReport(4, A)}`,
+                outDec: `Reconstructed A': [${LU_product.map(v => formatScaledInt(v)).join(", ")}]`,
+                gas,
+            });
+        });
+
+    });
+
+    describe("Section 7: Comparison for Iterative Methods", function () {
+
     });
 });
