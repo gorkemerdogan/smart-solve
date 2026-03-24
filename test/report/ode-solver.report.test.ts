@@ -31,28 +31,28 @@ const TOL_APPROX = 1000n; // For approximate (integration drift), allow a very s
 // Euler: y * (1 + h)
 const exactEulerLinear = (y: number, h: number) => y * (1 + h);
 // RK2 (Heun & Midpoint match for linear): y * (1 + h + h^2/2)
-const exactRK2Linear   = (y: number, h: number) => y * (1 + h + 0.5 * h * h);
+const exactRK2Linear = (y: number, h: number) => y * (1 + h + 0.5 * h * h);
 // RK4 Discrete Step: y * (1 + h + h^2/2 + h^3/6 + h^4/24)
-const exactRK4Linear   = (y: number, h: number) => y * (1 + h + 0.5*h*h + (h**3)/6 + (h**4)/24);
+const exactRK4Linear = (y: number, h: number) => y * (1 + h + 0.5 * h * h + (h ** 3) / 6 + (h ** 4) / 24);
 
 // y' = x^2
-const exactEulerSquare = (y: number, x: number, h: number) => y + h * (x**2);
-const exactMidSquare   = (y: number, x: number, h: number) => y + h * ((x + 0.5*h)**2);
+const exactEulerSquare = (y: number, x: number, h: number) => y + h * (x ** 2);
+const exactMidSquare = (y: number, x: number, h: number) => y + h * ((x + 0.5 * h) ** 2);
 
 // Heun Discrete: y + (h/2) * (f(x) + f(x+h))
-const exactHeunSquare  = (y: number, x: number, h: number) => {
-    const k1 = x**2;
-    const k2 = (x + h)**2;
+const exactHeunSquare = (y: number, x: number, h: number) => {
+    const k1 = x ** 2;
+    const k2 = (x + h) ** 2;
     return y + (0.5 * h * (k1 + k2));
 };
 
 // RK4 Discrete: Weighted average of 4 slopes
-const exactRK4Square   = (y: number, x: number, h: number) => {
-    const k1 = x**2;
-    const k2 = (x + 0.5*h)**2;
+const exactRK4Square = (y: number, x: number, h: number) => {
+    const k1 = x ** 2;
+    const k2 = (x + 0.5 * h) ** 2;
     const k3 = k2; // For f(x), k3 is same as k2 (x is same)
-    const k4 = (x + h)**2;
-    return y + (h/6) * (k1 + 2*k2 + 2*k3 + k4);
+    const k4 = (x + h) ** 2;
+    return y + (h / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
 };
 
 // ------------------------------------------------------------
@@ -69,7 +69,7 @@ const exactRK4Square   = (y: number, x: number, h: number) => {
 async function expectClose(h: ODESolverHarness, a: string, bDec: number, tol: bigint) {
     const ai = await h.toFloat(a);
     const bi = BigInt(Math.round(bDec * 1e12)); // Convert JS number expectation to BigInt scaled by 1e12
-    
+
     let d = ai - bi;
     if (d < 0n) d = -d;
 
@@ -105,7 +105,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
     // Step size constants
     let H_HEX: string;
     let HNEG_HEX: string;
-    
+
     // JS Numbers for verification
     const H_NUM = 0.1;
     const HNEG_NUM = -0.1;
@@ -143,11 +143,12 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         QZERO = await h.fromFloat(0n);
         H_HEX = await h.qFromFrac(1, 10);
         HNEG_HEX = await h.qFromFrac(-1, 10);
+        H_ONE_HEX = await h.qFromInt(1);
     });
 
-    // ---------------------------------------------------------===
+    // ------------------------------------------------------------
     // Section 1: Euler
-    // ---------------------------------------------------------===
+    // ------------------------------------------------------------
 
     describe("Section 1: Euler Method", function () {
 
@@ -350,9 +351,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         });
     });
 
-    // ---------------------------------------------------------===
+    // ------------------------------------------------------------
     // Section 2: RK2 Midpoint
-    // ---------------------------------------------------------===
+    // ------------------------------------------------------------
 
     describe("Section 2: RK2 Midpoint Method", function () {
 
@@ -523,9 +524,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         });
     });
 
-    // ---------------------------------------------------------===
+    // ------------------------------------------------------------
     // Section 3: RK2 Heun
-    // ---------------------------------------------------------===
+    // ------------------------------------------------------------
 
     describe("Section 3: RK2 Heun Method", function () {
 
@@ -698,9 +699,9 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
         });
     });
 
-    // ---------------------------------------------------------===
+    // ------------------------------------------------------------
     // Section 4: RK4
-    // ---------------------------------------------------------===
+    // ------------------------------------------------------------
 
     describe("Section 4: RK4 Method", function () {
 
@@ -733,7 +734,7 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
             t++;
             const yStart = 10;
             const y0 = await qi(yStart);
-            
+
             const expectedNum = exactRK4Linear(yStart, H_NUM); // Use RK4 Linear Generator
             const expectedHex = await h.fromFloat(BigInt(Math.round(expectedNum * 1e12)));
 
@@ -869,6 +870,216 @@ describe("ODESolverFacet – Single-Step ODE Solvers", function () {
                 outHex: "Reverted",
                 expectedDec: "Reverted",
                 outDec: "Reverted",
+            });
+        });
+    });
+
+    // ------------------------------------------------------------
+    // Comparison
+    // ------------------------------------------------------------
+
+    let H_ONE_HEX: string;
+    const H_ONE_NUM = 1.0;
+
+    describe("Section 5: Comparison", function () {
+
+        it("Test 30: Shared Normal Scenario (Euler, y' = y, y0=10, h=0.1)", async function () {
+            t++;
+            const y0 = await qi(10);
+            const expectedNum = exactEulerLinear(10, H_NUM); // 11
+            const expectedHex = await qi(11);
+
+            await touchGas(h, "euler", [target, selLinear, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "euler", [target, selLinear, QZERO, y0, H_HEX]);
+            const out = await h.euler(target, selLinear, QZERO, y0, H_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX);
+
+            printBlockRegular({
+                t,
+                method: "Euler",
+                explanation: "Shared normal scenario: one Euler step for y'=y with y0=10 and h=0.1.",
+                gas,
+                inHex: y0,
+                expectedHex: expectedHex,
+                outHex: out,
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
+            });
+        });
+
+        it("Test 31: Shared Normal Scenario (RK2 Midpoint, y' = y, y0=10, h=0.1)", async function () {
+            t++;
+            const y0 = await qi(10);
+            const expectedNum = exactRK2Linear(10, H_NUM); // 11.05
+            const expectedHex = await h.fromFloat(BigInt(Math.round(expectedNum * 1e12)));
+
+            await touchGas(h, "rk2Midpoint", [target, selLinear, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk2Midpoint", [target, selLinear, QZERO, y0, H_HEX]);
+            const out = await h.rk2Midpoint(target, selLinear, QZERO, y0, H_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX);
+
+            printBlockRegular({
+                t,
+                method: "RK2 Midpoint",
+                explanation: "Shared normal scenario: midpoint RK2 on y'=y with y0=10 and h=0.1.",
+                gas,
+                inHex: y0,
+                expectedHex: expectedHex,
+                outHex: out,
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
+            });
+        });
+
+        it("Test 32: Shared Normal Scenario (RK2 Heun, y' = y, y0=10, h=0.1)", async function () {
+            t++;
+            const y0 = await qi(10);
+            const expectedNum = exactRK2Linear(10, H_NUM); // 11.05
+            const expectedHex = await h.fromFloat(BigInt(Math.round(expectedNum * 1e12)));
+
+            await touchGas(h, "rk2Heun", [target, selLinear, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk2Heun", [target, selLinear, QZERO, y0, H_HEX]);
+            const out = await h.rk2Heun(target, selLinear, QZERO, y0, H_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX);
+
+            printBlockRegular({
+                t,
+                method: "RK2 Heun",
+                explanation: "Shared normal scenario: Heun RK2 on y'=y with y0=10 and h=0.1.",
+                gas,
+                inHex: y0,
+                expectedHex: expectedHex,
+                outHex: out,
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
+            });
+        });
+
+        it("Test 33: Shared Normal Scenario (RK4, y' = y, y0=10, h=0.1)", async function () {
+            t++;
+            const y0 = await qi(10);
+            const expectedNum = exactRK4Linear(10, H_NUM); // 11.051708333333...
+            const expectedHex = await h.fromFloat(BigInt(Math.round(expectedNum * 1e12)));
+
+            await touchGas(h, "rk4", [target, selLinear, QZERO, y0, H_HEX]);
+            const gas = await estimateGas(h, "rk4", [target, selLinear, QZERO, y0, H_HEX]);
+            const out = await h.rk4(target, selLinear, QZERO, y0, H_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX);
+
+            printBlockRegular({
+                t,
+                method: "RK4",
+                explanation: "Shared normal scenario: RK4 on y'=y with y0=10 and h=0.1.",
+                gas,
+                inHex: y0,
+                expectedHex: expectedHex,
+                outHex: out,
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
+            });
+        });
+
+        it("Test 34: Shared Stress Scenario (Euler, y' = y, y0=50, h=1)", async function () {
+            t++;
+            const y0 = await qi(50);
+            const expectedNum = exactEulerLinear(50, H_ONE_NUM); // 100
+            const expectedHex = await qi(100);
+
+            await touchGas(h, "euler", [target, selLinear, QZERO, y0, H_ONE_HEX]);
+            const gas = await estimateGas(h, "euler", [target, selLinear, QZERO, y0, H_ONE_HEX]);
+            const out = await h.euler(target, selLinear, QZERO, y0, H_ONE_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX);
+
+            printBlockRegular({
+                t,
+                method: "Euler",
+                explanation: "Shared stress scenario: large explicit step h=1 on y'=y amplifies first-order growth error.",
+                gas,
+                inHex: y0,
+                expectedHex: expectedHex,
+                outHex: out,
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
+            });
+        });
+
+        it("Test 35: Shared Stress Scenario (RK2 Midpoint, y' = y, y0=50, h=1)", async function () {
+            t++;
+            const y0 = await qi(50);
+            const expectedNum = exactRK2Linear(50, H_ONE_NUM); // 125
+            const expectedHex = await qi(125);
+
+            await touchGas(h, "rk2Midpoint", [target, selLinear, QZERO, y0, H_ONE_HEX]);
+            const gas = await estimateGas(h, "rk2Midpoint", [target, selLinear, QZERO, y0, H_ONE_HEX]);
+            const out = await h.rk2Midpoint(target, selLinear, QZERO, y0, H_ONE_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX);
+
+            printBlockRegular({
+                t,
+                method: "RK2 Midpoint",
+                explanation: "Shared stress scenario: midpoint RK2 on y'=y with large step h=1 and y0=50.",
+                gas,
+                inHex: y0,
+                expectedHex: expectedHex,
+                outHex: out,
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
+            });
+        });
+
+        it("Test 36: Shared Stress Scenario (RK2 Heun, y' = y, y0=50, h=1)", async function () {
+            t++;
+            const y0 = await qi(50);
+            const expectedNum = exactRK2Linear(50, H_ONE_NUM); // 125
+            const expectedHex = await qi(125);
+
+            await touchGas(h, "rk2Heun", [target, selLinear, QZERO, y0, H_ONE_HEX]);
+            const gas = await estimateGas(h, "rk2Heun", [target, selLinear, QZERO, y0, H_ONE_HEX]);
+            const out = await h.rk2Heun(target, selLinear, QZERO, y0, H_ONE_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX);
+
+            printBlockRegular({
+                t,
+                method: "RK2 Heun",
+                explanation: "Shared stress scenario: Heun RK2 on y'=y with large step h=1 and y0=50.",
+                gas,
+                inHex: y0,
+                expectedHex: expectedHex,
+                outHex: out,
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
+            });
+        });
+
+        it("Test 37: Shared Stress Scenario (RK4, y' = y, y0=50, h=1)", async function () {
+            t++;
+            const y0 = await qi(50);
+            const expectedNum = exactRK4Linear(50, H_ONE_NUM); // 135.416666666667
+            const expectedHex = await h.fromFloat(BigInt(Math.round(expectedNum * 1e12)));
+
+            await touchGas(h, "rk4", [target, selLinear, QZERO, y0, H_ONE_HEX]);
+            const gas = await estimateGas(h, "rk4", [target, selLinear, QZERO, y0, H_ONE_HEX]);
+            const out = await h.rk4(target, selLinear, QZERO, y0, H_ONE_HEX);
+
+            await expectClose(h, out, expectedNum, TOL_APPROX);
+
+            printBlockRegular({
+                t,
+                method: "RK4",
+                explanation: "Shared stress scenario: RK4 on y'=y with large step h=1 and y0=50.",
+                gas,
+                inHex: y0,
+                expectedHex: expectedHex,
+                outHex: out,
+                expectedDec: `${expectedNum}`,
+                outDec: await getDec(h, out),
             });
         });
     });
