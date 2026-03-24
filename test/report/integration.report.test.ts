@@ -482,10 +482,6 @@ describe("Integration Library - Numerical Methods", function () {
   //  Simpson 3/8 Rule
   // ------------------------------------------------------------
 
-  // ------------------------------------------------------------
-  //  Simpson 3/8 Rule
-  // ------------------------------------------------------------
-
   describe("Section 3: Simpson 3/8 Rule", function () {
 
     it("Test 16: Quadratic Exactness (f=x^2 on [0,1], n=9)", async function () {
@@ -618,6 +614,150 @@ describe("Integration Library - Numerical Methods", function () {
         outDec: await fmt(harness, out)
       });
     });
+  });
 
+  // ------------------------------------------------------------
+  //  Comparison
+  // ------------------------------------------------------------
+
+  describe("Section 4: Comparison", function () {
+
+    it("Test 22: Shared Low-Gas Comparison (sin(x) on [0,π], n=30)", async function () {
+      t++;
+      const expected = await qInt(2);
+
+      await touchGas(harness, "trapezoidal", [target, selSin, q0, qPI, 30]);
+      const gas = await estimateGas(harness, "trapezoidal", [target, selSin, q0, qPI, 30]);
+      const out = await harness.trapezoidal(target, selSin, q0, qPI, 30);
+
+      await expectClose(harness, out, expected, 5_000_000_000n);
+
+      printBlockRegular({
+        t,
+        method: "trapezoidal",
+        explanation: "Shared low-gas comparison case: trapezoidal integration of sin(x) over [0,π] with n=30.",
+        gas,
+        inHex: "f=sin, [0,π], n=30",
+        expectedHex: expected,
+        outHex: out,
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
+      });
+    });
+
+    it("Test 23: Shared Low-Gas Comparison (sin(x) on [0,π], n=30)", async function () {
+      t++;
+      const expected = await qInt(2);
+
+      await touchGas(harness, "simpson13", [target, selSin, q0, qPI, 30]);
+      const gas = await estimateGas(harness, "simpson13", [target, selSin, q0, qPI, 30]);
+      const out = await harness.simpson13(target, selSin, q0, qPI, 30);
+
+      await expectClose(harness, out, expected, 100_000_000n);
+
+      printBlockRegular({
+        t,
+        method: "simpson13",
+        explanation: "Shared low-gas comparison case: Simpson 1/3 integration of sin(x) over [0,π] with n=30.",
+        gas,
+        inHex: "f=sin, [0,π], n=30",
+        expectedHex: expected,
+        outHex: out,
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
+      });
+    });
+
+    it("Test 24: Shared Low-Gas Comparison (sin(x) on [0,π], n=30)", async function () {
+      t++;
+      const expected = await qInt(2);
+
+      await touchGas(harness, "simpson38", [target, selSin, q0, qPI, 30]);
+      const gas = await estimateGas(harness, "simpson38", [target, selSin, q0, qPI, 30]);
+      const out = await harness.simpson38(target, selSin, q0, qPI, 30);
+
+      await expectClose(harness, out, expected, 100_000_000n);
+
+      printBlockRegular({
+        t,
+        method: "simpson38",
+        explanation: "Shared low-gas comparison case: Simpson 3/8 integration of sin(x) over [0,π] with n=30.",
+        gas,
+        inHex: "f=sin, [0,π], n=30",
+        expectedHex: expected,
+        outHex: out,
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
+      });
+    });
+
+    it("Test 25: Shared Comparison Scenario (sin(x) on [0,π], n=300)", async function () {
+      t++;
+      const expected = await qInt(2);
+
+      await touchGas(harness, "trapezoidal", [target, selSin, q0, qPI, 300]);
+      const gas = await estimateGas(harness, "trapezoidal", [target, selSin, q0, qPI, 300]);
+      const out = await harness.trapezoidal(target, selSin, q0, qPI, 300);
+
+      await expectClose(harness, out, expected, 50_000_000n);
+
+      printBlockRegular({
+        t,
+        method: "trapezoidal",
+        explanation: "Shared comparison case: trapezoidal integration of sin(x) over [0,π] with n=300. Exact integral is 2.",
+        gas,
+        inHex: "f=sin, [0,π], n=300",
+        expectedHex: expected,
+        outHex: out,
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
+      });
+    });
+
+    it("Test 26: Shared Comparison Scenario (sin(x) on [0,π], n=300)", async function () {
+      t++;
+      const expected = await qInt(2);
+
+      await touchGas(harness, "simpson13", [target, selSin, q0, qPI, 300]);
+      const gas = await estimateGas(harness, "simpson13", [target, selSin, q0, qPI, 300]);
+      const out = await harness.simpson13(target, selSin, q0, qPI, 300);
+
+      await expectClose(harness, out, expected, 50_000_000n);
+
+      printBlockRegular({
+        t,
+        method: "simpson13",
+        explanation: "Shared comparison case: Simpson 1/3 integration of sin(x) over [0,π] with n=300. Exact integral is 2.",
+        gas,
+        inHex: "f=sin, [0,π], n=300",
+        expectedHex: expected,
+        outHex: out,
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
+      });
+    });
+
+    it("Test 27: Shared Comparison Scenario (sin(x) on [0,π], n=300)", async function () {
+      t++;
+      const expected = await qInt(2);
+
+      await touchGas(harness, "simpson38", [target, selSin, q0, qPI, 300]);
+      const gas = await estimateGas(harness, "simpson38", [target, selSin, q0, qPI, 300]);
+      const out = await harness.simpson38(target, selSin, q0, qPI, 300);
+
+      await expectClose(harness, out, expected, 50_000_000n);
+
+      printBlockRegular({
+        t,
+        method: "simpson38",
+        explanation: "Shared comparison case: Simpson 3/8 integration of sin(x) over [0,π] with n=300. Exact integral is 2.",
+        gas,
+        inHex: "f=sin, [0,π], n=300",
+        expectedHex: expected,
+        outHex: out,
+        expectedDec: await fmt(harness, expected),
+        outDec: await fmt(harness, out)
+      });
+    });
   });
 });
