@@ -105,7 +105,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
     //  Forward Difference
     // ------------------------------------------------------------
 
-    describe("Method 1: Forward Difference (Approximation)", function () {
+    describe("Section 1: Forward Difference (Approximation)", function () {
 
         it("Test 1: Standard Positive Input (x^2 at x=3)", async function () {
             t++;
@@ -251,7 +251,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
     //  Backward Difference
     // ------------------------------------------------------------
 
-    describe("Method 2: Backward Difference (Approximation)", function () {
+    describe("Section 2: Backward Difference (Approximation)", function () {
 
         it("Test 7: Standard Positive Input (x^2 at x=4)", async function () {
             t++;
@@ -397,7 +397,7 @@ describe("Differentiation Library - Extended Edge Cases", function () {
     //  Centered Difference
     // ------------------------------------------------------------
 
-    describe("Method 3: Centered Difference", function () {
+    describe("Section 3: Centered Difference", function () {
 
         it("Test 13: Exact Quadratic (x^2 at x=10)", async function () {
             t++;
@@ -537,6 +537,14 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 outDec: "Reverted",
             });
         });
+
+    });
+
+    // ------------------------------------------------------------
+    //  Comparison
+    // ------------------------------------------------------------
+
+    describe("Section 4: Centered Difference", function () {
 
         it("Test 19: Kink-Crossing Stress for FW (Abs at x=h/2)", async function () {
             t++;
