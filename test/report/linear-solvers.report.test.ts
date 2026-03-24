@@ -1408,5 +1408,283 @@ describe("LinearSolversHarness", function () {
 
     describe("Section 7: Comparison for Iterative Methods", function () {
 
+        it("Test 34: Shared Normal Scenario (Jacobi, 2x2 diagonally dominant system)", async function () {
+            t++;
+
+            const n = 2n;
+            const A_raw = [4n, 1n, 2n, 3n];
+            const b_raw = [1n, 2n];
+
+            const x0Exp = SCALE / 10n;      // 0.1
+            const x1Exp = 6n * SCALE / 10n; // 0.6
+
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+            const b = await Promise.all(b_raw.map(v => harness.qFromInt(v)));
+            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
+
+            const tol = await harness.qFromFrac(1, 1_000_000_000_000n); // 1e-12
+            const maxIter = 200n;
+
+            await touchGas(harness, "jacobi", [n, A, b, x0, maxIter, tol]);
+            const gas = await estimateGas(harness, "jacobi", [n, A, b, x0, maxIter, tol]);
+
+            const [x, iters] = await harness.jacobi(n, A, b, x0, maxIter, tol);
+
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
+
+            expectClose(actual0, x0Exp, TOL_ITERATIVE, "x0 mismatch");
+            expectClose(actual1, x1Exp, TOL_ITERATIVE, "x1 mismatch");
+
+            printBlockRegular({
+                t,
+                method: "Jacobi",
+                explanation: "Shared normal scenario: 2x2 diagonally dominant system with exact solution [0.1, 0.6].",
+                inHex: "A=[[4,1],[2,3]], b=[1,2]",
+                expectedHex: `[${await harness.fromFloat(x0Exp)}, ${await harness.fromFloat(x1Exp)}]`,
+                outHex: `[${x.join(", ")}], iter=${iters}`,
+                expectedDec: `[${formatScaledInt(x0Exp)}, ${formatScaledInt(x1Exp)}]`,
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}]`,
+                gas,
+            });
+        });
+
+        it("Test 35: Shared Normal Scenario (Gauss–Seidel, 2x2 diagonally dominant system)", async function () {
+            t++;
+
+            const n = 2n;
+            const A_raw = [4n, 1n, 2n, 3n];
+            const b_raw = [1n, 2n];
+
+            const x0Exp = SCALE / 10n;      // 0.1
+            const x1Exp = 6n * SCALE / 10n; // 0.6
+
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+            const b = await Promise.all(b_raw.map(v => harness.qFromInt(v)));
+            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
+
+            const tol = await harness.qFromFrac(1, 1_000_000_000_000n); // 1e-12
+            const maxIter = 200n;
+
+            await touchGas(harness, "gaussSeidel", [n, A, b, x0, maxIter, tol]);
+            const gas = await estimateGas(harness, "gaussSeidel", [n, A, b, x0, maxIter, tol]);
+
+            const [x, iters] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
+
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
+
+            expectClose(actual0, x0Exp, TOL_ITERATIVE, "x0 mismatch");
+            expectClose(actual1, x1Exp, TOL_ITERATIVE, "x1 mismatch");
+
+            printBlockRegular({
+                t,
+                method: "Gauss–Seidel",
+                explanation: "Shared normal scenario: 2x2 diagonally dominant system with exact solution [0.1, 0.6].",
+                inHex: "A=[[4,1],[2,3]], b=[1,2]",
+                expectedHex: `[${await harness.fromFloat(x0Exp)}, ${await harness.fromFloat(x1Exp)}]`,
+                outHex: `[${x.join(", ")}], iter=${iters}`,
+                expectedDec: `[${formatScaledInt(x0Exp)}, ${formatScaledInt(x1Exp)}]`,
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}]`,
+                gas,
+            });
+        });
+
+        it("Test 36: Shared Normal Scenario (Least Squares, 2x2 diagonally dominant system)", async function () {
+            t++;
+
+            const m = 2n;
+            const n = 2n;
+
+            const A_raw = [4n, 1n, 2n, 3n];
+            const b_raw = [1n, 2n];
+
+            const x0Exp = SCALE / 10n;      // 0.1
+            const x1Exp = 6n * SCALE / 10n; // 0.6
+
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+            const b = await Promise.all(b_raw.map(v => harness.qFromInt(v)));
+            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0)];
+
+            const alpha = await harness.qFromFrac(1, 20); // 0.05
+            const tol = await harness.qFromFrac(1, 1_000_000_000_000n); // 1e-12
+            const maxIter = 500n;
+
+            const args = [m, n, A, b, x0, alpha, maxIter, tol];
+
+            await touchGas(harness, "gradientDescentLeastSquares", args);
+            const gas = await estimateGas(harness, "gradientDescentLeastSquares", args);
+
+            const [x, iters] = await harness.gradientDescentLeastSquares(m, n, A, b, x0, alpha, maxIter, tol);
+
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
+
+            expectClose(actual0, x0Exp, TOL_ITERATIVE, "x0 mismatch");
+            expectClose(actual1, x1Exp, TOL_ITERATIVE, "x1 mismatch");
+
+            printBlockRegular({
+                t,
+                method: "Gradient Descent Least Squares",
+                explanation: "Shared normal scenario: same 2x2 diagonally dominant system used in Jacobi and Gauss-Seidel comparison.",
+                inHex: "A=[[4,1],[2,3]], b=[1,2]",
+                expectedHex: `[${await harness.fromFloat(x0Exp)}, ${await harness.fromFloat(x1Exp)}]`,
+                outHex: `[${x.join(", ")}], iter=${iters}`,
+                expectedDec: `[${formatScaledInt(x0Exp)}, ${formatScaledInt(x1Exp)}]`,
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}]`,
+                gas,
+            });
+        });
+
+        it("Test 37: Shared Stress Scenario (Jacobi, 3x3 coupled diagonally dominant system)", async function () {
+            t++;
+
+            const n = 3n;
+            const A_raw = [
+                10n, -1n, 2n,
+                -1n, 11n, -1n,
+                2n, -1n, 10n
+            ];
+            const b_raw = [14n, 18n, 30n]; // A * [1,2,3]
+
+            const expectedX = [1n * SCALE, 2n * SCALE, 3n * SCALE];
+
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+            const b = await Promise.all(b_raw.map(v => harness.qFromInt(v)));
+            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0), await harness.qFromInt(0)];
+
+            const tol = await harness.qFromFrac(1, 1_000_000_000_000n); // 1e-12
+            const maxIter = 300n;
+
+            await touchGas(harness, "jacobi", [n, A, b, x0, maxIter, tol]);
+            const gas = await estimateGas(harness, "jacobi", [n, A, b, x0, maxIter, tol]);
+
+            const [x, iters] = await harness.jacobi(n, A, b, x0, maxIter, tol);
+
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
+            const actual2 = await harness.toFloat(x[2]);
+
+            expectClose(actual0, expectedX[0], TOL_ITERATIVE, "x0 mismatch");
+            expectClose(actual1, expectedX[1], TOL_ITERATIVE, "x1 mismatch");
+            expectClose(actual2, expectedX[2], TOL_ITERATIVE, "x2 mismatch");
+
+            printBlockRegular({
+                t,
+                method: "Jacobi",
+                explanation: "Shared stress scenario: 3x3 coupled system increases iteration workload while preserving convergence.",
+                inHex: "A=[[10,-1,2],[-1,11,-1],[2,-1,10]], b=[14,18,30]",
+                expectedHex: `[${await harness.qFromInt(1)}, ${await harness.qFromInt(2)}, ${await harness.qFromInt(3)}]`,
+                outHex: `[${x.join(", ")}], iter=${iters}`,
+                expectedDec: "[1, 2, 3]",
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}, ${formatScaledInt(actual2)}]`,
+                gas,
+            });
+        });
+
+        it("Test 38: Shared Stress Scenario (Gauss–Seidel, 3x3 coupled diagonally dominant system)", async function () {
+            t++;
+
+            const n = 3n;
+            const A_raw = [
+                10n, -1n, 2n,
+                -1n, 11n, -1n,
+                2n, -1n, 10n
+            ];
+            const b_raw = [14n, 18n, 30n]; // A * [1,2,3]
+
+            const expectedX = [1n * SCALE, 2n * SCALE, 3n * SCALE];
+
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+            const b = await Promise.all(b_raw.map(v => harness.qFromInt(v)));
+            const x0 = [await harness.qFromInt(0), await harness.qFromInt(0), await harness.qFromInt(0)];
+
+            const tol = await harness.qFromFrac(1, 1_000_000_000_000n); // 1e-12
+            const maxIter = 300n;
+
+            await touchGas(harness, "gaussSeidel", [n, A, b, x0, maxIter, tol]);
+            const gas = await estimateGas(harness, "gaussSeidel", [n, A, b, x0, maxIter, tol]);
+
+            const [x, iters] = await harness.gaussSeidel(n, A, b, x0, maxIter, tol);
+
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
+            const actual2 = await harness.toFloat(x[2]);
+
+            expectClose(actual0, expectedX[0], TOL_ITERATIVE, "x0 mismatch");
+            expectClose(actual1, expectedX[1], TOL_ITERATIVE, "x1 mismatch");
+            expectClose(actual2, expectedX[2], TOL_ITERATIVE, "x2 mismatch");
+
+            printBlockRegular({
+                t,
+                method: "Gauss–Seidel",
+                explanation: "Shared stress scenario: 3x3 coupled system increases iteration workload while preserving convergence.",
+                inHex: "A=[[10,-1,2],[-1,11,-1],[2,-1,10]], b=[14,18,30]",
+                expectedHex: `[${await harness.qFromInt(1)}, ${await harness.qFromInt(2)}, ${await harness.qFromInt(3)}]`,
+                outHex: `[${x.join(", ")}], iter=${iters}`,
+                expectedDec: "[1, 2, 3]",
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}, ${formatScaledInt(actual2)}]`,
+                gas,
+            });
+        });
+
+        it("Test 39: Shared Stress Scenario (Least Squares, 3x3 coupled diagonally dominant system)", async function () {
+            t++;
+
+            const m = 3n;
+            const n = 3n;
+
+            const A_raw = [
+                10n, -1n, 2n,
+                -1n, 11n, -1n,
+                2n, -1n, 10n
+            ];
+            const b_raw = [14n, 18n, 30n]; // A * [1,2,3]
+
+            const expectedX = [1n * SCALE, 2n * SCALE, 3n * SCALE];
+
+            const A = await Promise.all(A_raw.map(v => harness.qFromInt(v)));
+            const b = await Promise.all(b_raw.map(v => harness.qFromInt(v)));
+            const x0 = [
+                await harness.qFromInt(0),
+                await harness.qFromInt(0),
+                await harness.qFromInt(0)
+            ];
+
+            const alpha = await harness.qFromFrac(1, 200); // 0.005
+            const tol = await harness.qFromFrac(1, 1_000_000n); // 1e-6
+            const maxIter = 1000n;
+
+            const args = [m, n, A, b, x0, alpha, maxIter, tol];
+
+            await touchGas(harness, "gradientDescentLeastSquares", args);
+            const gas = await estimateGas(harness, "gradientDescentLeastSquares", args);
+
+            const [x, iters] = await harness.gradientDescentLeastSquares(m, n, A, b, x0, alpha, maxIter, tol);
+
+            expect(x.length).to.equal(3);
+
+            const actual0 = await harness.toFloat(x[0]);
+            const actual1 = await harness.toFloat(x[1]);
+            const actual2 = await harness.toFloat(x[2]);
+
+            const STRESS_GD_TOL = 10_000_000n; // 1e-5
+
+            expectClose(actual0, expectedX[0], STRESS_GD_TOL, "x0 mismatch");
+            expectClose(actual1, expectedX[1], STRESS_GD_TOL, "x1 mismatch");
+            expectClose(actual2, expectedX[2], STRESS_GD_TOL, "x2 mismatch");
+
+            printBlockRegular({
+                t,
+                method: "Gradient Descent Least Squares",
+                explanation: "Shared stress scenario: same 3x3 coupled system used in Jacobi and Gauss-Seidel comparison, solved via least-squares descent.",
+                inHex: "A=[[10,-1,2],[-1,11,-1],[2,-1,10]], b=[14,18,30]",
+                expectedHex: `[${await harness.qFromInt(1)}, ${await harness.qFromInt(2)}, ${await harness.qFromInt(3)}]`,
+                outHex: `[${x.join(", ")}], iter=${iters}`,
+                expectedDec: "[1, 2, 3]",
+                outDec: `[${formatScaledInt(actual0)}, ${formatScaledInt(actual1)}, ${formatScaledInt(actual2)}]`,
+                gas,
+            });
+        });
     });
 });
