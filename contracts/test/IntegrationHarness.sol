@@ -98,7 +98,6 @@ contract IntegrationHarness {
         return MathLib.fromInt(1).div(x);
     }
 
-
     /**
      * @notice Integrand f(x) = 1e−30 · x.
      * @param x Input value.
@@ -106,6 +105,45 @@ contract IntegrationHarness {
      */
     function f_tiny(bytes16 x) external pure returns (bytes16) {
         bytes16 scale = MathLib.fromUInt(1).div(MathLib.fromUInt(10**30));
+        return x.mul(scale);
+    }
+
+    /**
+     * @notice Integrand f(x) = 1e-20 · x.
+     * @param x Input value.
+     * @return v Scaled quad-precision result.
+     */
+    function f_verySmall(bytes16 x) external pure returns (bytes16 v) {
+        bytes16 scale = MathLib.fromUInt(1).div(MathLib.fromUInt(10**20));
+        return x.mul(scale);
+    }
+
+    /**
+     * @notice Integrand f(x) = 1e-10 · x.
+     * @param x Input value.
+     * @return v Scaled quad-precision result.
+     */
+    function f_small(bytes16 x) external pure returns (bytes16 v) {
+        bytes16 scale = MathLib.fromUInt(1).div(MathLib.fromUInt(10**10));
+        return x.mul(scale);
+    }
+
+    /**
+     * @notice Integrand f(x) = x.
+     * @param x Input value.
+     * @return v Quad-precision result.
+     */
+    function f_normal(bytes16 x) external pure returns (bytes16 v) {
+        return x;
+    }
+
+    /**
+     * @notice Integrand f(x) = 1e30 · x.
+     * @param x Input value.
+     * @return v Scaled quad-precision result.
+     */
+    function f_huge(bytes16 x) external pure returns (bytes16 v) {
+        bytes16 scale = MathLib.fromUInt(10**30);
         return x.mul(scale);
     }
 
