@@ -537,5 +537,152 @@ describe("Differentiation Library - Extended Edge Cases", function () {
                 outDec: "Reverted",
             });
         });
+
+        it("Test 19: Kink-Crossing Stress for FW (Abs at x=h/2)", async function () {
+            t++;
+            const x = await harness.qFromFrac(1, 200000000); // x = h/2 = 5e-9
+            const expected = await qInt(1);
+
+            await touchGas(harness, "forwardDiffHarness", [target, selAbs, x, QZERO]);
+            const gas = await estimateGas(harness, "forwardDiffHarness", [target, selAbs, x, QZERO]);
+            const out = await harness.forwardDiffHarness(target, selAbs, x, QZERO);
+
+            await expectClose(harness, out, expected, TOL_EXACT);
+
+            printBlockRegular({
+                t,
+                method: "forwardDiff",
+                explanation: "Forward diff of |x| at x=h/2 crosses the kink asymmetrically and returns slope 1.",
+                gas,
+                inHex: x,
+                expectedHex: expected,
+                outHex: out,
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
+            });
+        });
+
+        it("Test 20: Kink-Crossing Stress for BW (Abs at x=h/2)", async function () {
+            t++;
+            const x = await harness.qFromFrac(1, 200000000); // x = h/2 = 5e-9
+            const expected = await qInt(0);
+
+            await touchGas(harness, "backwardDiffHarness", [target, selAbs, x, QZERO]);
+            const gas = await estimateGas(harness, "backwardDiffHarness", [target, selAbs, x, QZERO]);
+            const out = await harness.backwardDiffHarness(target, selAbs, x, QZERO);
+
+            await expectClose(harness, out, expected, TOL_EXACT);
+
+            printBlockRegular({
+                t,
+                method: "backwardDiff",
+                explanation: "Backward diff of |x| at x=h/2 crosses the kink and collapses to slope 0.",
+                gas,
+                inHex: x,
+                expectedHex: expected,
+                outHex: out,
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
+            });
+        });
+
+        it("Test 21: Kink-Crossing Stress for CENT (Abs at x=h/2)", async function () {
+            t++;
+            const x = await harness.qFromFrac(1, 200000000); // x = h/2 = 5e-9
+            const expected = await harness.qFromFrac(1, 2); // 0.5
+
+            await touchGas(harness, "centeredDiffHarness", [target, selAbs, x, QZERO]);
+            const gas = await estimateGas(harness, "centeredDiffHarness", [target, selAbs, x, QZERO]);
+            const out = await harness.centeredDiffHarness(target, selAbs, x, QZERO);
+
+            await expectClose(harness, out, expected, TOL_EXACT);
+
+            printBlockRegular({
+                t,
+                method: "centeredDiff",
+                explanation: "Centered diff of |x| at x=h/2 straddles the kink symmetrically in width but asymmetrically in values, giving slope 0.5.",
+                gas,
+                inHex: x,
+                expectedHex: expected,
+                outHex: out,
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
+            });
+        });
+
+        it("Test 22: Cubic Stress with Large Explicit Step (x^3 at x=50, h=1) for FW", async function () {
+            t++;
+            const x = await qInt(50);
+            const stepOne = await qInt(1);
+            const expected = await qInt(7651);
+
+            await touchGas(harness, "forwardDiffHarness", [target, selCube, x, stepOne]);
+            const gas = await estimateGas(harness, "forwardDiffHarness", [target, selCube, x, stepOne]);
+            const out = await harness.forwardDiffHarness(target, selCube, x, stepOne);
+
+            await expectClose(harness, out, expected, TOL_EXACT);
+
+            printBlockRegular({
+                t,
+                method: "forwardDiff",
+                explanation: "Forward diff of x^3 at x=50 with explicit h=1 stresses the cubic path and yields finite-difference slope 7651.",
+                gas,
+                inHex: x,
+                expectedHex: expected,
+                outHex: out,
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
+            });
+        });
+
+        it("Test 23: Cubic Stress with Large Explicit Step (x^3 at x=50, h=1) for BW", async function () {
+            t++;
+            const x = await qInt(50);
+            const stepOne = await qInt(1);
+            const expected = await qInt(7351);
+
+            await touchGas(harness, "backwardDiffHarness", [target, selCube, x, stepOne]);
+            const gas = await estimateGas(harness, "backwardDiffHarness", [target, selCube, x, stepOne]);
+            const out = await harness.backwardDiffHarness(target, selCube, x, stepOne);
+
+            await expectClose(harness, out, expected, TOL_EXACT);
+
+            printBlockRegular({
+                t,
+                method: "backwardDiff",
+                explanation: "Backward diff of x^3 at x=50 with explicit h=1 stresses the cubic path and yields finite-difference slope 7351.",
+                gas,
+                inHex: x,
+                expectedHex: expected,
+                outHex: out,
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
+            });
+        });
+
+        it("Test 23: Cubic Stress with Large Explicit Step (x^3 at x=50, h=1) for CENT", async function () {
+            t++;
+            const x = await qInt(50);
+            const stepOne = await qInt(1);
+            const expected = await qInt(7501);
+
+            await touchGas(harness, "centeredDiffHarness", [target, selCube, x, stepOne]);
+            const gas = await estimateGas(harness, "centeredDiffHarness", [target, selCube, x, stepOne]);
+            const out = await harness.centeredDiffHarness(target, selCube, x, stepOne);
+
+            await expectClose(harness, out, expected, TOL_EXACT);
+
+            printBlockRegular({
+                t,
+                method: "centeredDiff",
+                explanation: "Centered diff of x^3 at x=50 with explicit h=1 stresses the cubic path and yields finite-difference slope 7501.",
+                gas,
+                inHex: x,
+                expectedHex: expected,
+                outHex: out,
+                expectedDec: await fmt(harness, expected),
+                outDec: await fmt(harness, out),
+            });
+        });
     });
 });
