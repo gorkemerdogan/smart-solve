@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { MathLib } from "../libraries/MathLib.sol";
+import {MathLib} from "../libraries/MathLib.sol";
 
 /**
  * @title RootFindingHarness
@@ -55,8 +55,8 @@ contract RootFindingHarness {
      */
     function df_cubic(bytes16 x) external pure returns (bytes16 y) {
         bytes16 three = MathLib.fromInt(3);
-        bytes16 one   = MathLib.fromInt(1);
-        bytes16 x2    = x.mul(x);
+        bytes16 one = MathLib.fromInt(1);
+        bytes16 x2 = x.mul(x);
         y = three.mul(x2).sub(one);
     }
 
@@ -89,7 +89,10 @@ contract RootFindingHarness {
      * @param den Signed denominator (must be non-zero).
      * @return q  Quadruple-precision value representing num/den.
      */
-    function qFromFrac(int256 num, int256 den) external pure returns (bytes16 q) {
+    function qFromFrac(
+        int256 num,
+        int256 den
+    ) external pure returns (bytes16 q) {
         require(den != 0, "den=0");
         bytes16 qNum = MathLib.fromInt(num);
         bytes16 qDen = MathLib.fromInt(den);
@@ -113,8 +116,8 @@ contract RootFindingHarness {
     /**
      * @notice Compares two quadruple-precision values.
      * @dev Returns:
-     *      -1 if a < b  
-     *       0 if a == b  
+     *      -1 if a < b
+     *       0 if a == b
      *      +1 if a > b
      * @param a First operand.
      * @param b Second operand.
@@ -122,5 +125,62 @@ contract RootFindingHarness {
      */
     function cmp(bytes16 a, bytes16 b) external pure returns (int256) {
         return MathLib.cmp(a, b);
+    }
+
+    /**
+     * @notice Evaluates the shifted linear function f(x) = x - 2.
+     * @param x Input value.
+     * @return Function value at x.
+     */
+    function f_shift_small(bytes16 x) external pure returns (bytes16) {
+        return MathLib.sub(x, MathLib.fromUInt(2));
+    }
+
+    /**
+     * @notice Evaluates the derivative of the shifted linear function f'(x) = 1.
+     * @param x Input value.
+     * @return Derivative value at x.
+     */
+    function df_shift_small(bytes16 x) external pure returns (bytes16) {
+        x; // silence unused parameter warning
+        return MathLib.fromUInt(1);
+    }
+
+    /**
+     * @notice Evaluates the shifted linear function f(x) = x - 200.
+     * @param x Input value.
+     * @return Function value at x.
+     */
+    function f_shift_medium(bytes16 x) external pure returns (bytes16) {
+        return MathLib.sub(x, MathLib.fromUInt(200));
+    }
+
+    /**
+     * @notice Evaluates the derivative of the shifted linear function f'(x) = 1.
+     * @param x Input value.
+     * @return Derivative value at x.
+     */
+    function df_shift_medium(bytes16 x) external pure returns (bytes16) {
+        x; // silence unused parameter warning
+        return MathLib.fromUInt(1);
+    }
+
+    /**
+     * @notice Evaluates the shifted linear function f(x) = x - 20000.
+     * @param x Input value.
+     * @return Function value at x.
+     */
+    function f_shift_large(bytes16 x) external pure returns (bytes16) {
+        return MathLib.sub(x, MathLib.fromUInt(20000));
+    }
+
+    /**
+     * @notice Evaluates the derivative of the shifted linear function f'(x) = 1.
+     * @param x Input value.
+     * @return Derivative value at x.
+     */
+    function df_shift_large(bytes16 x) external pure returns (bytes16) {
+        x; // silence unused parameter warning
+        return MathLib.fromUInt(1);
     }
 }
