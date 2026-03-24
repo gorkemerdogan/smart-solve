@@ -12,7 +12,7 @@ type RootFindingHarness = Contract & {
   qFromInt(n: bigint): Promise<string>;
   qFromFrac(num: bigint, den: bigint): Promise<string>;
   toFloat(x: string): Promise<bigint>;
-  
+
   f_x2_minus_4(x: string): Promise<string>;
   df_2x(x: string): Promise<string>;
   f_cubic(x: string): Promise<string>;
@@ -587,6 +587,191 @@ describe("RootFinding — Report (values + gas)", function () {
         method: "secant",
         explanation: "Stress case with very wide initial guesses [-10,10]. Examines max-iteration behavior and convergence flag.",
         inHex: "f=x^3-x-2, x0=-10, x1=10",
+        expectedHex: "~",
+        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
+        gas,
+      });
+    });
+  });
+
+  // ------------------------------------------------------------
+  //  Comparison
+  // ------------------------------------------------------------
+
+  describe("Section 4: Comparison", function () {
+
+    it("Test 16: Shared Normal Scenario (Bisection, x^2-4 on [1,3])", async function () {
+      t++;
+      const a = await qInt(1);
+      const b = await qInt(3);
+      const ref = bisectionRef(f_x2_minus_4, 1, 3);
+      const target = await harness.getAddress();
+
+      await touchGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
+      const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
+      const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fx2m4, a, b);
+
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
+      expect(ok).to.eq(true);
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
+      printBlockRegular({
+        t,
+        method: "bisection",
+        explanation: "Shared normal scenario: bisection on x^2-4 over [1,3], converging to the simple root near 2.",
+        inHex: "f=x^2-4, [1,3]",
+        expectedHex: "~",
+        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
+        gas,
+      });
+    });
+
+    it("Test 17: Shared Normal Scenario (Newton, x^2-4, x0=3)", async function () {
+      t++;
+      const x0 = await qInt(3);
+      const ref = newtonRef(f_x2_minus_4, df_2x, 3);
+      const target = await harness.getAddress();
+
+      await touchGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
+      const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
+      const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0);
+
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
+      expect(ok).to.eq(true);
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
+      printBlockRegular({
+        t,
+        method: "newton",
+        explanation: "Shared normal scenario: Newton-Raphson on x^2-4 from x0=3, showing fast convergence to the root near 2.",
+        inHex: "f=x^2-4, df=2x, x0=3",
+        expectedHex: "~",
+        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
+        gas,
+      });
+    });
+
+    it("Test 18: Shared Normal Scenario (Secant, x^2-4, x0=1, x1=3)", async function () {
+      t++;
+      const x0 = await qInt(1);
+      const x1 = await qInt(3);
+      const ref = secantRef(f_x2_minus_4, 1, 3);
+      const target = await harness.getAddress();
+
+      await touchGas(root, "rootFindingSecant", [target, sel_fx2m4, x0, x1]);
+      const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fx2m4, x0, x1]);
+      const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fx2m4, x0, x1);
+
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
+      expect(ok).to.eq(true);
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
+      printBlockRegular({
+        t,
+        method: "secant",
+        explanation: "Shared normal scenario: secant method on x^2-4 with seeds 1 and 3, converging without derivative information.",
+        inHex: "f=x^2-4, x0=1, x1=3",
+        expectedHex: "~",
+        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
+        gas,
+      });
+    });
+
+    it("Test 19: Shared Stress Scenario (Bisection, x^3-x-2 on [1,2])", async function () {
+      t++;
+      const a = await qInt(1);
+      const b = await qInt(2);
+      const ref = bisectionRef(f_cubic, 1, 2);
+      const target = await harness.getAddress();
+
+      await touchGas(root, "rootFindingBisection", [target, sel_fcubic, a, b]);
+      const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fcubic, a, b]);
+      const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fcubic, a, b);
+
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
+      expect(ok).to.eq(true);
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
+      printBlockRegular({
+        t,
+        method: "bisection",
+        explanation: "Shared stress scenario: bisection on cubic x^3-x-2 over [1,2], requiring more subdivisions for the nonlinear root.",
+        inHex: "f=x^3-x-2, [1,2]",
+        expectedHex: "~",
+        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
+        gas,
+      });
+    });
+
+    it("Test 20: Shared Stress Scenario (Newton, x^3-x-2, x0=1)", async function () {
+      t++;
+      const x0 = await qInt(1);
+      const ref = newtonRef(f_cubic, df_cubic, 1);
+      const target = await harness.getAddress();
+
+      await touchGas(root, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0]);
+      const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0]);
+      const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fcubic, target, sel_dfcubic, x0);
+
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
+      expect(ok).to.eq(true);
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
+      printBlockRegular({
+        t,
+        method: "newton",
+        explanation: "Shared stress scenario: Newton-Raphson on cubic x^3-x-2 from x0=1, testing nonlinear convergence behavior.",
+        inHex: "f=x^3-x-2, df=3x^2-1, x0=1",
+        expectedHex: "~",
+        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+        expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
+        outDec: `root: ${trim(actualRoot)}, f: ${trim(actualFAtRoot)}, iter: ${iters}`,
+        gas,
+      });
+    });
+
+    it("Test 21: Shared Stress Scenario (Secant, x^3-x-2, x0=1, x1=2)", async function () {
+      t++;
+      const x0 = await qInt(1);
+      const x1 = await qInt(2);
+      const ref = secantRef(f_cubic, 1, 2);
+      const target = await harness.getAddress();
+
+      await touchGas(root, "rootFindingSecant", [target, sel_fcubic, x0, x1]);
+      const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fcubic, x0, x1]);
+      const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fcubic, x0, x1);
+
+      const actualRoot = await fromQuad(harness, rHex);
+      const actualFAtRoot = await fromQuad(harness, fHex);
+
+      expect(ok).to.eq(true);
+      expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
+
+      printBlockRegular({
+        t,
+        method: "secant",
+        explanation: "Shared stress scenario: secant method on cubic x^3-x-2 with seeds 1 and 2, probing superlinear convergence on a nonlinear root.",
+        inHex: "f=x^3-x-2, x0=1, x1=2",
         expectedHex: "~",
         outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
         expectedDec: `root: ${trim(ref.root)}, f: ${trim(ref.fAtRoot)}, iter: ${ref.iterations}`,
