@@ -740,10 +740,10 @@ describe("MatrixMasterHarness - Gas Growth Tests (Part 2)", function () {
     });
 
     // ------------------------------------------------------------
-    // Section 4: Matrix size vs average gas (transpose, determinant, inversion)
+    // Section 4: Matrix size vs gas (transpose / determinant / inversion)
     // ------------------------------------------------------------
 
-    describe("Section 4: Matrix size vs average gas (transpose, determinant, inversion)", function () {
+    describe("Section 4: Matrix size vs gas", function () {
         const SIZE_CASES = [
             { sub: "4.1", n: 2 },
             { sub: "4.2", n: 4 },
@@ -752,46 +752,95 @@ describe("MatrixMasterHarness - Gas Growth Tests (Part 2)", function () {
             { sub: "4.5", n: 10 },
         ];
 
-        for (const c of SIZE_CASES) {
-            it(`${c.sub} Matrix size vs average gas for n=${c.n}`, async function () {
-                t++;
-                const A = makeDiagonallyDominant(c.n);
-                const Aq = await qArrayFromNumbers(harness, flatten(A));
+        describe("Section 4.1: Transpose", function () {
+            for (const c of SIZE_CASES) {
+                it(`${c.sub} Transpose gas growth for n=${c.n}`, async function () {
+                    t++;
+                    const A = makeDiagonallyDominant(c.n);
+                    const Aq = await qArrayFromNumbers(harness, flatten(A));
 
-                await touchGas(harness, "transposeHarness", [BigInt(c.n), BigInt(c.n), Aq]);
-                const gasTranspose = toGasBigInt(
-                    await estimateGas(harness, "transposeHarness", [BigInt(c.n), BigInt(c.n), Aq])
-                );
+                    await touchGas(harness, "transposeHarness", [BigInt(c.n), BigInt(c.n), Aq]);
+                    const gas = await estimateGas(harness, "transposeHarness", [BigInt(c.n), BigInt(c.n), Aq]);
 
-                await touchGas(harness, "detHarness", [BigInt(c.n), BigInt(c.n), Aq]);
-                const gasDet = toGasBigInt(
-                    await estimateGas(harness, "detHarness", [BigInt(c.n), BigInt(c.n), Aq])
-                );
+                    const [, , out] = await harness.transposeHarness(BigInt(c.n), BigInt(c.n), Aq);
+                    const outDec = await fromQuadArray(harness, out);
 
-                await touchGas(harness, "inverseHarness", [BigInt(c.n), BigInt(c.n), Aq]);
-                const gasInv = toGasBigInt(
-                    await estimateGas(harness, "inverseHarness", [BigInt(c.n), BigInt(c.n), Aq])
-                );
+                    printBlockRegular({
+                        t,
+                        method: "transpose",
+                        explanation: `Gas growth of transpose operation for square matrix size n=${c.n}.`,
+                        gas,
+                        inHex: `shape=${c.n}x${c.n}`,
+                        expectedHex: "N/A",
+                        outHex: headTail(out),
+                        expectedDec: "N/A",
+                        outDec: headTail(outDec.map(formatScaledInt)),
+                    });
 
-                const avgGas = (gasTranspose + gasDet + gasInv) / 3n;
-                const detOut = await harness.detHarness(BigInt(c.n), BigInt(c.n), Aq);
-                const detDec = await fromQuad(harness, detOut);
-
-                printBlockRegular({
-                    t,
-                    method: "average gas (transpose + determinant + inversion)",
-                    explanation: `Average gas across transpose, determinant, and inversion for square well-conditioned matrix of size n=${c.n}.`,
-                    gas: avgGas.toString(),
-                    inHex: `shape=${c.n}x${c.n}`,
-                    expectedHex: "N/A",
-                    outHex: `transposeGas=${gasTranspose}, detGas=${gasDet}, inverseGas=${gasInv}, det=${detOut}`,
-                    expectedDec: "N/A",
-                    outDec: `avgGas=${avgGas}, det=${formatScaledInt(detDec)}`,
+                    expect(toGasBigInt(gas) > 0n).to.equal(true);
                 });
+            }
+        });
 
-                expect(avgGas > 0n).to.equal(true);
-            });
-        }
+        describe("Section 4.2: Determinant", function () {
+            for (const c of SIZE_CASES) {
+                it(`${c.sub} Determinant gas growth for n=${c.n}`, async function () {
+                    t++;
+                    const A = makeDiagonallyDominant(c.n);
+                    const Aq = await qArrayFromNumbers(harness, flatten(A));
+
+                    await touchGas(harness, "detHarness", [BigInt(c.n), BigInt(c.n), Aq]);
+                    const gas = await estimateGas(harness, "detHarness", [BigInt(c.n), BigInt(c.n), Aq]);
+
+                    const detHex = await harness.detHarness(BigInt(c.n), BigInt(c.n), Aq);
+                    const detDec = await fromQuad(harness, detHex);
+
+                    printBlockRegular({
+                        t,
+                        method: "determinant",
+                        explanation: `Gas growth of determinant computation for square matrix size n=${c.n}.`,
+                        gas,
+                        inHex: `shape=${c.n}x${c.n}`,
+                        expectedHex: "N/A",
+                        outHex: detHex,
+                        expectedDec: "N/A",
+                        outDec: formatScaledInt(detDec),
+                    });
+
+                    expect(toGasBigInt(gas) > 0n).to.equal(true);
+                });
+            }
+        });
+
+        describe("Section 4.3: Inversion", function () {
+            for (const c of SIZE_CASES) {
+                it(`${c.sub} Inversion gas growth for n=${c.n}`, async function () {
+                    t++;
+                    const A = makeDiagonallyDominant(c.n);
+                    const Aq = await qArrayFromNumbers(harness, flatten(A));
+
+                    await touchGas(harness, "inverseHarness", [BigInt(c.n), BigInt(c.n), Aq]);
+                    const gas = await estimateGas(harness, "inverseHarness", [BigInt(c.n), BigInt(c.n), Aq]);
+
+                    const [, , invHex] = await harness.inverseHarness(BigInt(c.n), BigInt(c.n), Aq);
+                    const invDec = await fromQuadArray(harness, invHex);
+
+                    printBlockRegular({
+                        t,
+                        method: "inverse",
+                        explanation: `Gas growth of matrix inversion for square matrix size n=${c.n}.`,
+                        gas,
+                        inHex: `shape=${c.n}x${c.n}`,
+                        expectedHex: "N/A",
+                        outHex: headTail(invHex),
+                        expectedDec: "N/A",
+                        outDec: headTail(invDec.map(formatScaledInt)),
+                    });
+
+                    expect(toGasBigInt(gas) > 0n).to.equal(true);
+                });
+            }
+        });
     });
 
     // ------------------------------------------------------------
