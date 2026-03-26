@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { MathLib } from "../libraries/MathLib.sol";
-import { MatrixMaster } from "../libraries/numeric/MatrixMaster.sol";
+import {MathLib} from "../libraries/MathLib.sol";
+import {MatrixMaster} from "../libraries/numeric/MatrixMaster.sol";
 
 /**
  * @title MatrixMasterHarness
@@ -15,6 +15,7 @@ contract MatrixMasterHarness {
 
     // Short alias for library struct
     using MatrixMaster for MatrixMaster.Matrix;
+    using MatrixMaster for MatrixMaster.SparseMatrix;
 
     // ---------------------------------------------------------
     // Helpers (Matrix)
@@ -26,7 +27,11 @@ contract MatrixMasterHarness {
      * @param cols Number of columns
      * @param dataFlat Flattened matrix data, length must be rows * cols
      */
-    function _toMatrix(uint256 rows, uint256 cols, bytes16[] calldata dataFlat) private pure returns (MatrixMaster.Matrix memory m) {
+    function _toMatrix(
+        uint256 rows,
+        uint256 cols,
+        bytes16[] calldata dataFlat
+    ) private pure returns (MatrixMaster.Matrix memory m) {
         require(rows > 0 && cols > 0, "MatrixMasterHarness: dims must be > 0");
         require(
             rows * cols == dataFlat.length,
@@ -38,13 +43,15 @@ contract MatrixMasterHarness {
             data[i] = dataFlat[i];
         }
 
-        m = MatrixMaster.Matrix({ rows: rows, cols: cols, data: data });
+        m = MatrixMaster.Matrix({rows: rows, cols: cols, data: data});
     }
 
     /**
      * @notice Return matrix components as tuple.
      */
-    function _fromMatrix(MatrixMaster.Matrix memory m) private pure returns (uint256 rows, uint256 cols, bytes16[] memory data) {
+    function _fromMatrix(
+        MatrixMaster.Matrix memory m
+    ) private pure returns (uint256 rows, uint256 cols, bytes16[] memory data) {
         return (m.rows, m.cols, m.data);
     }
 
@@ -111,9 +118,11 @@ contract MatrixMasterHarness {
     }
 
     /**
-    * @notice Copy calldata bytes16[] to a new memory array.
-    */ 
-    function _toMemory(bytes16[] calldata a) internal pure returns (bytes16[] memory m) {
+     * @notice Copy calldata bytes16[] to a new memory array.
+     */
+    function _toMemory(
+        bytes16[] calldata a
+    ) internal pure returns (bytes16[] memory m) {
         m = new bytes16[](a.length);
         for (uint256 i = 0; i < a.length; ++i) {
             m[i] = a[i];
@@ -121,9 +130,11 @@ contract MatrixMasterHarness {
     }
 
     /**
-    * @notice Copy calldata uint256[] to a new memory array.
-    */ 
-    function _toMemory(uint256[] calldata a) internal pure returns (uint256[] memory m) {
+     * @notice Copy calldata uint256[] to a new memory array.
+     */
+    function _toMemory(
+        uint256[] calldata a
+    ) internal pure returns (uint256[] memory m) {
         m = new uint256[](a.length);
         for (uint256 i = 0; i < a.length; ++i) {
             m[i] = a[i];
@@ -137,23 +148,37 @@ contract MatrixMasterHarness {
     /**
      * @notice Wrapper for zeros.
      */
-    function zerosHarness(uint256 rows, uint256 cols) external pure returns (uint256, uint256, bytes16[] memory) {
-        MatrixMaster.Matrix memory m = MatrixMaster.createZerosMatrix(rows, cols);
+    function zerosHarness(
+        uint256 rows,
+        uint256 cols
+    ) external pure returns (uint256, uint256, bytes16[] memory) {
+        MatrixMaster.Matrix memory m = MatrixMaster.createZerosMatrix(
+            rows,
+            cols
+        );
         return _fromMatrix(m);
     }
 
     /**
      * @notice Wrapper for ones.
      */
-    function onesHarness(uint256 rows, uint256 cols) external pure returns (uint256, uint256, bytes16[] memory) {
-        MatrixMaster.Matrix memory m = MatrixMaster.createOnesMatrix(rows, cols);
+    function onesHarness(
+        uint256 rows,
+        uint256 cols
+    ) external pure returns (uint256, uint256, bytes16[] memory) {
+        MatrixMaster.Matrix memory m = MatrixMaster.createOnesMatrix(
+            rows,
+            cols
+        );
         return _fromMatrix(m);
     }
 
     /**
      * @notice Wrapper for createIdentityMatrix.
      */
-    function createIdentityMatrixHarness(uint256 n) external pure returns (uint256, uint256, bytes16[] memory) {
+    function createIdentityMatrixHarness(
+        uint256 n
+    ) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory m = MatrixMaster.createIdentityMatrix(n);
         return _fromMatrix(m);
     }
@@ -161,7 +186,9 @@ contract MatrixMasterHarness {
     /**
      * @notice Wrapper for fromDiagonal.
      */
-    function fromDiagonalHarness(bytes16[] calldata diag) external pure returns (uint256, uint256, bytes16[] memory) {
+    function fromDiagonalHarness(
+        bytes16[] calldata diag
+    ) external pure returns (uint256, uint256, bytes16[] memory) {
         // Copy diag into memory for the library
         bytes16[] memory d = new bytes16[](diag.length);
         for (uint256 i = 0; i < diag.length; ++i) {
@@ -175,8 +202,16 @@ contract MatrixMasterHarness {
     /**
      * @notice Wrapper for randomMatrix.
      */
-    function randomMatrixHarness(uint256 rows, uint256 cols, bytes32 seed) external pure returns (uint256, uint256, bytes16[] memory) {
-        MatrixMaster.Matrix memory m = MatrixMaster.createRandomMatrix(rows, cols, seed);
+    function randomMatrixHarness(
+        uint256 rows,
+        uint256 cols,
+        bytes32 seed
+    ) external pure returns (uint256, uint256, bytes16[] memory) {
+        MatrixMaster.Matrix memory m = MatrixMaster.createRandomMatrix(
+            rows,
+            cols,
+            seed
+        );
         return _fromMatrix(m);
     }
 
@@ -185,66 +220,100 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-    * @notice Wrapper for createZeroSparse.
-    */
-    function createZeroSparseHarness(uint256 rows, uint256 cols) external pure returns (
+     * @notice Wrapper for createZeroSparse.
+     */
+    function createZeroSparseHarness(
+        uint256 rows,
+        uint256 cols
+    )
+        external
+        pure
+        returns (
             uint256,
             uint256,
             uint256[] memory,
             uint256[] memory,
-            bytes16[] memory) {
-        MatrixMaster.SparseMatrix memory A = MatrixMaster.createZeroSparse(rows, cols);
+            bytes16[] memory
+        )
+    {
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createZeroSparse(
+            rows,
+            cols
+        );
         return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
     }
 
     /**
-    * @notice Wrapper for createIdentitySparse.
-    */
-    function createIdentitySparseHarness(uint256 n) external pure returns (
+     * @notice Wrapper for createIdentitySparse.
+     */
+    function createIdentitySparseHarness(
+        uint256 n
+    )
+        external
+        pure
+        returns (
             uint256,
             uint256,
             uint256[] memory,
             uint256[] memory,
-            bytes16[] memory) {
-        MatrixMaster.SparseMatrix memory A = MatrixMaster.createIdentitySparse(n);
+            bytes16[] memory
+        )
+    {
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createIdentitySparse(
+            n
+        );
         return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
     }
 
     /**
-    * @notice Wrapper for createDiagonalSparse.
-    */
-    function createDiagonalSparseHarness(bytes16[] calldata diag) external pure returns (
+     * @notice Wrapper for createDiagonalSparse.
+     */
+    function createDiagonalSparseHarness(
+        bytes16[] calldata diag
+    )
+        external
+        pure
+        returns (
             uint256,
             uint256,
             uint256[] memory,
             uint256[] memory,
-            bytes16[] memory) {
-        
+            bytes16[] memory
+        )
+    {
         bytes16[] memory d = _toMemory(diag);
-        MatrixMaster.SparseMatrix memory A = MatrixMaster.createDiagonalSparse(d);
+        MatrixMaster.SparseMatrix memory A = MatrixMaster.createDiagonalSparse(
+            d
+        );
         return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
     }
 
     /**
-    * @notice Wrapper for createSparseFromTriplets.
-    */
+     * @notice Wrapper for createSparseFromTriplets.
+     */
     function createSparseFromTripletsHarness(
         uint256 rows,
         uint256 cols,
         uint256[] calldata rowInd,
         uint256[] calldata colInd,
-        bytes16[] calldata values) external pure returns (
+        bytes16[] calldata values
+    )
+        external
+        pure
+        returns (
             uint256,
             uint256,
             uint256[] memory,
             uint256[] memory,
-            bytes16[] memory) {
-
+            bytes16[] memory
+        )
+    {
         uint256[] memory r = _toMemory(rowInd);
         uint256[] memory c = _toMemory(colInd);
         bytes16[] memory v = _toMemory(values);
 
-        MatrixMaster.SparseMatrix memory A = MatrixMaster.createSparseFromTriplets(rows, cols, r, c, v);
+        MatrixMaster.SparseMatrix memory A = MatrixMaster
+            .createSparseFromTriplets(rows, cols, r, c, v);
         return (A.rows, A.cols, A.rowPtr, A.colInd, A.values);
     }
 
@@ -459,8 +528,8 @@ contract MatrixMasterHarness {
     // ------------------------------------------------------------
 
     /**
-    * @notice Harness wrapper for sparse matrix × dense vector multiplication.
-    */
+     * @notice Harness wrapper for sparse matrix × dense vector multiplication.
+     */
     function mulSparseMatrixVectorHarness(
         uint256 aRows,
         uint256 aCols,
@@ -469,10 +538,7 @@ contract MatrixMasterHarness {
         bytes16[] calldata values,
         uint256 xRows,
         bytes16[] calldata xData
-    )
-        external pure
-        returns (uint256, uint256, bytes16[] memory)
-    {
+    ) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.SparseMatrix memory A = MatrixMaster.SparseMatrix({
             rows: aRows,
             cols: aCols,
@@ -487,8 +553,7 @@ contract MatrixMasterHarness {
             data: _toMemory(xData)
         });
 
-        MatrixMaster.Matrix memory y =
-            MatrixMaster.mulSparseMatrixVector(A, x);
+        MatrixMaster.Matrix memory y = MatrixMaster.mulSparseMatrixVector(A, x);
 
         return (y.rows, y.cols, y.data);
     }
@@ -566,7 +631,7 @@ contract MatrixMasterHarness {
 
     /**
      * @notice Wrapper for normalize, computing v / ||v||_2.
-     *         Reverts on zero vector.  
+     *         Reverts on zero vector.
      * @return (rows, cols, data)  normalized vector with unit l_2 norm
      */
     function normalizeHarness(
@@ -584,10 +649,11 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-    * @notice Wrapper for createVector (n × 1).
-    */
-    function createVectorHarness(bytes16[] calldata data)
-        external pure returns (uint256, uint256, bytes16[] memory) {
+     * @notice Wrapper for createVector (n × 1).
+     */
+    function createVectorHarness(
+        bytes16[] calldata data
+    ) external pure returns (uint256, uint256, bytes16[] memory) {
         MatrixMaster.Matrix memory v = MatrixMaster.createVector(data);
         return (v.rows, v.cols, v.data);
     }
@@ -597,8 +663,8 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-    * @notice Wrapper for randomVector (n × 1).
-    */
+     * @notice Wrapper for randomVector (n × 1).
+     */
     function randomVectorHarness(
         uint256 n,
         bytes32 seed
@@ -633,8 +699,8 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
 
     /**
-    * @notice Wrapper for powerIteration.
-    */
+     * @notice Wrapper for powerIteration.
+     */
     function powerIterationHarness(
         uint256 rows,
         uint256 cols,
@@ -655,10 +721,80 @@ contract MatrixMasterHarness {
         MatrixMaster.Matrix memory A = _toMatrix(rows, cols, dataFlat);
 
         // Compute dominant eigenpair
-        (bytes16 lam, MatrixMaster.Matrix memory x) =
-            MatrixMaster.powerIteration(A, seed, tol);
+        (bytes16 lam, MatrixMaster.Matrix memory x) = MatrixMaster
+            .powerIteration(A, seed, tol);
 
         return (lam, x.rows, x.cols, x.data);
+    }
+
+    /**
+     * @notice Wrapper for power iteration that also returns iteration count.
+     *         Re-implements the iteration loop in the harness
+     * @param rows       Number of rows of A
+     * @param cols       Number of cols of A
+     * @param dataFlat   Flattened dense matrix data
+     * @param seed       Seed used for initial random vector
+     * @param tol        Convergence tolerance
+     * @param maxIter    Maximum number of iterations allowed
+     * @return lambda    Dominant eigenvalue approximation
+     * @return xRows     Eigenvector row count
+     * @return xCols     Eigenvector col count
+     * @return xData     Dominant eigenvector data
+     * @return iterCount Number of iterations actually performed
+     */
+    function powerIterationWithIterHarness(
+        uint256 rows,
+        uint256 cols,
+        bytes16[] calldata dataFlat,
+        bytes32 seed,
+        bytes16 tol,
+        uint256 maxIter
+    )
+        external
+        pure
+        returns (
+            bytes16 lambda,
+            uint256 xRows,
+            uint256 xCols,
+            bytes16[] memory xData,
+            uint256 iterCount
+        )
+    {
+        require(rows == cols, "MatrixMasterHarness: matrix must be square");
+        require(maxIter > 0, "MatrixMasterHarness: maxIter must be > 0");
+
+        MatrixMaster.Matrix memory A = _toMatrix(rows, cols, dataFlat);
+
+        MatrixMaster.Matrix memory x = MatrixMaster.randomVector(rows, seed);
+        x = MatrixMaster.normalize(x);
+
+        bytes16 lam = MathLib.fromInt(0);
+        uint256 k = 0;
+
+        for (k = 0; k < maxIter; ++k) {
+            MatrixMaster.Matrix memory y = MatrixMaster.multiplyMatrixVector(
+                A,
+                x
+            );
+            MatrixMaster.Matrix memory xNext = MatrixMaster.normalize(y);
+
+            // Rayleigh quotient: lambda = xNext^T A xNext
+            MatrixMaster.Matrix memory Ax = MatrixMaster.multiplyMatrixVector(
+                A,
+                xNext
+            );
+            lam = MatrixMaster.dot(xNext, Ax);
+
+            if (MatrixMaster.hasConverged(x, xNext, tol)) {
+                x = xNext;
+                k = k + 1;
+                break;
+            }
+
+            x = xNext;
+        }
+
+        return (lam, x.rows, x.cols, x.data, k);
     }
 
     // ---------------------------------------------------------
@@ -712,7 +848,10 @@ contract MatrixMasterHarness {
      * @param den Signed denominator (must be non-zero).
      * @return q  Quadruple-precision value representing num/den.
      */
-    function qFromFrac(int256 num, int256 den) external pure returns (bytes16 q) {
+    function qFromFrac(
+        int256 num,
+        int256 den
+    ) external pure returns (bytes16 q) {
         require(den != 0, "den=0");
         bytes16 qNum = MathLib.fromInt(num);
         bytes16 qDen = MathLib.fromInt(den);
