@@ -909,7 +909,8 @@ library MatrixMaster {
             }
 
             // Check singularity
-            require(MathLib.cmp(maxAbs, QC.EPS_1e30()) > 0, "MatrixMaster: singular matrix");
+            bytes16 pivotTol = QC.EPS_1e18();
+            require(MathLib.cmp(maxAbs, pivotTol) > 0, "MatrixMaster: singular matrix");
 
             // Swap rows if pivot != k
             if (pivot != k) {
