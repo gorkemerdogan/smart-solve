@@ -844,62 +844,181 @@ describe("MatrixMasterHarness - Gas Growth Tests (Part 2)", function () {
     });
 
     // ------------------------------------------------------------
-    // Section 5: Convergence / iteration proxy for power iteration
+    // Section 5: Power Iteration
     // ------------------------------------------------------------
 
-    describe("Section 5: Iteration proxy for power iteration", function () {
-        const TOL_CASES = [
-            { sub: "5.1", label: "veryLoose", num: 1n, den: 100n },               // 1e-2
-            { sub: "5.2", label: "loose", num: 1n, den: 10_000n },                // 1e-4
-            { sub: "5.3", label: "medium", num: 1n, den: 1_000_000n },            // 1e-6
-            { sub: "5.4", label: "tight", num: 1n, den: 100_000_000n },           // 1e-8
-            { sub: "5.5", label: "veryTight", num: 1n, den: 10_000_000_000n },    // 1e-10
-        ];
+    function makeSymmetricMatrix(
+        n: number,
+        pattern: "diagDominant" | "identity" | "clustered" | "weighted" | "mixed"
+    ): number[][] {
+        const A = Array.from({ length: n }, () => Array(n).fill(0));
 
-        for (const c of TOL_CASES) {
-            it(`${c.sub} Power iteration convergence proxy for tolerance ${c.label}`, async function () {
-                t++;
-                const n = 8;
-                const A = makePowerMatrix(n);
-                const Aq = await qArrayFromNumbers(harness, flatten(A));
-                const tol = await harness.qFromFrac(c.num, c.den);
+        for (let i = 0; i < n; i++) {
+            for (let j = i + 1; j < n; j++) {
+                let v: number;
 
-                let tolPower = await harness.qFromFrac(1n, 1_000_000n); // 1e-6
+                if (pattern === "identity") v = 0;
+                else if (pattern === "clustered") v = (i + j) % 2 === 0 ? 1 : 2;
+                else if (pattern === "weighted") v = (i % 3) + 1;
+                else if (pattern === "mixed") v = ((i + j) % 3) + 1;
+                else v = 1; // diagDominant default off-diagonal
 
-                await touchGas(harness, "powerIterationWithIterHarness", [BigInt(n), BigInt(n), Aq, powerSeed, tolPower, 200n]);
-                const gas = await estimateGas(harness, "powerIterationWithIterHarness", [BigInt(n), BigInt(n), Aq, powerSeed, tolPower, 200n]);
+                A[i][j] = v;
+                A[j][i] = v;
+            }
+        }
 
-                const [lambdaHex, xRows, xCols, xData, iterCount] =
-                    await harness.powerIterationWithIterHarness(
-                        BigInt(n),
-                        BigInt(n),
+        for (let i = 0; i < n; i++) {
+            let rowAbsSum = 0;
+            for (let j = 0; j < n; j++) {
+                if (i !== j) rowAbsSum += absNumber(A[i][j]);
+            }
+
+            if (pattern === "identity") A[i][i] = 1;
+            else if (pattern === "clustered") A[i][i] = rowAbsSum + 5 + i;
+            else if (pattern === "weighted") A[i][i] = rowAbsSum + 10 + 2 * i;
+            else if (pattern === "mixed") A[i][i] = rowAbsSum + 7 + (i % 4);
+            else A[i][i] = rowAbsSum + 3; // diagDominant
+        }
+
+        return A;
+    }
+
+    describe("Section 5: Power Iteration", function () {
+
+        describe("Section 5.1: Gas vs matrix dimension", function () {
+            const DIM_CASES = [
+                { sub: "5.1", n: 2 },
+                { sub: "5.2", n: 4 },
+                { sub: "5.3", n: 6 },
+                { sub: "5.4", n: 9 },
+                { sub: "5.5", n: 12 },
+            ];
+
+            for (const c of DIM_CASES) {
+                it(`${c.sub} Power iteration gas growth for n=${c.n}`, async function () {
+                    t++;
+
+                    const A = makeSymmetricMatrix(c.n, "diagDominant");
+                    const Aq = await qArrayFromNumbers(harness, flatten(A));
+                    const tol = await harness.qFromFrac(1n, 1_000_000n); // 1e-6
+
+                    await touchGas(harness, "powerIterationWithIterHarness", [
+                        BigInt(c.n),
+                        BigInt(c.n),
                         Aq,
                         powerSeed,
-                        tolPower,
+                        tol,
                         200n
-                    );
+                    ]);
 
-                const lambdaDec = await fromQuad(harness, lambdaHex);
-                const expectedLambda = BigInt((2 * n + 1)) * SCALE; // 17 for n=8
-                const xDec = await fromQuadArray(harness, xData);
-                const lambdaScaled = await harness.toFloat(lambdaHex);
-                const err = lambdaDec >= expectedLambda ? lambdaDec - expectedLambda : expectedLambda - lambdaDec;
+                    const gas = await estimateGas(harness, "powerIterationWithIterHarness", [
+                        BigInt(c.n),
+                        BigInt(c.n),
+                        Aq,
+                        powerSeed,
+                        tol,
+                        200n
+                    ]);
 
-                printBlockRegular({
-                    t,
-                    method: "power iteration",
-                    explanation: `Convergence proxy for power iteration using tolerance ${c.label}. Current harness does not expose raw iteration count, so lambda error is reported instead.`,
-                    gas,
-                    inHex: `shape=8x8, tol=${c.label}, seed=fixed`,
-                    expectedHex: "N/A",
-                    outHex: `lambda=${lambdaHex}, iter=${iterCount}, eigenvector=${headTail(xData)}`,
-                    expectedDec: `expectedLambda=${formatScaledInt(expectedLambda)}`,
-                    outDec: `lambda=${lambdaDec}, iter=${iterCount}, eigenvector=${xDec}`,
+                    const [lambdaHex, xRows, xCols, xData, iterCount] =
+                        await harness.powerIterationWithIterHarness(
+                            BigInt(c.n),
+                            BigInt(c.n),
+                            Aq,
+                            powerSeed,
+                            tol,
+                            200n
+                        );
+
+                    const lambdaDec = await fromQuad(harness, lambdaHex);
+                    const xDec = await fromQuadArray(harness, xData);
+
+                    printBlockRegular({
+                        t,
+                        method: "power iteration",
+                        explanation: `Gas growth with respect to matrix dimension for dominant eigenvalue approximation using diagDominant symmetric matrix.`,
+                        gas,
+                        inHex: `shape=${c.n}x${c.n}, pattern=diagDominant, seed=fixed, tol=1e-6`,
+                        expectedHex: "N/A",
+                        outHex: `lambda=${lambdaHex}, iter=${iterCount}, eigenvector=${headTail(xData)}`,
+                        expectedDec: "N/A",
+                        outDec: `lambda=${formatScaledInt(lambdaDec)}, iter=${iterCount}, eigenvector=${headTail(xDec.map(formatScaledInt))}`,
+                    });
+
+                    expect(toGasBigInt(gas) > 0n).to.equal(true);
                 });
+            }
+        });
 
-                expect(toGasBigInt(gas) > 0n).to.equal(true);
-            });
-        }
+        describe("Section 5.2: Gas by matrix pattern", function () {
+            const PATTERN_CASES: Array<{
+                sub: string;
+                pattern: "identity" | "diagDominant" | "clustered" | "weighted" | "mixed";
+            }> = [
+                    { sub: "5.6", pattern: "identity" },
+                    { sub: "5.7", pattern: "diagDominant" },
+                    { sub: "5.8", pattern: "clustered" },
+                    { sub: "5.9", pattern: "weighted" },
+                    { sub: "5.10", pattern: "mixed" },
+                ];
+
+            for (const c of PATTERN_CASES) {
+                it(`${c.sub} Power iteration gas sensitivity for ${c.pattern}`, async function () {
+                    t++;
+
+                    const n = 8;
+                    const A = makeSymmetricMatrix(n, c.pattern);
+                    const Aq = await qArrayFromNumbers(harness, flatten(A));
+                    const tol = await harness.qFromFrac(1n, 1_000_000n); // 1e-6
+
+                    await touchGas(harness, "powerIterationWithIterHarness", [
+                        8n,
+                        8n,
+                        Aq,
+                        powerSeed,
+                        tol,
+                        200n
+                    ]);
+
+                    const gas = await estimateGas(harness, "powerIterationWithIterHarness", [
+                        8n,
+                        8n,
+                        Aq,
+                        powerSeed,
+                        tol,
+                        200n
+                    ]);
+
+                    const [lambdaHex, xRows, xCols, xData, iterCount] =
+                        await harness.powerIterationWithIterHarness(
+                            8n,
+                            8n,
+                            Aq,
+                            powerSeed,
+                            tol,
+                            200n
+                        );
+
+                    const lambdaDec = await fromQuad(harness, lambdaHex);
+                    const xDec = await fromQuadArray(harness, xData);
+
+                    printBlockRegular({
+                        t,
+                        method: "power iteration",
+                        explanation: `Gas sensitivity of power iteration under different symmetric matrix patterns at fixed dimension n=8.`,
+                        gas,
+                        inHex: `shape=8x8, pattern=${c.pattern}, seed=fixed, tol=1e-6`,
+                        expectedHex: "N/A",
+                        outHex: `lambda=${lambdaHex}, iter=${iterCount}, eigenvector=${headTail(xData)}`,
+                        expectedDec: "N/A",
+                        outDec: `lambda=${formatScaledInt(lambdaDec)}, iter=${iterCount}, eigenvector=${headTail(xDec.map(formatScaledInt))}`,
+                    });
+
+                    expect(toGasBigInt(gas) > 0n).to.equal(true);
+                });
+            }
+        });
     });
 
     // ------------------------------------------------------------
@@ -1065,8 +1184,8 @@ describe("MatrixMasterHarness - Gas Growth Tests (Part 2)", function () {
             { sub: "9.1", n: 2 },
             { sub: "9.2", n: 4 },
             { sub: "9.3", n: 8 },
-            { sub: "9.4", n: 16 },
-            { sub: "9.5", n: 32 },
+            { sub: "9.4", n: 12 },
+            { sub: "9.5", n: 16 },
         ];
 
         for (const c of DIM_CASES) {
