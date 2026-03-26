@@ -690,52 +690,61 @@ describe("MatrixMasterHarness - Gas Growth Tests (Part 2)", function () {
     });
 
     // ------------------------------------------------------------
-    // Section 3: Gas vs number of nonzero entries (nnz)
+    // Section 3: Gas vs number of nonzero entries (nnz) for different matrix sizes
     // ------------------------------------------------------------
 
     describe("Section 3: Gas vs number of nonzero entries (nnz)", function () {
+        const SIZE_CASES = [2, 4, 8, 16, 32];
+
         const NNZ_CASES = [
-            { sub: "3.1", bandwidth: 0, label: "diagonal" },
-            { sub: "3.2", bandwidth: 1, label: "band-1" },
-            { sub: "3.3", bandwidth: 2, label: "band-2" },
-            { sub: "3.4", bandwidth: 3, label: "band-3" },
-            { sub: "3.5", bandwidth: 4, label: "band-4" },
+            { label: "diagonal", bandwidth: 0 },
+            { label: "band-1", bandwidth: 1 },
+            { label: "band-2", bandwidth: 2 },
+            { label: "band-3", bandwidth: 3 },
+            { label: "band-4", bandwidth: 4 },
         ];
 
-        for (const c of NNZ_CASES) {
-            it(`${c.sub} Gas vs nnz using ${c.label} sparse pattern`, async function () {
-                t++;
-                const n = 32;
-                const sparse = buildSparseBandCSR(n, c.bandwidth);
-                const valuesQ = await qArrayFromNumbers(harness, sparse.values);
-                const xQ = await qArrayFromNumbers(harness, sparse.vector);
+        let localIdx = 0;
 
-                await touchGas(harness, "mulSparseMatrixVectorHarness", [
-                    BigInt(n), BigInt(n), sparse.rowPtr, sparse.colInd, valuesQ, BigInt(n), xQ,
-                ]);
-                const gas = await estimateGas(harness, "mulSparseMatrixVectorHarness", [
-                    BigInt(n), BigInt(n), sparse.rowPtr, sparse.colInd, valuesQ, BigInt(n), xQ,
-                ]);
+        for (const n of SIZE_CASES) {
+            for (const c of NNZ_CASES) {
+                const sub = `3.${++localIdx}`;
 
-                const [, , out] = await harness.mulSparseMatrixVectorHarness(
-                    BigInt(n), BigInt(n), sparse.rowPtr, sparse.colInd, valuesQ, BigInt(n), xQ
-                );
-                const outDec = await fromQuadArray(harness, out);
+                it(`${sub} Gas vs nnz using ${c.label} sparse pattern at n=${n}`, async function () {
+                    t++;
 
-                printBlockRegular({
-                    t,
-                    method: "sparse matrix-vector multiplication",
-                    explanation: `Gas growth with respect to number of nonzero entries (nnz) using ${c.label} sparse structure at fixed dimension n=32.`,
-                    gas,
-                    inHex: `shape=32x32, pattern=${c.label}, nnz=${sparse.colInd.length}`,
-                    expectedHex: "N/A",
-                    outHex: headTail(out),
-                    expectedDec: "N/A",
-                    outDec: headTail(outDec.map(formatScaledInt)),
+                    const sparse = buildSparseBandCSR(n, c.bandwidth);
+                    const valuesQ = await qArrayFromNumbers(harness, sparse.values);
+                    const xQ = await qArrayFromNumbers(harness, sparse.vector);
+
+                    await touchGas(harness, "mulSparseMatrixVectorHarness", [
+                        BigInt(n), BigInt(n), sparse.rowPtr, sparse.colInd, valuesQ, BigInt(n), xQ,
+                    ]);
+
+                    const gas = await estimateGas(harness, "mulSparseMatrixVectorHarness", [
+                        BigInt(n), BigInt(n), sparse.rowPtr, sparse.colInd, valuesQ, BigInt(n), xQ,
+                    ]);
+
+                    const [, , out] = await harness.mulSparseMatrixVectorHarness(
+                        BigInt(n), BigInt(n), sparse.rowPtr, sparse.colInd, valuesQ, BigInt(n), xQ
+                    );
+                    const outDec = await fromQuadArray(harness, out);
+
+                    printBlockRegular({
+                        t,
+                        method: "sparse matrix-vector multiplication",
+                        explanation: `Gas growth with respect to number of nonzero entries (nnz) using ${c.label} sparse structure at matrix size ${n}x${n}.`,
+                        gas,
+                        inHex: `shape=${n}x${n}, pattern=${c.label}, nnz=${sparse.colInd.length}`,
+                        expectedHex: "N/A",
+                        outHex: headTail(out),
+                        expectedDec: "N/A",
+                        outDec: headTail(outDec.map(formatScaledInt)),
+                    });
+
+                    expect(toGasBigInt(gas) > 0n).to.equal(true);
                 });
-
-                expect(toGasBigInt(gas) > 0n).to.equal(true);
-            });
+            }
         }
     });
 
@@ -1240,55 +1249,6 @@ describe("MatrixMasterHarness - Gas Growth Tests (Part 2)", function () {
                     outHex: headTail(out),
                     expectedDec: "N/A",
                     outDec: headTail(outDec.map(formatScaledInt)),
-                });
-
-                expect(toGasBigInt(gas) > 0n).to.equal(true);
-            });
-        }
-    });
-
-    // ------------------------------------------------------------
-    // Section 10: Sparse Matrix-Vector Multiplication
-    // ------------------------------------------------------------
-
-    describe("Section 10: Sparse Matrix-Vector Multiplication", function () {
-
-        const CASES = [
-            { sub: "10.1", bw: 0 },
-            { sub: "10.2", bw: 1 },
-            { sub: "10.3", bw: 2 },
-            { sub: "10.4", bw: 3 },
-            { sub: "10.5", bw: 4 },
-        ];
-
-        for (const c of CASES) {
-            it(`${c.sub} Sparse matvec gas vs bandwidth=${c.bw}`, async function () {
-                t++;
-
-                const n = 32;
-                const s = buildSparseBandCSR(n, c.bw);
-
-                const valuesQ = await qArrayFromNumbers(harness, s.values);
-                const xQ = await qArrayFromNumbers(harness, s.vector);
-
-                await touchGas(harness, "mulSparseMatrixVectorHarness", [
-                    BigInt(n), BigInt(n), s.rowPtr, s.colInd, valuesQ, BigInt(n), xQ
-                ]);
-
-                const gas = await estimateGas(harness, "mulSparseMatrixVectorHarness", [
-                    BigInt(n), BigInt(n), s.rowPtr, s.colInd, valuesQ, BigInt(n), xQ
-                ]);
-
-                printBlockRegular({
-                    t,
-                    method: "sparse matrix-vector multiplication",
-                    explanation: `Gas vs sparsity (bandwidth=${c.bw}).`,
-                    gas,
-                    inHex: `nnz=${s.colInd.length}`,
-                    expectedHex: "N/A",
-                    outHex: "N/A",
-                    expectedDec: "N/A",
-                    outDec: "N/A",
                 });
 
                 expect(toGasBigInt(gas) > 0n).to.equal(true);
