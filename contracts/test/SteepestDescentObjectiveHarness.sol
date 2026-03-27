@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import {IObjectiveFunction} from "../interfaces/IObjectiveFunction.sol";
+import {MathLib} from "../libraries/MathLib.sol";
+
+/**
+ * @title  QuadraticObjectiveHarness
+ * @notice Simple convex quadratic objective for testing the Steepest Descent solver.
+ *
+ *         Objective: g(x) = sum_i x_i^2
+ *         Gradient: grad g(x)_i = 2 * x_i
+ *
+ *         The unique global minimizer is x = 0, where g(x) = 0.
+ */
+contract QuadraticObjectiveHarness is IObjectiveFunction {
+    /**
+     * @notice    Evaluate g(x) = sum_i x_i^2.
+     * @param  x  Current point vector
+     * @return gx Objective value
+     */
+    function g(bytes16[] memory x) external pure override returns (bytes16 gx) {
+        gx = MathLib.fromUInt(0);
+
+        for (uint256 i = 0; i < x.length; ++i) {
+            gx = MathLib.add(gx, MathLib.mul(x[i], x[i]));
+        }
+    }
+
+    /**
+     * @notice       Evaluate grad g(x) = 2x.
+     * @param  x     Current point vector
+     * @return gradx Gradient vector
+     */
+    function grad(
+        bytes16[] memory x
+    ) external pure override returns (bytes16[] memory gradx) {
+        gradx = new bytes16[](x.length);
+        bytes16 two = MathLib.fromUInt(2);
+
+        for (uint256 i = 0; i < x.length; ++i) {
+            gradx[i] = MathLib.mul(two, x[i]);
+        }
+    }
+}
+
+/**
+ * @title  WeightedQuadraticObjectiveHarness
+ * @notice Test objective for generic steepest descent experiments.
+ *         Implements the weighted quadratic function
+ *         g(x) = sum_i w_i * x_i^2
+ *         with gradient
+ *         grad g(x)_i = 2 * w_i * x_i
+ */
+contract WeightedQuadraticObjectiveHarness {
+    using MathLib for bytes16;
+
+    /**
+     * @notice Evaluates the weighted quadratic objective g(x) = sum_i (i+1) * x_i^2.
+     * @param  x Input vector in quad-precision.
+     * @return value Objective value g(x) in quad-precision.
+     */
+    function g(bytes16[] memory x) external pure returns (bytes16 value) {
+        value = MathLib.fromUInt(0);
+
+        for (uint256 i = 0; i < x.length; ++i) {
+            bytes16 weight = MathLib.fromUInt(i + 1);
+            bytes16 xi2 = x[i].mul(x[i]);
+            value = value.add(weight.mul(xi2));
+        }
+    }
+
+    /**
+     * @notice  Computes the gradient of the weighted quadratic objective.
+     * @dev     For g(x) = sum_i (i+1) * x_i^2,
+     *          grad g(x)_i = 2 * (i+1) * x_i.
+     * @param x Input vector in quad-precision.
+     * @return gradVec Gradient vector in quad-precision.
+     */
+    function grad(
+        bytes16[] memory x
+    ) external pure returns (bytes16[] memory gradVec) {
+        gradVec = new bytes16[](x.length);
+
+        bytes16 two = MathLib.fromUInt(2);
+
+        for (uint256 i = 0; i < x.length; ++i) {
+            bytes16 weight = MathLib.fromUInt(i + 1);
+            gradVec[i] = two.mul(weight).mul(x[i]);
+        }
+    }
+}
+
+/**
+ * @title SphericalObjectiveHarness
+ * @notice Test objective implementing the spherical quadratic function
+ *         g(x) = \sum_i x_i^2 and its gradient \nabla g(x) = 2x.
+ */
+contract SphericalObjectiveHarness is IObjectiveFunction {
+    /**
+     * @notice Evaluate the spherical quadratic objective at the given point.
+     * @param  x Input vector
+     * @return sum Objective value computed as \sum_i x_i^2
+     */
+    function g(bytes16[] memory x) external pure override returns (bytes16) {
+        bytes16 sum = MathLib.fromUInt(0);
+        for (uint256 i = 0; i < x.length; ++i) {
+            sum = MathLib.add(sum, MathLib.mul(x[i], x[i]));
+        }
+        return sum;
+    }
+
+    /**
+     * @notice Evaluate the gradient of the spherical quadratic objective.
+     * @param  x Input vector
+     * @return z Gradient vector computed as 2x
+     */
+    function grad(
+        bytes16[] memory x
+    ) external pure override returns (bytes16[] memory) {
+        bytes16[] memory z = new bytes16[](x.length);
+        bytes16 two = MathLib.fromUInt(2);
+
+        for (uint256 i = 0; i < x.length; ++i) {
+            z[i] = MathLib.mul(two, x[i]);
+        }
+        return z;
+    }
+}
+
+/**
+ * @title MildWeightedQuadraticObjectiveHarness
+ * @notice Test objective implementing a moderately weighted quadratic function
+ *         g(x) = \sum_i w_i x_i^2 with mild anisotropy.
+ */
+contract MildWeightedQuadraticObjectiveHarness is IObjectiveFunction {
+    /**
+     * @notice Evaluate the moderately weighted quadratic objective.
+     * @param x Input vector
+     * @return sum Objective value computed as
+     *         1*x1^2 + 2*x2^2 + ... + n*xn^2
+     */
+    function g(bytes16[] memory x) external pure override returns (bytes16) {
+        bytes16 sum = MathLib.fromUInt(0);
+
+        for (uint256 i = 0; i < x.length; ++i) {
+            bytes16 w = MathLib.fromUInt(i + 1);
+            bytes16 term = MathLib.mul(w, MathLib.mul(x[i], x[i]));
+            sum = MathLib.add(sum, term);
+        }
+
+        return sum;
+    }
+
+    /**
+     * @notice Evaluate the gradient of the moderately weighted quadratic objective.
+     * @param x Input vector
+     * @return z Gradient vector computed as 2*w_i*x_i
+     */
+    function grad(bytes16[] memory x) external pure override returns (bytes16[] memory z) {
+        z = new bytes16[](x.length);
+        bytes16 two = MathLib.fromUInt(2);
+
+        for (uint256 i = 0; i < x.length; ++i) {
+            bytes16 w = MathLib.fromUInt(i + 1);
+            z[i] = MathLib.mul(two, MathLib.mul(w, x[i]));
+        }
+    }
+}
