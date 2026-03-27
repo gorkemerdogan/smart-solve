@@ -372,16 +372,16 @@ describe("MatrixMasterHarness - Gas Growth Tests (Part 2)", function () {
     });
 
     // ------------------------------------------------------------
-    // Section 0: Matrix Creation
+    // Section 1: Matrix Creation
     // ------------------------------------------------------------
 
-    describe("Section 0: Matrix Creation", function () {
+    describe("Section 1: Matrix Creation", function () {
         const CREATION_CASES = [
-            { sub: "0.1", kind: "zeros", label: "zeros", n: 8 },
-            { sub: "0.2", kind: "ones", label: "ones", n: 8 },
-            { sub: "0.3", kind: "identity", label: "identity", n: 8 },
-            { sub: "0.4", kind: "diagonal", label: "diagonal", n: 8 },
-            { sub: "0.5", kind: "random", label: "random", n: 8 },
+            { sub: "1.1", kind: "zeros", label: "zeros", n: 8 },
+            { sub: "1.2", kind: "ones", label: "ones", n: 8 },
+            { sub: "1.3", kind: "identity", label: "identity", n: 8 },
+            { sub: "1.4", kind: "diagonal", label: "diagonal", n: 8 },
+            { sub: "1.5", kind: "random", label: "random", n: 8 },
         ] as const;
 
         for (const c of CREATION_CASES) {
@@ -502,191 +502,71 @@ describe("MatrixMasterHarness - Gas Growth Tests (Part 2)", function () {
     });
 
     // ------------------------------------------------------------
-    // Section 1: Basic Matrix Ops
+    // Section 2: Basic Matrix Ops
     // ------------------------------------------------------------
 
-    describe("Section 1: Basic Matrix Ops", function () {
-        describe("Section 0.1: Matrix Creation", function () {
-            const CREATION_CASES = [
-                { sub: "1.1", kind: "zeros", label: "zeros", n: 8 },
-                { sub: "1.2", kind: "ones", label: "ones", n: 8 },
-                { sub: "1.3", kind: "identity", label: "identity", n: 8 },
-                { sub: "1.4", kind: "diagonal", label: "diagonal", n: 8 },
-                { sub: "1.5", kind: "random", label: "random", n: 8 },
-            ] as const;
+    describe("Section 2: Matrix Add/Sub", function () {
+        const ADD_SUB_CASES = [
+            { sub: "2.1", patternA: "dense", patternB: "dense", label: "dense+dense", op: "add" },
+            { sub: "2.2", patternA: "identity", patternB: "dense", label: "identity+dense", op: "add" },
+            { sub: "2.3", patternA: "diagonal", patternB: "banded", label: "diagonal+banded", op: "add" },
+            { sub: "2.4", patternA: "dense", patternB: "banded", label: "dense-banded", op: "sub" },
+            { sub: "2.5", patternA: "mixed", patternB: "dense", label: "mixed-dense", op: "sub" },
+        ] as const;
 
-            for (const c of CREATION_CASES) {
-                it(`${c.sub} Matrix creation gas sensitivity for ${c.label}`, async function () {
-                    t++;
+        for (const c of ADD_SUB_CASES) {
+            it(`${c.sub} Matrix ${c.op} gas sensitivity for ${c.label}`, async function () {
+                t++;
+                const n = 8;
 
-                    if (c.kind === "zeros") {
-                        await touchGas(harness, "zerosHarness", [BigInt(c.n), BigInt(c.n)]);
-                        const gas = await estimateGas(harness, "zerosHarness", [BigInt(c.n), BigInt(c.n)]);
-                        const [, , out] = await harness.zerosHarness(BigInt(c.n), BigInt(c.n));
-                        const outDec = await fromQuadArray(harness, out);
+                const A = makeDenseMatrix(n, c.patternA);
+                const B = makeDenseMatrix(n, c.patternB);
+                const Aq = await qArrayFromBigints(harness, A);
+                const Bq = await qArrayFromBigints(harness, B);
 
-                        printBlockRegular({
-                            t,
-                            method: "matrix creation",
-                            explanation: `Gas sensitivity of dense matrix creation using zeros pattern at fixed dimension n=${c.n}.`,
-                            gas,
-                            inHex: `pattern=zeros, shape=${c.n}x${c.n}`,
-                            expectedHex: "N/A",
-                            outHex: headTail(out),
-                            expectedDec: "all zeros",
-                            outDec: headTail(outDec.map(formatScaledInt)),
-                        });
+                if (c.op === "add") {
+                    await touchGas(harness, "addHarness", [BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq]);
+                    const gas = await estimateGas(harness, "addHarness", [BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq]);
 
-                        expect(toGasBigInt(gas) > 0n).to.equal(true);
-                    } else if (c.kind === "ones") {
-                        await touchGas(harness, "onesHarness", [BigInt(c.n), BigInt(c.n)]);
-                        const gas = await estimateGas(harness, "onesHarness", [BigInt(c.n), BigInt(c.n)]);
-                        const [, , out] = await harness.onesHarness(BigInt(c.n), BigInt(c.n));
-                        const outDec = await fromQuadArray(harness, out);
+                    const [, , out] = await harness.addHarness(BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq);
+                    const outDec = await fromQuadArray(harness, out);
 
-                        printBlockRegular({
-                            t,
-                            method: "matrix creation",
-                            explanation: `Gas sensitivity of dense matrix creation using ones pattern at fixed dimension n=${c.n}.`,
-                            gas,
-                            inHex: `pattern=ones, shape=${c.n}x${c.n}`,
-                            expectedHex: "N/A",
-                            outHex: headTail(out),
-                            expectedDec: "all ones",
-                            outDec: headTail(outDec.map(formatScaledInt)),
-                        });
+                    printBlockRegular({
+                        t,
+                        method: "matrix add",
+                        explanation: `Gas sensitivity of matrix addition using ${c.label} operand structure at fixed dimension n=${n}.`,
+                        gas,
+                        inHex: `op=add, pattern=${c.label}, shape=${n}x${n}`,
+                        expectedHex: "N/A",
+                        outHex: headTail(out),
+                        expectedDec: "N/A",
+                        outDec: headTail(outDec.map(formatScaledInt)),
+                    });
 
-                        expect(toGasBigInt(gas) > 0n).to.equal(true);
-                    } else if (c.kind === "identity") {
-                        await touchGas(harness, "createIdentityMatrixHarness", [BigInt(c.n)]);
-                        const gas = await estimateGas(harness, "createIdentityMatrixHarness", [BigInt(c.n)]);
-                        const [, , out] = await harness.createIdentityMatrixHarness(BigInt(c.n));
-                        const outDec = await fromQuadArray(harness, out);
+                    expect(toGasBigInt(gas) > 0n).to.equal(true);
+                } else {
+                    await touchGas(harness, "subHarness", [BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq]);
+                    const gas = await estimateGas(harness, "subHarness", [BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq]);
 
-                        printBlockRegular({
-                            t,
-                            method: "matrix creation",
-                            explanation: `Gas sensitivity of dense matrix creation using identity pattern at fixed dimension n=${c.n}.`,
-                            gas,
-                            inHex: `pattern=identity, shape=${c.n}x${c.n}`,
-                            expectedHex: "N/A",
-                            outHex: headTail(out),
-                            expectedDec: "identity matrix",
-                            outDec: headTail(outDec.map(formatScaledInt)),
-                        });
+                    const [, , out] = await harness.subHarness(BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq);
+                    const outDec = await fromQuadArray(harness, out);
 
-                        expect(toGasBigInt(gas) > 0n).to.equal(true);
-                    } else if (c.kind === "diagonal") {
-                        const diag = Array.from({ length: c.n }, (_, i) => i + 2);
-                        const diagQ = await qArrayFromNumbers(harness, diag);
+                    printBlockRegular({
+                        t,
+                        method: "matrix sub",
+                        explanation: `Gas sensitivity of matrix subtraction using ${c.label} operand structure at fixed dimension n=${n}.`,
+                        gas,
+                        inHex: `op=sub, pattern=${c.label}, shape=${n}x${n}`,
+                        expectedHex: "N/A",
+                        outHex: headTail(out),
+                        expectedDec: "N/A",
+                        outDec: headTail(outDec.map(formatScaledInt)),
+                    });
 
-                        await touchGas(harness, "fromDiagonalHarness", [diagQ]);
-                        const gas = await estimateGas(harness, "fromDiagonalHarness", [diagQ]);
-                        const [, , out] = await harness.fromDiagonalHarness(diagQ);
-                        const outDec = await fromQuadArray(harness, out);
-
-                        printBlockRegular({
-                            t,
-                            method: "matrix creation",
-                            explanation: `Gas sensitivity of dense matrix creation from diagonal vector at fixed dimension n=${c.n}.`,
-                            gas,
-                            inHex: `pattern=diagonal, shape=${c.n}x${c.n}`,
-                            expectedHex: "N/A",
-                            outHex: headTail(out),
-                            expectedDec: `diag=${headTail(diag.map(v => v.toString()))}`,
-                            outDec: headTail(outDec.map(formatScaledInt)),
-                        });
-
-                        expect(toGasBigInt(gas) > 0n).to.equal(true);
-                    } else if (c.kind === "random") {
-                        const seed = ethers.keccak256(ethers.toUtf8Bytes(`matrix-creation-${c.n}`));
-
-                        await touchGas(harness, "randomMatrixHarness", [BigInt(c.n), BigInt(c.n), seed]);
-                        const gas = await estimateGas(harness, "randomMatrixHarness", [BigInt(c.n), BigInt(c.n), seed]);
-                        const [, , out] = await harness.randomMatrixHarness(BigInt(c.n), BigInt(c.n), seed);
-                        const outDec = await fromQuadArray(harness, out);
-
-                        printBlockRegular({
-                            t,
-                            method: "matrix creation",
-                            explanation: `Gas sensitivity of dense matrix creation using pseudo-random pattern at fixed dimension n=${c.n}.`,
-                            gas,
-                            inHex: `pattern=random, shape=${c.n}x${c.n}, seed=fixed`,
-                            expectedHex: "N/A",
-                            outHex: headTail(out),
-                            expectedDec: "pseudo-random values",
-                            outDec: headTail(outDec.map(formatScaledInt)),
-                        });
-
-                        expect(toGasBigInt(gas) > 0n).to.equal(true);
-                    }
-                });
-            }
-        });
-
-        describe("Section 2: Matrix Add/Sub", function () {
-            const ADD_SUB_CASES = [
-                { sub: "2.1", patternA: "dense", patternB: "dense", label: "dense+dense", op: "add" },
-                { sub: "2.2", patternA: "identity", patternB: "dense", label: "identity+dense", op: "add" },
-                { sub: "2.3", patternA: "diagonal", patternB: "banded", label: "diagonal+banded", op: "add" },
-                { sub: "2.4", patternA: "dense", patternB: "banded", label: "dense-banded", op: "sub" },
-                { sub: "2.5", patternA: "mixed", patternB: "dense", label: "mixed-dense", op: "sub" },
-            ] as const;
-
-            for (const c of ADD_SUB_CASES) {
-                it(`${c.sub} Matrix ${c.op} gas sensitivity for ${c.label}`, async function () {
-                    t++;
-                    const n = 8;
-
-                    const A = makeDenseMatrix(n, c.patternA);
-                    const B = makeDenseMatrix(n, c.patternB);
-                    const Aq = await qArrayFromBigints(harness, A);
-                    const Bq = await qArrayFromBigints(harness, B);
-
-                    if (c.op === "add") {
-                        await touchGas(harness, "addHarness", [BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq]);
-                        const gas = await estimateGas(harness, "addHarness", [BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq]);
-
-                        const [, , out] = await harness.addHarness(BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq);
-                        const outDec = await fromQuadArray(harness, out);
-
-                        printBlockRegular({
-                            t,
-                            method: "matrix add",
-                            explanation: `Gas sensitivity of matrix addition using ${c.label} operand structure at fixed dimension n=${n}.`,
-                            gas,
-                            inHex: `op=add, pattern=${c.label}, shape=${n}x${n}`,
-                            expectedHex: "N/A",
-                            outHex: headTail(out),
-                            expectedDec: "N/A",
-                            outDec: headTail(outDec.map(formatScaledInt)),
-                        });
-
-                        expect(toGasBigInt(gas) > 0n).to.equal(true);
-                    } else {
-                        await touchGas(harness, "subHarness", [BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq]);
-                        const gas = await estimateGas(harness, "subHarness", [BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq]);
-
-                        const [, , out] = await harness.subHarness(BigInt(n), BigInt(n), Aq, BigInt(n), BigInt(n), Bq);
-                        const outDec = await fromQuadArray(harness, out);
-
-                        printBlockRegular({
-                            t,
-                            method: "matrix sub",
-                            explanation: `Gas sensitivity of matrix subtraction using ${c.label} operand structure at fixed dimension n=${n}.`,
-                            gas,
-                            inHex: `op=sub, pattern=${c.label}, shape=${n}x${n}`,
-                            expectedHex: "N/A",
-                            outHex: headTail(out),
-                            expectedDec: "N/A",
-                            outDec: headTail(outDec.map(formatScaledInt)),
-                        });
-
-                        expect(toGasBigInt(gas) > 0n).to.equal(true);
-                    }
-                });
-            }
-        });
+                    expect(toGasBigInt(gas) > 0n).to.equal(true);
+                }
+            });
+        }
     });
 
     // ------------------------------------------------------------
