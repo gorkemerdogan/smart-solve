@@ -129,22 +129,37 @@ contract SphericalObjectiveHarness is IObjectiveFunction {
 }
 
 /**
- * @title MildWeightedQuadraticObjectiveHarness
- * @notice Test objective implementing a moderately weighted quadratic function
- *         g(x) = \sum_i w_i x_i^2 with mild anisotropy.
+ * @title SemiWeightedQuadraticObjectiveHarness
+ * @notice Test objective implementing a more softly weighted quadratic function
+ *         g(x) = \sum_i w_i x_i^2 with very mild anisotropy.
  */
-contract MildWeightedQuadraticObjectiveHarness is IObjectiveFunction {
+contract SemiWeightedQuadraticObjectiveHarness is IObjectiveFunction {
     /**
-     * @notice Evaluate the moderately weighted quadratic objective.
+     * @notice Return the per-coordinate weight used in the objective.
+     * @dev    The weights are intentionally kept close to each other so that
+     *         the objective remains anisotropic, but not so stiff that the
+     *         optimizer behaves like the hard weighted test case.
+     * @param i Zero-based coordinate index
+     * @return Weight associated with coordinate i
+     */
+    function _weight(uint256 i) internal pure returns (bytes16) {
+        uint256[8] memory ws = [uint256(1), 1, 1, 2, 2, 2, 3, 3];
+        if (i < 8) {
+            return MathLib.fromUInt(ws[i]);
+        }
+        return MathLib.fromUInt((i / 3) + 1);
+    }
+
+    /**
+     * @notice Evaluate the softly weighted quadratic objective.
      * @param x Input vector
-     * @return sum Objective value computed as
-     *         1*x1^2 + 2*x2^2 + ... + n*xn^2
+     * @return sum Objective value computed as \sum_i w_i x_i^2
      */
     function g(bytes16[] memory x) external pure override returns (bytes16) {
         bytes16 sum = MathLib.fromUInt(0);
 
         for (uint256 i = 0; i < x.length; ++i) {
-            bytes16 w = MathLib.fromUInt(i + 1);
+            bytes16 w = _weight(i);
             bytes16 term = MathLib.mul(w, MathLib.mul(x[i], x[i]));
             sum = MathLib.add(sum, term);
         }
@@ -153,7 +168,7 @@ contract MildWeightedQuadraticObjectiveHarness is IObjectiveFunction {
     }
 
     /**
-     * @notice Evaluate the gradient of the moderately weighted quadratic objective.
+     * @notice Evaluate the gradient of the softly weighted quadratic objective.
      * @param x Input vector
      * @return z Gradient vector computed as 2*w_i*x_i
      */
@@ -162,7 +177,7 @@ contract MildWeightedQuadraticObjectiveHarness is IObjectiveFunction {
         bytes16 two = MathLib.fromUInt(2);
 
         for (uint256 i = 0; i < x.length; ++i) {
-            bytes16 w = MathLib.fromUInt(i + 1);
+            bytes16 w = _weight(i);
             z[i] = MathLib.mul(two, MathLib.mul(w, x[i]));
         }
     }
