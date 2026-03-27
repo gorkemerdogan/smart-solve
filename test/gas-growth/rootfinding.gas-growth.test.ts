@@ -84,7 +84,6 @@ function toGasBigInt(gas: unknown): bigint {
 
 describe("RootFinding - Gas Growth Tests", function () {
   let harness: RootFindingHarness;
-  let t = 0;
 
   let target: string;
   let tolDefault: string;
@@ -141,6 +140,8 @@ describe("RootFinding - Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 1: Gas Sensitivity to Function Structure", function () {
+    let testNo = 0;
+
     const FUNCTION_CASES = [
       {
         label: "f(x)=x^2-4",
@@ -161,71 +162,80 @@ describe("RootFinding - Gas Growth Tests", function () {
     ];
 
     for (const fc of FUNCTION_CASES) {
-      it(`Test ${++t}: Bisection gas sensitivity for ${fc.label}`, async function () {
-        const [a, b] = await fc.bisectionArgs();
+      {
+        const t = `1.${++testNo}`;
+        it(`Test ${t}: Bisection gas sensitivity for ${fc.label}`, async function () {
+          const [a, b] = await fc.bisectionArgs();
 
-        await touchGas(harness, "rootFindingBisection", [target, fc.fSelector(), a, b, tolDefault, MAX_ITER_BISECTION]);
-        const gas = await estimateGas(harness, "rootFindingBisection", [target, fc.fSelector(), a, b, tolDefault, MAX_ITER_BISECTION]);
-        const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, fc.fSelector(), a, b, tolDefault, MAX_ITER_BISECTION);
+          await touchGas(harness, "rootFindingBisection", [target, fc.fSelector(), a, b, tolDefault, MAX_ITER_BISECTION]);
+          const gas = await estimateGas(harness, "rootFindingBisection", [target, fc.fSelector(), a, b, tolDefault, MAX_ITER_BISECTION]);
+          const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, fc.fSelector(), a, b, tolDefault, MAX_ITER_BISECTION);
 
-        printBlockRegular({
-          t,
-          method: "bisection",
-          explanation: `Gas sensitivity to function structure using ${fc.label}.`,
-          inHex: `${fc.label}`,
-          expectedHex: "N/A",
-          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-          expectedDec: "N/A",
-          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-          gas,
+          printBlockRegular({
+            t: `${t}`,
+            method: "bisection",
+            explanation: `Gas sensitivity to function structure using ${fc.label}.`,
+            inHex: `${fc.label}`,
+            expectedHex: "N/A",
+            outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+            expectedDec: "N/A",
+            outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+            gas,
+          });
+
+          expect(toGasBigInt(gas) > 0n).to.eq(true);
         });
+      }
 
-        expect(toGasBigInt(gas) > 0n).to.eq(true);
-      });
+      {
+        const t = `1.${++testNo}`;
+        it(`Test ${t}: Newton gas sensitivity for ${fc.label}`, async function () {
+          const [x0] = await fc.newtonArgs();
 
-      it(`Test ${++t}: Newton gas sensitivity for ${fc.label}`, async function () {
-        const [x0] = await fc.newtonArgs();
+          await touchGas(harness, "rootFindingNewton", [target, fc.fSelector(), target, fc.dfSelector(), x0, tolDefault, MAX_ITER_NEWTON]);
+          const gas = await estimateGas(harness, "rootFindingNewton", [target, fc.fSelector(), target, fc.dfSelector(), x0, tolDefault, MAX_ITER_NEWTON]);
+          const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, fc.fSelector(), target, fc.dfSelector(), x0, tolDefault, MAX_ITER_NEWTON);
 
-        await touchGas(harness, "rootFindingNewton", [target, fc.fSelector(), target, fc.dfSelector(), x0, tolDefault, MAX_ITER_NEWTON]);
-        const gas = await estimateGas(harness, "rootFindingNewton", [target, fc.fSelector(), target, fc.dfSelector(), x0, tolDefault, MAX_ITER_NEWTON]);
-        const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, fc.fSelector(), target, fc.dfSelector(), x0, tolDefault, MAX_ITER_NEWTON);
+          printBlockRegular({
+            t: `${t}`,
+            method: "newton",
+            explanation: `Gas sensitivity to function structure using ${fc.label}.`,
+            inHex: `${fc.label}`,
+            expectedHex: "N/A",
+            outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+            expectedDec: "N/A",
+            outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+            gas,
+          });
 
-        printBlockRegular({
-          t,
-          method: "newton",
-          explanation: `Gas sensitivity to function structure using ${fc.label}.`,
-          inHex: `${fc.label}`,
-          expectedHex: "N/A",
-          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-          expectedDec: "N/A",
-          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-          gas,
+          expect(toGasBigInt(gas) > 0n).to.eq(true);
         });
+      }
 
-        expect(toGasBigInt(gas) > 0n).to.eq(true);
-      });
+      {
+        const t = `1.${++testNo}`;
+        it(`Test ${t}: Secant gas sensitivity for ${fc.label}`, async function () {
+          const [x0, x1] = await fc.secantArgs();
 
-      it(`Test ${++t}: Secant gas sensitivity for ${fc.label}`, async function () {
-        const [x0, x1] = await fc.secantArgs();
+          await touchGas(harness, "rootFindingSecant", [target, fc.fSelector(), x0, x1, tolDefault, MAX_ITER_SECANT]);
+          const gas = await estimateGas(harness, "rootFindingSecant", [target, fc.fSelector(), x0, x1, tolDefault, MAX_ITER_SECANT]);
+          const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, fc.fSelector(), x0, x1, tolDefault, MAX_ITER_SECANT);
 
-        await touchGas(harness, "rootFindingSecant", [target, fc.fSelector(), x0, x1, tolDefault, MAX_ITER_SECANT]);
-        const gas = await estimateGas(harness, "rootFindingSecant", [target, fc.fSelector(), x0, x1, tolDefault, MAX_ITER_SECANT]);
-        const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, fc.fSelector(), x0, x1, tolDefault, MAX_ITER_SECANT);
+          printBlockRegular({
+            t: `${t}`,
+            method: "secant",
+            explanation: `Gas sensitivity to function structure using ${fc.label}.`,
+            inHex: `${fc.label}`,
+            expectedHex: "N/A",
+            outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+            expectedDec: "N/A",
+            outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+            gas,
+          });
 
-        printBlockRegular({
-          t,
-          method: "secant",
-          explanation: `Gas sensitivity to function structure using ${fc.label}.`,
-          inHex: `${fc.label}`,
-          expectedHex: "N/A",
-          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-          expectedDec: "N/A",
-          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-          gas,
+          expect(toGasBigInt(gas) > 0n).to.eq(true);
         });
-
-        expect(toGasBigInt(gas) > 0n).to.eq(true);
-      });
+      }
     }
   });
 
@@ -234,6 +244,8 @@ describe("RootFinding - Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 2: Gas Sensitivity to Initial Guess / Interval Width", function () {
+    let testNo = 0;
+
     const BISECTION_CASES = [
       { label: "[1,3]", args: async () => [await qInt(1), await qInt(3)] },
       { label: "[1.5,3]", args: async () => [await qFrac(3, 2), await qInt(3)] },
@@ -243,7 +255,8 @@ describe("RootFinding - Gas Growth Tests", function () {
     ];
 
     for (const c of BISECTION_CASES) {
-      it(`Test ${++t}: Bisection gas sensitivity for interval ${c.label}`, async function () {
+      const t = `2.${++testNo}`;
+      it(`Test ${t}: Bisection gas sensitivity for interval ${c.label}`, async function () {
         const [a, b] = await c.args();
 
         await touchGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
@@ -251,7 +264,7 @@ describe("RootFinding - Gas Growth Tests", function () {
         const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION);
 
         printBlockRegular({
-          t,
+          t: `${t}`,
           method: "bisection",
           explanation: `Gas sensitivity to interval width using f(x)=x^2-4 on ${c.label}.`,
           inHex: `f=x^2-4, ${c.label}`,
@@ -275,7 +288,8 @@ describe("RootFinding - Gas Growth Tests", function () {
     ];
 
     for (const c of NEWTON_CASES) {
-      it(`Test ${++t}: Newton gas sensitivity for ${c.label}`, async function () {
+      const t = `2.${++testNo}`;
+      it(`Test ${t}: Newton gas sensitivity for ${c.label}`, async function () {
         const x0 = await c.arg();
 
         await touchGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
@@ -283,7 +297,7 @@ describe("RootFinding - Gas Growth Tests", function () {
         const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON);
 
         printBlockRegular({
-          t,
+          t: `${t}`,
           method: "newton",
           explanation: `Gas sensitivity to initial guess using f(x)=x^2-4 and ${c.label}.`,
           inHex: `f=x^2-4, df=2x, ${c.label}`,
@@ -307,7 +321,8 @@ describe("RootFinding - Gas Growth Tests", function () {
     ];
 
     for (const c of SECANT_CASES) {
-      it(`Test ${++t}: Secant gas sensitivity for seeds ${c.label}`, async function () {
+      const t = `2.${++testNo}`;
+      it(`Test ${t}: Secant gas sensitivity for seeds ${c.label}`, async function () {
         const [x0, x1] = await c.args();
 
         await touchGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
@@ -315,7 +330,7 @@ describe("RootFinding - Gas Growth Tests", function () {
         const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT);
 
         printBlockRegular({
-          t,
+          t: `${t}`,
           method: "secant",
           explanation: `Gas sensitivity to initial seeds using f(x)=x^2-4 and ${c.label}.`,
           inHex: `f=x^2-4, seeds=${c.label}`,
@@ -336,6 +351,8 @@ describe("RootFinding - Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 3: Gas Sensitivity to Root Scale", function () {
+    let testNo = 0;
+
     const SCALE_CASES = [
       {
         label: "small root",
@@ -364,71 +381,80 @@ describe("RootFinding - Gas Growth Tests", function () {
     ];
 
     for (const c of SCALE_CASES) {
-      it(`Test ${++t}: Bisection gas sensitivity for ${c.label}`, async function () {
-        const [a, b] = await c.bisectionArgs();
+      {
+        const t = `3.${++testNo}`;
+        it(`Test ${t}: Bisection gas sensitivity for ${c.label}`, async function () {
+          const [a, b] = await c.bisectionArgs();
 
-        await touchGas(harness, "rootFindingBisection", [target, c.f(), a, b, tolDefault, MAX_ITER_BISECTION]);
-        const gas = await estimateGas(harness, "rootFindingBisection", [target, c.f(), a, b, tolDefault, MAX_ITER_BISECTION]);
-        const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, c.f(), a, b, tolDefault, MAX_ITER_BISECTION);
+          await touchGas(harness, "rootFindingBisection", [target, c.f(), a, b, tolDefault, MAX_ITER_BISECTION]);
+          const gas = await estimateGas(harness, "rootFindingBisection", [target, c.f(), a, b, tolDefault, MAX_ITER_BISECTION]);
+          const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, c.f(), a, b, tolDefault, MAX_ITER_BISECTION);
 
-        printBlockRegular({
-          t,
-          method: "bisection",
-          explanation: `Gas sensitivity to root scale using ${c.label}.`,
-          inHex: `${c.label}`,
-          expectedHex: "N/A",
-          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-          expectedDec: "N/A",
-          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-          gas,
+          printBlockRegular({
+            t: `${t}`,
+            method: "bisection",
+            explanation: `Gas sensitivity to root scale using ${c.label}.`,
+            inHex: `${c.label}`,
+            expectedHex: "N/A",
+            outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+            expectedDec: "N/A",
+            outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+            gas,
+          });
+
+          expect(ok).to.eq(true);
         });
+      }
 
-        expect(ok).to.eq(true);
-      });
+      {
+        const t = `3.${++testNo}`;
+        it(`Test ${t}: Newton gas sensitivity for ${c.label}`, async function () {
+          const x0 = await c.newtonArg();
 
-      it(`Test ${++t}: Newton gas sensitivity for ${c.label}`, async function () {
-        const x0 = await c.newtonArg();
+          await touchGas(harness, "rootFindingNewton", [target, c.f(), target, c.df(), x0, tolDefault, MAX_ITER_NEWTON]);
+          const gas = await estimateGas(harness, "rootFindingNewton", [target, c.f(), target, c.df(), x0, tolDefault, MAX_ITER_NEWTON]);
+          const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, c.f(), target, c.df(), x0, tolDefault, MAX_ITER_NEWTON);
 
-        await touchGas(harness, "rootFindingNewton", [target, c.f(), target, c.df(), x0, tolDefault, MAX_ITER_NEWTON]);
-        const gas = await estimateGas(harness, "rootFindingNewton", [target, c.f(), target, c.df(), x0, tolDefault, MAX_ITER_NEWTON]);
-        const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, c.f(), target, c.df(), x0, tolDefault, MAX_ITER_NEWTON);
+          printBlockRegular({
+            t: `${t}`,
+            method: "newton",
+            explanation: `Gas sensitivity to root scale using ${c.label}.`,
+            inHex: `${c.label}`,
+            expectedHex: "N/A",
+            outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+            expectedDec: "N/A",
+            outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+            gas,
+          });
 
-        printBlockRegular({
-          t,
-          method: "newton",
-          explanation: `Gas sensitivity to root scale using ${c.label}.`,
-          inHex: `${c.label}`,
-          expectedHex: "N/A",
-          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-          expectedDec: "N/A",
-          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-          gas,
+          expect(ok).to.eq(true);
         });
+      }
 
-        expect(ok).to.eq(true);
-      });
+      {
+        const t = `3.${++testNo}`;
+        it(`Test ${t}: Secant gas sensitivity for ${c.label}`, async function () {
+          const [x0, x1] = await c.secantArgs();
 
-      it(`Test ${++t}: Secant gas sensitivity for ${c.label}`, async function () {
-        const [x0, x1] = await c.secantArgs();
+          await touchGas(harness, "rootFindingSecant", [target, c.f(), x0, x1, tolDefault, MAX_ITER_SECANT]);
+          const gas = await estimateGas(harness, "rootFindingSecant", [target, c.f(), x0, x1, tolDefault, MAX_ITER_SECANT]);
+          const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, c.f(), x0, x1, tolDefault, MAX_ITER_SECANT);
 
-        await touchGas(harness, "rootFindingSecant", [target, c.f(), x0, x1, tolDefault, MAX_ITER_SECANT]);
-        const gas = await estimateGas(harness, "rootFindingSecant", [target, c.f(), x0, x1, tolDefault, MAX_ITER_SECANT]);
-        const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, c.f(), x0, x1, tolDefault, MAX_ITER_SECANT);
+          printBlockRegular({
+            t: `${t}`,
+            method: "secant",
+            explanation: `Gas sensitivity to root scale using ${c.label}.`,
+            inHex: `${c.label}`,
+            expectedHex: "N/A",
+            outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+            expectedDec: "N/A",
+            outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+            gas,
+          });
 
-        printBlockRegular({
-          t,
-          method: "secant",
-          explanation: `Gas sensitivity to root scale using ${c.label}.`,
-          inHex: `${c.label}`,
-          expectedHex: "N/A",
-          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-          expectedDec: "N/A",
-          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-          gas,
+          expect(ok).to.eq(true);
         });
-
-        expect(ok).to.eq(true);
-      });
+      }
     }
   });
 
@@ -437,128 +463,148 @@ describe("RootFinding - Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 4: Direct Method Comparison", function () {
-    it(`Test ${++t}: Shared normal scenario (Bisection, x^2-4 on [1,3])`, async function () {
-      const a = await qInt(1);
-      const b = await qInt(3);
+    let testNo = 0;
 
-      await touchGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
-      const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
-      const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION);
+    {
+      const t = `4.${++testNo}`;
+      it(`Test ${t}: Shared normal scenario (Bisection, x^2-4 on [1,3])`, async function () {
+        const a = await qInt(1);
+        const b = await qInt(3);
 
-      printBlockRegular({
-        t,
-        method: "bisection",
-        explanation: "Shared normal scenario: bisection on x^2-4 over [1,3].",
-        inHex: "f=x^2-4, [1,3]",
-        expectedHex: "N/A",
-        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec: "N/A",
-        outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-        gas,
+        await touchGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
+        const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
+        const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION);
+
+        printBlockRegular({
+          t: `${t}`,
+          method: "bisection",
+          explanation: "Shared normal scenario: bisection on x^2-4 over [1,3].",
+          inHex: "f=x^2-4, [1,3]",
+          expectedHex: "N/A",
+          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+          expectedDec: "N/A",
+          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+          gas,
+        });
       });
-    });
+    }
 
-    it(`Test ${++t}: Shared normal scenario (Newton, x^2-4, x0=3)`, async function () {
-      const x0 = await qInt(3);
+    {
+      const t = `4.${++testNo}`;
+      it(`Test ${t}: Shared normal scenario (Newton, x^2-4, x0=3)`, async function () {
+        const x0 = await qInt(3);
 
-      await touchGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
-      const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
-      const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON);
+        await touchGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
+        const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
+        const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON);
 
-      printBlockRegular({
-        t,
-        method: "newton",
-        explanation: "Shared normal scenario: Newton-Raphson on x^2-4 from x0=3.",
-        inHex: "f=x^2-4, df=2x, x0=3",
-        expectedHex: "N/A",
-        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec: "N/A",
-        outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-        gas,
+        printBlockRegular({
+          t: `${t}`,
+          method: "newton",
+          explanation: "Shared normal scenario: Newton-Raphson on x^2-4 from x0=3.",
+          inHex: "f=x^2-4, df=2x, x0=3",
+          expectedHex: "N/A",
+          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+          expectedDec: "N/A",
+          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+          gas,
+        });
       });
-    });
+    }
 
-    it(`Test ${++t}: Shared normal scenario (Secant, x^2-4, x0=1, x1=3)`, async function () {
-      const x0 = await qInt(1);
-      const x1 = await qInt(3);
+    {
+      const t = `4.${++testNo}`;
+      it(`Test ${t}: Shared normal scenario (Secant, x^2-4, x0=1, x1=3)`, async function () {
+        const x0 = await qInt(1);
+        const x1 = await qInt(3);
 
-      await touchGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
-      const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
-      const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT);
+        await touchGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
+        const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
+        const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT);
 
-      printBlockRegular({
-        t,
-        method: "secant",
-        explanation: "Shared normal scenario: secant on x^2-4 with seeds 1 and 3.",
-        inHex: "f=x^2-4, x0=1, x1=3",
-        expectedHex: "N/A",
-        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec: "N/A",
-        outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-        gas,
+        printBlockRegular({
+          t: `${t}`,
+          method: "secant",
+          explanation: "Shared normal scenario: secant on x^2-4 with seeds 1 and 3.",
+          inHex: "f=x^2-4, x0=1, x1=3",
+          expectedHex: "N/A",
+          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+          expectedDec: "N/A",
+          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+          gas,
+        });
       });
-    });
+    }
 
-    it(`Test ${++t}: Shared stress scenario (Bisection, x^3-x-2 on [1,2])`, async function () {
-      const a = await qInt(1);
-      const b = await qInt(2);
+    {
+      const t = `4.${++testNo}`;
+      it(`Test ${t}: Shared stress scenario (Bisection, x^3-x-2 on [1,2])`, async function () {
+        const a = await qInt(1);
+        const b = await qInt(2);
 
-      await touchGas(harness, "rootFindingBisection", [target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION]);
-      const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION]);
-      const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION);
+        await touchGas(harness, "rootFindingBisection", [target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION]);
+        const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION]);
+        const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION);
 
-      printBlockRegular({
-        t,
-        method: "bisection",
-        explanation: "Shared stress scenario: bisection on x^3-x-2 over [1,2].",
-        inHex: "f=x^3-x-2, [1,2]",
-        expectedHex: "N/A",
-        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec: "N/A",
-        outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-        gas,
+        printBlockRegular({
+          t: `${t}`,
+          method: "bisection",
+          explanation: "Shared stress scenario: bisection on x^3-x-2 over [1,2].",
+          inHex: "f=x^3-x-2, [1,2]",
+          expectedHex: "N/A",
+          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+          expectedDec: "N/A",
+          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+          gas,
+        });
       });
-    });
+    }
 
-    it(`Test ${++t}: Shared stress scenario (Newton, x^3-x-2, x0=1)`, async function () {
-      const x0 = await qInt(1);
+    {
+      const t = `4.${++testNo}`;
+      it(`Test ${t}: Shared stress scenario (Newton, x^3-x-2, x0=1)`, async function () {
+        const x0 = await qInt(1);
 
-      await touchGas(harness, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON]);
-      const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON]);
-      const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON);
+        await touchGas(harness, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON]);
+        const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON]);
+        const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON);
 
-      printBlockRegular({
-        t,
-        method: "newton",
-        explanation: "Shared stress scenario: Newton-Raphson on x^3-x-2 from x0=1.",
-        inHex: "f=x^3-x-2, df=3x^2-1, x0=1",
-        expectedHex: "N/A",
-        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec: "N/A",
-        outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-        gas,
+        printBlockRegular({
+          t: `${t}`,
+          method: "newton",
+          explanation: "Shared stress scenario: Newton-Raphson on x^3-x-2 from x0=1.",
+          inHex: "f=x^3-x-2, df=3x^2-1, x0=1",
+          expectedHex: "N/A",
+          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+          expectedDec: "N/A",
+          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+          gas,
+        });
       });
-    });
+    }
 
-    it(`Test ${++t}: Shared stress scenario (Secant, x^3-x-2, x0=1, x1=2)`, async function () {
-      const x0 = await qInt(1);
-      const x1 = await qInt(2);
+    {
+      const t = `4.${++testNo}`;
+      it(`Test ${t}: Shared stress scenario (Secant, x^3-x-2, x0=1, x1=2)`, async function () {
+        const x0 = await qInt(1);
+        const x1 = await qInt(2);
 
-      await touchGas(harness, "rootFindingSecant", [target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT]);
-      const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT]);
-      const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT);
+        await touchGas(harness, "rootFindingSecant", [target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT]);
+        const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT]);
+        const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT);
 
-      printBlockRegular({
-        t,
-        method: "secant",
-        explanation: "Shared stress scenario: secant on x^3-x-2 with seeds 1 and 2.",
-        inHex: "f=x^3-x-2, x0=1, x1=2",
-        expectedHex: "N/A",
-        outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
-        expectedDec: "N/A",
-        outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
-        gas,
+        printBlockRegular({
+          t: `${t}`,
+          method: "secant",
+          explanation: "Shared stress scenario: secant on x^3-x-2 with seeds 1 and 2.",
+          inHex: "f=x^3-x-2, x0=1, x1=2",
+          expectedHex: "N/A",
+          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+          expectedDec: "N/A",
+          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+          gas,
+        });
       });
-    });
+    }
   });
 });

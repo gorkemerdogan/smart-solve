@@ -58,7 +58,6 @@ async function runODECase(
 describe("ODESolverHarness - Gas Growth Tests", function () {
     let h: ODESolverHarness;
     let target: string;
-    let t = 0;
 
     let QZERO: string;
 
@@ -100,10 +99,10 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
 
         QZERO = await h.fromFloat(0n);
 
-        H_001 = await qf(1, 100);   // 0.01
-        H_01 = await qf(1, 10);     // 0.1
-        H_05 = await qf(1, 2);      // 0.5
-        H_1 = await qi(1);          // 1
+        H_001 = await qf(1, 100);    // 0.01
+        H_01 = await qf(1, 10);      // 0.1
+        H_05 = await qf(1, 2);       // 0.5
+        H_1 = await qi(1);           // 1
         H_NEG_01 = await qf(-1, 10); // -0.1
     });
 
@@ -112,6 +111,8 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 1: Gas Sensitivity to RHS Function Structure", function () {
+        let testNo = 0;
+
         const METHODS: Array<{ method: ODEMethod; label: string }> = [
             { method: "euler", label: "Euler" },
             { method: "rk2Midpoint", label: "RK2 Midpoint" },
@@ -128,7 +129,9 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
 
         for (const m of METHODS) {
             for (const f of FUNCTIONS) {
-                it(`Test ${++t}: ${m.label} gas sensitivity for ${f.label}`, async function () {
+                const t = `1.${++testNo}`;
+
+                it(`Test ${t}: ${m.label} gas sensitivity for ${f.label}`, async function () {
                     const x0 = QZERO;
                     const y0 = await qi(10);
 
@@ -143,7 +146,7 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
                     );
 
                     printBlockRegular({
-                        t,
+                        t: `${t}`,
                         method: m.label,
                         explanation: `Gas sensitivity to RHS function structure using ${f.label} with x0=0, y0=10, and h=0.1.`,
                         gas,
@@ -165,6 +168,8 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 2: Gas Sensitivity to Step Size", function () {
+        let testNo = 0;
+
         const METHODS: Array<{ method: ODEMethod; label: string }> = [
             { method: "euler", label: "Euler" },
             { method: "rk2Midpoint", label: "RK2 Midpoint" },
@@ -182,7 +187,9 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
 
         for (const m of METHODS) {
             for (const s of STEP_CASES) {
-                it(`Test ${++t}: ${m.label} gas sensitivity for h=${s.label}`, async function () {
+                const t = `2.${++testNo}`;
+
+                it(`Test ${t}: ${m.label} gas sensitivity for h=${s.label}`, async function () {
                     const x0 = QZERO;
                     const y0 = await qi(10);
 
@@ -197,7 +204,7 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
                     );
 
                     printBlockRegular({
-                        t,
+                        t: `${t}`,
                         method: m.label,
                         explanation: `Gas sensitivity to step size using y'=y with x0=0, y0=10, and h=${s.label}.`,
                         gas,
@@ -219,6 +226,8 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 3: Gas Sensitivity to Initial y Value", function () {
+        let testNo = 0;
+
         const METHODS: Array<{ method: ODEMethod; label: string }> = [
             { method: "euler", label: "Euler" },
             { method: "rk2Midpoint", label: "RK2 Midpoint" },
@@ -236,7 +245,9 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
 
         for (const m of METHODS) {
             for (const yc of Y_CASES) {
-                it(`Test ${++t}: ${m.label} gas sensitivity for y0=${yc.label}`, async function () {
+                const t = `3.${++testNo}`;
+
+                it(`Test ${t}: ${m.label} gas sensitivity for y0=${yc.label}`, async function () {
                     const x0 = QZERO;
                     const y0 = await qi(yc.y);
 
@@ -251,7 +262,7 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
                     );
 
                     printBlockRegular({
-                        t,
+                        t: `${t}`,
                         method: m.label,
                         explanation: `Gas sensitivity to initial y value using y'=y with x0=0, h=0.1, and y0=${yc.label}.`,
                         gas,
@@ -273,6 +284,8 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 4: Gas Sensitivity to Initial x Position", function () {
+        let testNo = 0;
+
         const METHODS: Array<{ method: ODEMethod; label: string }> = [
             { method: "euler", label: "Euler" },
             { method: "rk2Midpoint", label: "RK2 Midpoint" },
@@ -290,7 +303,9 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
 
         for (const m of METHODS) {
             for (const xc of X_CASES) {
-                it(`Test ${++t}: ${m.label} gas sensitivity for x0=${xc.label}`, async function () {
+                const t = `4.${++testNo}`;
+
+                it(`Test ${t}: ${m.label} gas sensitivity for x0=${xc.label}`, async function () {
                     const x0 = await qi(xc.x);
                     const y0 = await qi(1);
 
@@ -305,7 +320,7 @@ describe("ODESolverHarness - Gas Growth Tests", function () {
                     );
 
                     printBlockRegular({
-                        t,
+                        t: `${t}`,
                         method: m.label,
                         explanation: `Gas sensitivity to initial x position using y'=x² with y0=1, h=0.1, and x0=${xc.label}.`,
                         gas,

@@ -209,7 +209,6 @@ async function runIterCase(
 
 describe("LinearSolversHarness - Gas Growth Tests", function () {
     let harness: LinearSolversHarness;
-    let t = 0;
 
     let GD_ALPHA: string;
     let GD_TOL: string;
@@ -240,6 +239,8 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
         const DIM_CASES = [2, 3, 4, 5];
 
         describe("Section 1.1: Direct Methods", function () {
+            let testNo = 0;
+
             const METHODS: Array<{ method: DirectMethod; label: string }> = [
                 { method: "gaussianElimination", label: "Gaussian Elimination" },
                 { method: "luDecomposition", label: "LU Decomposition" },
@@ -247,7 +248,9 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
 
             for (const m of METHODS) {
                 for (const n of DIM_CASES) {
-                    it(`Test ${++t}: ${m.label} gas growth with matrix dimension n=${n}`, async function () {
+                    const t = `1.1.${++testNo}`;
+
+                    it(`Test ${t}: ${m.label} gas growth with matrix dimension n=${n}`, async function () {
                         const sys = buildSystem(n);
                         const Aq = await qArrayFromBigints(harness, sys.A);
                         const bq = await qArrayFromBigints(harness, sys.b);
@@ -276,6 +279,8 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
         });
 
         describe("Section 1.2: Iterative Methods", function () {
+            let testNo = 0;
+
             const METHODS: Array<{ method: IterMethod; label: string }> = [
                 { method: "jacobi", label: "Jacobi" },
                 { method: "gaussSeidel", label: "Gauss-Seidel" },
@@ -286,7 +291,9 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
 
             for (const m of METHODS) {
                 for (const n of DIM_CASES) {
-                    it(`Test ${++t}: ${m.label} gas growth with matrix dimension n=${n}`, async function () {
+                    const t = `1.2.${++testNo}`;
+
+                    it(`Test ${t}: ${m.label} gas growth with matrix dimension n=${n}`, async function () {
                         const sys = buildSystem(n);
                         const Aq = await qArrayFromBigints(harness, sys.A);
                         const bq = await qArrayFromBigints(harness, sys.b);
@@ -330,6 +337,8 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 2: Gas Growth with Respect to Iteration Budget", function () {
+        let testNo = 0;
+
         const ITER_CASES = [1n, 5n, 10n, 20n, 50n];
         const n = 3;
 
@@ -341,7 +350,9 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
 
         for (const m of METHODS) {
             for (const maxIter of ITER_CASES) {
-                it(`Test ${++t}: ${m.label} gas growth with maxIter=${maxIter}`, async function () {
+                const t = `2.${++testNo}`;
+
+                it(`Test ${t}: ${m.label} gas growth with maxIter=${maxIter}`, async function () {
                     const sys = buildSystem(n);
                     const Aq = await qArrayFromBigints(harness, sys.A);
                     const bq = await qArrayFromBigints(harness, sys.b);
@@ -384,6 +395,8 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 3: Gas Sensitivity to Initial Guess", function () {
+        let testNo = 0;
+
         const n = 3;
         const FIXED_MAX_ITER = 20n;
 
@@ -403,7 +416,9 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
 
         for (const m of METHODS) {
             for (const g of GUESS_CASES) {
-                it(`Test ${++t}: ${m.label} gas sensitivity for ${g.label}`, async function () {
+                const t = `3.${++testNo}`;
+
+                it(`Test ${t}: ${m.label} gas sensitivity for ${g.label}`, async function () {
                     const sys = buildSystem(n);
                     const Aq = await qArrayFromBigints(harness, sys.A);
                     const bq = await qArrayFromBigints(harness, sys.b);
@@ -446,6 +461,8 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 4: Gas Sensitivity to Coefficient Scale", function () {
+        let testNo = 0;
+
         const n = 3;
 
         const SCALE_CASES: Array<{ label: string; factorNum: bigint; factorDen: bigint }> = [
@@ -469,7 +486,9 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
 
         for (const m of DIRECT_METHODS) {
             for (const s of SCALE_CASES) {
-                it(`Test ${++t}: ${m.label} gas sensitivity for coefficient scale ${s.label}`, async function () {
+                const t = `4.${++testNo}`;
+
+                it(`Test ${t}: ${m.label} gas sensitivity for coefficient scale ${s.label}`, async function () {
                     const base = buildSystem(n);
 
                     const Aq = await qScaledArrayFromBigints(harness, base.A, s.factorNum, s.factorDen);
@@ -499,7 +518,9 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
 
         for (const m of ITER_METHODS) {
             for (const s of SCALE_CASES) {
-                it(`Test ${++t}: ${m.label} gas sensitivity for coefficient scale ${s.label}`, async function () {
+                const t = `4.${++testNo}`;
+
+                it(`Test ${t}: ${m.label} gas sensitivity for coefficient scale ${s.label}`, async function () {
                     const base = buildSystem(n);
 
                     const Aq = await qScaledArrayFromBigints(harness, base.A, s.factorNum, s.factorDen);

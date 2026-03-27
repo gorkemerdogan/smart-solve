@@ -115,7 +115,6 @@ async function runHornerCase(
 
 describe("PolynomialHarness - Horner Gas Growth Tests", function () {
   let harness: PolynomialHarness;
-  let t = 0;
 
   let X_NEG_1000: string;
   let X_NEG_1: string;
@@ -147,6 +146,8 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 1: Gas Growth with Respect to Polynomial Length", function () {
+    let testNo = 0;
+
     const SIZES = [4, 8, 16, 32, 64];
 
     const METHODS: Array<{ method: HornerMethod; label: string }> = [
@@ -157,7 +158,9 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
 
     for (const m of METHODS) {
       for (const n of SIZES) {
-        it(`Test ${++t}: ${m.label} gas growth with polynomial length n=${n}`, async function () {
+        const t = `1.${++testNo}`;
+
+        it(`Test ${t}: ${m.label} gas growth with polynomial length n=${n}`, async function () {
           const base = buildIncreasingCoeffs(n);
           const coeffs = await qScaledArrayFromInts(harness, base, 1n, 1n);
           const x = await harness.qFromFrac(5n, 4n); // 1.25
@@ -177,7 +180,7 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
           }
 
           printBlockRegular({
-            t,
+            t: `${t}`,
             method: m.label,
             explanation: `Gas growth with respect to polynomial length using increasing coefficients of length n=${n}.`,
             gas,
@@ -199,6 +202,8 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 2: Gas Sensitivity to Evaluation Point Magnitude", function () {
+    let testNo = 0;
+
     const METHODS: Array<{ method: HornerMethod; label: string }> = [
       { method: "evaluateHorners", label: "evaluateHorners" },
       { method: "evaluateWithDerivative", label: "evaluateWithDerivative" },
@@ -215,7 +220,9 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
 
     for (const m of METHODS) {
       for (const xc of X_CASES) {
-        it(`Test ${++t}: ${m.label} gas sensitivity for x=${xc.label}`, async function () {
+        const t = `2.${++testNo}`;
+
+        it(`Test ${t}: ${m.label} gas sensitivity for x=${xc.label}`, async function () {
           const base = buildIncreasingCoeffs(16);
           const coeffs =
             m.method === "evalHornerMonic"
@@ -237,7 +244,7 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
           }
 
           printBlockRegular({
-            t,
+            t: `${t}`,
             method: m.label,
             explanation: `Gas sensitivity to evaluation point magnitude using increasing coefficients and x=${xc.label}.`,
             gas,
@@ -259,6 +266,8 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 3: Gas Sensitivity to Coefficient Scale", function () {
+    let testNo = 0;
+
     const METHODS: Array<{ method: HornerMethod; label: string }> = [
       { method: "evaluateHorners", label: "evaluateHorners" },
       { method: "evaluateWithDerivative", label: "evaluateWithDerivative" },
@@ -275,7 +284,9 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
 
     for (const m of METHODS) {
       for (const s of SCALE_CASES) {
-        it(`Test ${++t}: ${m.label} gas sensitivity for coefficient scale ${s.label}`, async function () {
+        const t = `3.${++testNo}`;
+
+        it(`Test ${t}: ${m.label} gas sensitivity for coefficient scale ${s.label}`, async function () {
           const base = buildIncreasingCoeffs(16);
           const coeffs =
             m.method === "evalHornerMonic"
@@ -297,7 +308,7 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
           }
 
           printBlockRegular({
-            t,
+            t: `${t}`,
             method: m.label,
             explanation: `Gas sensitivity to coefficient scale using x=1 and ${s.label} scaled increasing coefficients.`,
             gas,
@@ -319,6 +330,8 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 4: Gas Sensitivity to Coefficient Pattern", function () {
+    let testNo = 0;
+
     const METHODS: Array<{ method: HornerMethod; label: string }> = [
       { method: "evaluateHorners", label: "evaluateHorners" },
       { method: "evaluateWithDerivative", label: "evaluateWithDerivative" },
@@ -335,7 +348,9 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
 
     for (const m of METHODS) {
       for (const p of PATTERN_CASES) {
-        it(`Test ${++t}: ${m.label} gas sensitivity for ${p.label}`, async function () {
+        const t = `4.${++testNo}`;
+
+        it(`Test ${t}: ${m.label} gas sensitivity for ${p.label}`, async function () {
           const base = p.builder(16);
           const coeffs =
             m.method === "evalHornerMonic"
@@ -357,7 +372,7 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
           }
 
           printBlockRegular({
-            t,
+            t: `${t}`,
             method: m.label,
             explanation: `Gas sensitivity to coefficient pattern using ${p.label} with fixed length and x=1.`,
             gas,

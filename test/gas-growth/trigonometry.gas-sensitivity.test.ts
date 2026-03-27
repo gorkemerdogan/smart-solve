@@ -50,7 +50,6 @@ function fmt(x: number): string {
 
 describe("Trigonometry - Gas Growth Tests", function () {
     let harness: TrigHarness;
-    let t = 0;
 
     let QPI: string;
     let QHALF_PI: string;
@@ -78,6 +77,8 @@ describe("Trigonometry - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 1: Gas Sensitivity to Input Magnitude", function () {
+        let testNo = 0;
+
         const DIRECT_CASES = [-1000, -1, 0, 1, 1000];
         const INV_CASES = [-1, -0.5, 0, 0.5, 1];
         const ATAN_CASES = [-1000, -1, 0, 1, 1000];
@@ -96,7 +97,9 @@ describe("Trigonometry - Gas Growth Tests", function () {
 
         for (const m of DIRECT_METHODS) {
             for (const x of DIRECT_CASES) {
-                it(`Test ${++t}: ${m.label} gas sensitivity for x=${x}`, async function () {
+                const t = `1.${++testNo}`;
+
+                it(`Test ${t}: ${m.label} gas sensitivity for x=${x}`, async function () {
                     const qx = await toQuad(harness, x);
 
                     await touchGas(harness, m.method, [qx]);
@@ -111,7 +114,7 @@ describe("Trigonometry - Gas Growth Tests", function () {
                     const isNan = await harness.isNaN(out);
 
                     printBlockRegular({
-                        t,
+                        t: `${t}`,
                         method: m.label,
                         explanation: `Gas sensitivity to input magnitude using x=${x}.`,
                         gas,
@@ -127,7 +130,9 @@ describe("Trigonometry - Gas Growth Tests", function () {
 
         for (const m of INV_METHODS) {
             for (const x of INV_CASES) {
-                it(`Test ${++t}: ${m.label} gas sensitivity for x=${x}`, async function () {
+                const t = `1.${++testNo}`;
+
+                it(`Test ${t}: ${m.label} gas sensitivity for x=${x}`, async function () {
                     const qx = await toQuad(harness, x);
 
                     await touchGas(harness, m.method, [qx]);
@@ -141,7 +146,7 @@ describe("Trigonometry - Gas Growth Tests", function () {
                     const isNan = await harness.isNaN(out);
 
                     printBlockRegular({
-                        t,
+                        t: `${t}`,
                         method: m.label,
                         explanation: `Gas sensitivity to input magnitude using x=${x}.`,
                         gas,
@@ -156,7 +161,9 @@ describe("Trigonometry - Gas Growth Tests", function () {
         }
 
         for (const x of ATAN_CASES) {
-            it(`Test ${++t}: atan gas sensitivity for x=${x}`, async function () {
+            const t = `1.${++testNo}`;
+
+            it(`Test ${t}: atan gas sensitivity for x=${x}`, async function () {
                 const qx = await toQuad(harness, x);
 
                 await touchGas(harness, "atan", [qx]);
@@ -166,7 +173,7 @@ describe("Trigonometry - Gas Growth Tests", function () {
                 const isNan = await harness.isNaN(out);
 
                 printBlockRegular({
-                    t,
+                    t: `${t}`,
                     method: "atan",
                     explanation: `Gas sensitivity to input magnitude using x=${x}.`,
                     gas,
@@ -185,6 +192,7 @@ describe("Trigonometry - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 2: Gas Sensitivity to Branch / Critical Region", function () {
+        let testNo = 0;
         const EPS = 1e-6;
 
         const SIN_COS_CASES: Array<{ label: string; value: number | "PI_OVER_4" | "HALF_PI" | "PI" | "THREE_HALF_PI" | "TWO_PI" }> = [
@@ -245,7 +253,9 @@ describe("Trigonometry - Gas Growth Tests", function () {
 
         for (const method of ["sin", "cos"] as const) {
             for (const c of SIN_COS_CASES) {
-                it(`Test ${++t}: ${method} gas sensitivity for critical point ${c.label}`, async function () {
+                const t = `2.${++testNo}`;
+
+                it(`Test ${t}: ${method} gas sensitivity for critical point ${c.label}`, async function () {
                     const qx = await resolveSpecial(c.value);
 
                     await touchGas(harness, method, [qx]);
@@ -255,7 +265,7 @@ describe("Trigonometry - Gas Growth Tests", function () {
                     const isNan = await harness.isNaN(out);
 
                     printBlockRegular({
-                        t,
+                        t: `${t}`,
                         method,
                         explanation: `Gas sensitivity to branch / critical region using x=${c.label}.`,
                         gas,
@@ -270,7 +280,9 @@ describe("Trigonometry - Gas Growth Tests", function () {
         }
 
         for (const c of TAN_CASES) {
-            it(`Test ${++t}: tan gas sensitivity for critical point ${c.label}`, async function () {
+            const t = `2.${++testNo}`;
+
+            it(`Test ${t}: tan gas sensitivity for critical point ${c.label}`, async function () {
                 const qx = await resolveSpecial(c.value);
 
                 await touchGas(harness, "tan", [qx]);
@@ -280,7 +292,7 @@ describe("Trigonometry - Gas Growth Tests", function () {
                 const isNan = await harness.isNaN(out);
 
                 printBlockRegular({
-                    t,
+                    t: `${t}`,
                     method: "tan",
                     explanation: `Gas sensitivity to branch / critical region using x=${c.label}.`,
                     gas,
@@ -294,7 +306,9 @@ describe("Trigonometry - Gas Growth Tests", function () {
         }
 
         for (const c of COT_CASES) {
-            it(`Test ${++t}: cot gas sensitivity for critical point ${c.label}`, async function () {
+            const t = `2.${++testNo}`;
+
+            it(`Test ${t}: cot gas sensitivity for critical point ${c.label}`, async function () {
                 const qx = await resolveSpecial(c.value);
 
                 await touchGas(harness, "cot", [qx]);
@@ -304,7 +318,7 @@ describe("Trigonometry - Gas Growth Tests", function () {
                 const isNan = await harness.isNaN(out);
 
                 printBlockRegular({
-                    t,
+                    t: `${t}`,
                     method: "cot",
                     explanation: `Gas sensitivity to branch / critical region using x=${c.label}.`,
                     gas,
@@ -319,7 +333,9 @@ describe("Trigonometry - Gas Growth Tests", function () {
 
         for (const method of ["asin", "acos"] as const) {
             for (const x of ASIN_ACOS_CASES) {
-                it(`Test ${++t}: ${method} gas sensitivity for critical point ${x}`, async function () {
+                const t = `2.${++testNo}`;
+
+                it(`Test ${t}: ${method} gas sensitivity for critical point ${x}`, async function () {
                     const qx = await toQuad(harness, x);
 
                     await touchGas(harness, method, [qx]);
@@ -329,7 +345,7 @@ describe("Trigonometry - Gas Growth Tests", function () {
                     const isNan = await harness.isNaN(out);
 
                     printBlockRegular({
-                        t,
+                        t: `${t}`,
                         method,
                         explanation: `Gas sensitivity to branch / critical region using x=${x}.`,
                         gas,
@@ -344,7 +360,9 @@ describe("Trigonometry - Gas Growth Tests", function () {
         }
 
         for (const x of ATAN_CASES) {
-            it(`Test ${++t}: atan gas sensitivity for critical point ${x}`, async function () {
+            const t = `2.${++testNo}`;
+
+            it(`Test ${t}: atan gas sensitivity for critical point ${x}`, async function () {
                 const qx = await toQuad(harness, x);
 
                 await touchGas(harness, "atan", [qx]);
@@ -354,7 +372,7 @@ describe("Trigonometry - Gas Growth Tests", function () {
                 const isNan = await harness.isNaN(out);
 
                 printBlockRegular({
-                    t,
+                    t: `${t}`,
                     method: "atan",
                     explanation: `Gas sensitivity to branch / critical region using x=${x}.`,
                     gas,

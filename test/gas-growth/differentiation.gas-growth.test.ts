@@ -79,7 +79,6 @@ function gasSpread(values: bigint[]): bigint {
 describe("Differentiation Library - Gas Growth Tests", function () {
     let harness: DifferentiationHarness;
     let target: string;
-    let t = 0;
 
     let QZERO: string;
 
@@ -127,6 +126,8 @@ describe("Differentiation Library - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 1: Gas vs Input Magnitude", function () {
+        let testNo = 0;
+
         const CASES = [
             { label: "x=-1e6", value: -1_000_000 },
             { label: "x=-1", value: -1 },
@@ -142,17 +143,21 @@ describe("Differentiation Library - Gas Growth Tests", function () {
         ];
 
         for (const m of METHODS) {
-            it(`Test ${++t}: ${m.label} gas remains approximately stable as x magnitude changes`, async function () {
+            const t = `1.${++testNo}`;
+
+            it(`Test ${t}: ${m.label} gas remains approximately stable as x magnitude changes`, async function () {
                 const gasValues: bigint[] = [];
+                let subNo = 0;
 
                 for (const c of CASES) {
+                    const subT = `${t}.${++subNo}`;
                     const x = await qInt(c.value);
                     const { gas, out } = await runGasCase(harness, m.method, target, selSquare, x, QZERO);
                     const gasBI = toGasBigInt(gas);
                     gasValues.push(gasBI);
 
                     printBlockRegular({
-                        t,
+                        t: subT,
                         method: m.label,
                         explanation: `Gas sensitivity to input magnitude using f(x)=x^2 and ${c.label}.`,
                         gas,
@@ -169,8 +174,6 @@ describe("Differentiation Library - Gas Growth Tests", function () {
                 console.log(`\n[${m.label}] gas values: ${gasValues.map(v => v.toString()).join(", ")}`);
                 console.log(`[${m.label}] spread: ${spread.toString()}\n`);
 
-                // Soft sanity assertion:
-                // Input magnitude should not create large gas divergence.
                 expect(spread < 5000n).to.equal(true);
             });
         }
@@ -181,6 +184,8 @@ describe("Differentiation Library - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 2: Gas vs Step Selection", function () {
+        let testNo = 0;
+
         const STEP_CASES: Array<{ label: string; hKey: "QZERO" | "H_TINY" | "H_SMALL" | "H_ONE" | "H_TEN" | "H_NEG_ONE" }> = [
             { label: "default h (QZERO branch)", hKey: "QZERO" },
             { label: "h=1e-8", hKey: "H_TINY" },
@@ -197,11 +202,15 @@ describe("Differentiation Library - Gas Growth Tests", function () {
         ];
 
         for (const m of METHODS) {
-            it(`Test ${++t}: ${m.label} gas under different h selections`, async function () {
+            const t = `2.${++testNo}`;
+
+            it(`Test ${t}: ${m.label} gas under different h selections`, async function () {
                 const x = await qInt(100);
                 const gasValues: bigint[] = [];
+                let subNo = 0;
 
                 for (const s of STEP_CASES) {
+                    const subT = `${t}.${++subNo}`;
                     const h =
                         s.hKey === "QZERO" ? QZERO :
                         s.hKey === "H_TINY" ? H_TINY :
@@ -215,7 +224,7 @@ describe("Differentiation Library - Gas Growth Tests", function () {
                     gasValues.push(gasBI);
 
                     printBlockRegular({
-                        t,
+                        t: subT,
                         method: m.label,
                         explanation: `Gas sensitivity to step size branch/selection with f(x)=x^3 and ${s.label}.`,
                         gas,
@@ -232,7 +241,6 @@ describe("Differentiation Library - Gas Growth Tests", function () {
                 console.log(`\n[${m.label}] step gas values: ${gasValues.map(v => v.toString()).join(", ")}`);
                 console.log(`[${m.label}] step spread: ${spread.toString()}\n`);
 
-                // Some branch variation is acceptable, but it should still stay limited.
                 expect(spread < 8000n).to.equal(true);
             });
         }
@@ -243,6 +251,8 @@ describe("Differentiation Library - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 3: Gas vs Target Function Complexity", function () {
+        let testNo = 0;
+
         const FUNCTIONS: Array<{ label: string; selectorName: "linear" | "square" | "cube" | "abs" }> = [
             { label: "f_linear", selectorName: "linear" },
             { label: "f_square", selectorName: "square" },
@@ -257,10 +267,14 @@ describe("Differentiation Library - Gas Growth Tests", function () {
         ];
 
         for (const m of METHODS) {
-            it(`Test ${++t}: ${m.label} gas across target function complexity`, async function () {
+            const t = `3.${++testNo}`;
+
+            it(`Test ${t}: ${m.label} gas across target function complexity`, async function () {
                 const x = await qInt(7);
+                let subNo = 0;
 
                 for (const f of FUNCTIONS) {
+                    const subT = `${t}.${++subNo}`;
                     const selector =
                         f.selectorName === "linear" ? selLinear :
                         f.selectorName === "square" ? selSquare :
@@ -270,7 +284,7 @@ describe("Differentiation Library - Gas Growth Tests", function () {
                     const { gas, out } = await runGasCase(harness, m.method, target, selector, x, QZERO);
 
                     printBlockRegular({
-                        t,
+                        t: subT,
                         method: m.label,
                         explanation: `Gas comparison across target functions using ${f.label}.`,
                         gas,
@@ -292,7 +306,9 @@ describe("Differentiation Library - Gas Growth Tests", function () {
     // ------------------------------------------------------------
 
     describe("Section 4: Direct Method Comparison", function () {
-        it(`Test ${++t}: Compare FW, BW, CENT on same input and same target`, async function () {
+        const t = "4.1";
+
+        it(`Test ${t}: Compare FW, BW, CENT on same input and same target`, async function () {
             const x = await qInt(25);
 
             const fw = await runGasCase(harness, "forwardDiffHarness", target, selSquare, x, QZERO);
@@ -300,7 +316,7 @@ describe("Differentiation Library - Gas Growth Tests", function () {
             const cent = await runGasCase(harness, "centeredDiffHarness", target, selSquare, x, QZERO);
 
             printBlockRegular({
-                t,
+                t: `${t}.1`,
                 method: "FW",
                 explanation: "Direct comparison baseline for f(x)=x^2 at x=25.",
                 gas: fw.gas,
@@ -312,7 +328,7 @@ describe("Differentiation Library - Gas Growth Tests", function () {
             });
 
             printBlockRegular({
-                t,
+                t: `${t}.2`,
                 method: "BW",
                 explanation: "Direct comparison baseline for f(x)=x^2 at x=25.",
                 gas: bw.gas,
@@ -324,7 +340,7 @@ describe("Differentiation Library - Gas Growth Tests", function () {
             });
 
             printBlockRegular({
-                t,
+                t: `${t}.3`,
                 method: "CENT",
                 explanation: "Direct comparison baseline for f(x)=x^2 at x=25.",
                 gas: cent.gas,

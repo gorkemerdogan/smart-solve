@@ -87,7 +87,6 @@ function toGasBigInt(gas: unknown): bigint {
 describe("Integration Library - Gas Growth Tests", function () {
   let harness: IntegrationHarness;
   let target: string;
-  let t = 0;
 
   // Constants
   let q0: string;
@@ -146,6 +145,8 @@ describe("Integration Library - Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 1: Gas Growth with Respect to n", function () {
+    let testNo = 0;
+
     const N_CASES = [12, 30, 120, 300, 1200, 3000];
 
     const METHODS: Array<{ method: MethodName; label: MethodLabel }> = [
@@ -156,7 +157,9 @@ describe("Integration Library - Gas Growth Tests", function () {
 
     for (const m of METHODS) {
       for (const n of N_CASES) {
-        it(`Test ${++t}: ${m.label} gas growth with n=${n}`, async function () {
+        const t = `1.${++testNo}`;
+
+        it(`Test ${t}: ${m.label} gas growth with n=${n}`, async function () {
           const { gas, out } = await runGasCase(harness, m.method, target, selSquare, q0, q1, n);
 
           printBlockRegular({
@@ -182,6 +185,8 @@ describe("Integration Library - Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 2: Gas Sensitivity to Interval Width", function () {
+    let testNo = 0;
+
     const INTERVAL_CASES: Array<{ label: string; b: () => Promise<string> }> = [
       { label: "[0,1]", b: async () => q1 },
       { label: "[0,10]", b: async () => q10 },
@@ -200,7 +205,9 @@ describe("Integration Library - Gas Growth Tests", function () {
 
     for (const m of METHODS) {
       for (const intervalCase of INTERVAL_CASES) {
-        it(`Test ${++t}: ${m.label} gas sensitivity on interval ${intervalCase.label}`, async function () {
+        const t = `2.${++testNo}`;
+
+        it(`Test ${t}: ${m.label} gas sensitivity on interval ${intervalCase.label}`, async function () {
           const b = await intervalCase.b();
           const { gas, out } = await runGasCase(harness, m.method, target, selSquare, q0, b, FIXED_N);
 
@@ -227,6 +234,8 @@ describe("Integration Library - Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 3: Gas Sensitivity to Function Degree", function () {
+    let testNo = 0;
+
     const FUNCTION_CASES: Array<{ label: string; selector: () => string }> = [
       { label: "f(x)=5", selector: () => selConst5 },
       { label: "f(x)=x", selector: () => selLinear },
@@ -244,7 +253,9 @@ describe("Integration Library - Gas Growth Tests", function () {
 
     for (const m of METHODS) {
       for (const f of FUNCTION_CASES) {
-        it(`Test ${++t}: ${m.label} gas sensitivity for ${f.label}`, async function () {
+        const t = `3.${++testNo}`;
+
+        it(`Test ${t}: ${m.label} gas sensitivity for ${f.label}`, async function () {
           const { gas, out } = await runGasCase(harness, m.method, target, f.selector(), q0, q1, FIXED_N);
 
           printBlockRegular({
@@ -270,6 +281,8 @@ describe("Integration Library - Gas Growth Tests", function () {
   // ------------------------------------------------------------
 
   describe("Section 4: Gas Sensitivity to Numeric Scale", function () {
+    let testNo = 0;
+
     const SCALE_CASES: Array<{ label: string; selector: () => string }> = [
       { label: "f_verySmall", selector: () => selVerySmall },
       { label: "f_small", selector: () => selSmall },
@@ -288,7 +301,9 @@ describe("Integration Library - Gas Growth Tests", function () {
 
     for (const m of METHODS) {
       for (const s of SCALE_CASES) {
-        it(`Test ${++t}: ${m.label} gas sensitivity for ${s.label}`, async function () {
+        const t = `4.${++testNo}`;
+
+        it(`Test ${t}: ${m.label} gas sensitivity for ${s.label}`, async function () {
           const { gas, out } = await runGasCase(harness, m.method, target, s.selector(), q0, q1, FIXED_N);
 
           printBlockRegular({
