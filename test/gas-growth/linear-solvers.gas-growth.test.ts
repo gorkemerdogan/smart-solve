@@ -54,23 +54,8 @@ type LinearSolversHarness = Contract & {
 const SCALE_DECIMALS = 12n;
 const SCALE = 10n ** SCALE_DECIMALS;
 
-function formatScaledInt(v: bigint): string {
-    const neg = v < 0n;
-    const abs = neg ? -v : v;
-    const intPart = abs / SCALE;
-    const fracPart = abs % SCALE;
-    const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
-    return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`.replace(/\.?0+$/, "");
-}
-
-function toGasBigInt(gas: unknown): bigint {
-    if (typeof gas === "bigint") return gas;
-    return BigInt(gas as string);
-}
-
 type IterMethod = "jacobi" | "gaussSeidel" | "gradientDescentLeastSquares";
 type DirectMethod = "gaussianElimination" | "luDecomposition";
-type AnyMethod = IterMethod | DirectMethod;
 
 type MatrixCase = {
     n: number;
@@ -81,6 +66,107 @@ type MatrixCase = {
 
 function idx(n: number, i: number, j: number): number {
     return i * n + j;
+}
+
+function toGasBigInt(gas: unknown): bigint {
+    if (typeof gas === "bigint") return gas;
+    return BigInt(gas as string);
+}
+
+function formatScaledInt(v: bigint): string {
+    const neg = v < 0n;
+    const abs = neg ? -v : v;
+    const intPart = abs / SCALE;
+    const fracPart = abs % SCALE;
+    const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
+    return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`.replace(/\.?0+$/, "");
+}
+
+function padRight(s: string, len: number): string {
+    return s.length >= len ? s : s + " ".repeat(len - s.length);
+}
+
+function splitEvery<T>(arr: T[], width: number): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += width) {
+        out.push(arr.slice(i, i + width));
+    }
+    return out;
+}
+
+function maxAbs(arr: bigint[]): bigint {
+    let best = 0n;
+    for (const v of arr) {
+        const a = v < 0n ? -v : v;
+        if (a > best) best = a;
+    }
+    return best;
+}
+
+function subVec(a: bigint[], b: bigint[]): bigint[] {
+    return a.map((v, i) => v - b[i]);
+}
+
+function matVecMulScaled(A: bigint[], x: bigint[], n: number): bigint[] {
+    const out = new Array<bigint>(n).fill(0n);
+    for (let i = 0; i < n; i++) {
+        let sum = 0n;
+        for (let j = 0; j < n; j++) {
+            sum += (A[idx(n, i, j)] * x[j]) / SCALE;
+        }
+        out[i] = sum;
+    }
+    return out;
+}
+
+function matMulScaled(A: bigint[], B: bigint[], n: number): bigint[] {
+    const out = new Array<bigint>(n * n).fill(0n);
+    for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+            let sum = 0n;
+            for (let k = 0; k < n; k++) {
+                sum += (A[idx(n, i, k)] * B[idx(n, k, j)]) / SCALE;
+            }
+            out[idx(n, i, j)] = sum;
+        }
+    }
+    return out;
+}
+
+function maxAbsMatDiff(A: bigint[], B: bigint[]): bigint {
+    let best = 0n;
+    for (let i = 0; i < A.length; i++) {
+        const d = A[i] - B[i];
+        const a = d < 0n ? -d : d;
+        if (a > best) best = a;
+    }
+    return best;
+}
+
+function formatVectorScaled(arr: bigint[], label = "vec", limit = 8): string {
+    const shown = arr.slice(0, limit).map(formatScaledInt);
+    const suffix = arr.length > limit ? ", ..." : "";
+    return `${label}=[${shown.join(", ")}${suffix}]`;
+}
+
+function formatMatrixScaled(flat: bigint[], n: number, label = "M", maxRows = 4, maxCols = 4): string {
+    const rows = splitEvery(flat, n);
+    const shownRows = rows.slice(0, maxRows).map(r => {
+        const shownCols = r.slice(0, maxCols).map(v => padRight(formatScaledInt(v), 12));
+        const suffix = r.length > maxCols ? " ..." : "";
+        return `[ ${shownCols.join("  ")}${suffix} ]`;
+    });
+
+    return `${label}=\n${shownRows.join("\n")}${rows.length > maxRows ? "\n..." : ""}`;
+}
+
+function describeScale(factorNum: bigint, factorDen: bigint): string {
+    if (factorDen === 1n) return factorNum.toString();
+    return `${factorNum.toString()}/${factorDen.toString()}`;
+}
+
+async function qArrayFromBigints(harness: LinearSolversHarness, arr: bigint[]): Promise<string[]> {
+    return Promise.all(arr.map(v => harness.qFromInt(v)));
 }
 
 async function qScaledArrayFromBigints(
@@ -97,6 +183,10 @@ async function qScaledArrayFromBigints(
             return harness.qFromFrac(v * factorNum, factorDen);
         })
     );
+}
+
+async function toScaledArray(harness: LinearSolversHarness, arr: string[]): Promise<bigint[]> {
+    return Promise.all(arr.map(v => harness.toFloat(v)));
 }
 
 /**
@@ -133,7 +223,10 @@ function buildSystem(n: number, scale: bigint = 1n): MatrixCase {
     return { n, A, b, xTrue };
 }
 
-function makeGuess(kind: "zero" | "near" | "farPositive" | "farNegative" | "mixed", xTrue: bigint[]): bigint[] {
+function makeGuess(
+    kind: "zero" | "near" | "farPositive" | "farNegative" | "mixed",
+    xTrue: bigint[]
+): bigint[] {
     const n = xTrue.length;
 
     if (kind === "zero") return new Array(n).fill(0n);
@@ -141,14 +234,6 @@ function makeGuess(kind: "zero" | "near" | "farPositive" | "farNegative" | "mixe
     if (kind === "farPositive") return xTrue.map((v, i) => v + 50n + BigInt(i));
     if (kind === "farNegative") return xTrue.map((v, i) => -(v + 50n + BigInt(i)));
     return xTrue.map((v, i) => (i % 2 === 0 ? v + 25n : -(v + 25n)));
-}
-
-async function qArrayFromBigints(harness: LinearSolversHarness, arr: bigint[]): Promise<string[]> {
-    return Promise.all(arr.map(v => harness.qFromInt(v)));
-}
-
-async function toScaledArray(harness: LinearSolversHarness, arr: string[]): Promise<bigint[]> {
-    return Promise.all(arr.map(v => harness.toFloat(v)));
 }
 
 async function runDirectCase(
@@ -201,6 +286,172 @@ async function runIterCase(
             : await harness.gaussSeidel(BigInt(n), A, b, x0, maxIter, tol);
 
     return { gas, out };
+}
+
+async function buildGaussianOutput(
+    harness: LinearSolversHarness,
+    n: number,
+    Aq: string[],
+    bq: string[],
+    xOutQ: string[],
+    xTrueInts: bigint[]
+): Promise<{ inHex: string; outHex: string; expectedDec: string; outDec: string }> {
+    const AScaled = await toScaledArray(harness, Aq);
+    const bScaled = await toScaledArray(harness, bq);
+    const xScaled = await toScaledArray(harness, xOutQ);
+    const xTrueScaled = xTrueInts.map(v => v * SCALE);
+
+    const xErr = subVec(xScaled, xTrueScaled);
+    const residual = subVec(matVecMulScaled(AScaled, xScaled, n), bScaled);
+
+    return {
+        inHex: `n=${n}, A=scaled dense system, b=scaled RHS`,
+        outHex: `x=[${xOutQ.join(", ")}]`,
+        expectedDec: [
+            formatVectorScaled(xTrueScaled, "xTrue"),
+            formatMatrixScaled(AScaled, n, "A"),
+            formatVectorScaled(bScaled, "b"),
+        ].join("\n"),
+        outDec: [
+            formatVectorScaled(xScaled, "xApprox"),
+            formatVectorScaled(xErr, "xError"),
+            formatVectorScaled(residual, "residual"),
+            `max|x-xTrue|=${formatScaledInt(maxAbs(xErr))}`,
+            `max|Ax-b|=${formatScaledInt(maxAbs(residual))}`,
+        ].join("\n"),
+    };
+}
+
+async function buildIterativeOutput(
+    harness: LinearSolversHarness,
+    n: number,
+    Aq: string[],
+    bq: string[],
+    x0q: string[],
+    out: [string[], bigint],
+    xTrueInts: bigint[],
+    extra?: { alpha?: string; maxIter?: bigint }
+): Promise<{ inHex: string; outHex: string; expectedDec: string; outDec: string }> {
+    const [xOutQ, iters] = out;
+
+    const AScaledSafe = await safeToScaledArray(harness, Aq);
+    const bScaledSafe = await safeToScaledArray(harness, bq);
+    const x0ScaledSafe = await safeToScaledArray(harness, x0q);
+    const xScaledSafe = await safeToScaledArray(harness, xOutQ);
+    const xTrueScaled = xTrueInts.map(v => v * SCALE);
+
+    const alphaSafe = extra?.alpha ? await safeToScaled(harness, extra.alpha) : undefined;
+
+    const expectedLines = [
+        formatVectorScaled(xTrueScaled, "xTrue"),
+        formatSafeVector(x0ScaledSafe, "x0"),
+        alphaSafe
+            ? alphaSafe.ok
+                ? `alpha=${formatScaledInt(alphaSafe.value)}`
+                : `alpha=${alphaSafe.raw} (${alphaSafe.reason})`
+            : "",
+        allSafeOk(AScaledSafe) ? formatMatrixScaled(AScaledSafe.map(v => v.value), n, "A") : "A=[unprintable via toFloat; raw quad values used]",
+        formatSafeVector(bScaledSafe, "b"),
+    ].filter(Boolean);
+
+    const outLines = [
+        formatSafeVector(xScaledSafe, "xApprox"),
+        `iterations=${iters.toString()}`,
+    ];
+
+    if (allSafeOk(AScaledSafe) && allSafeOk(bScaledSafe) && allSafeOk(xScaledSafe)) {
+        const AScaled = AScaledSafe.map(v => v.value);
+        const bScaled = bScaledSafe.map(v => v.value);
+        const xScaled = xScaledSafe.map(v => v.value);
+
+        const xErr = subVec(xScaled, xTrueScaled);
+        const residual = subVec(matVecMulScaled(AScaled, xScaled, n), bScaled);
+
+        outLines.push(
+            formatVectorScaled(xErr, "xError"),
+            formatVectorScaled(residual, "residual"),
+            `max|x-xTrue|=${formatScaledInt(maxAbs(xErr))}`,
+            `max|Ax-b|=${formatScaledInt(maxAbs(residual))}`
+        );
+    } else {
+        outLines.push("xError/residual skipped because one or more values could not be converted with toFloat()");
+    }
+
+    return {
+        inHex: `n=${n}, maxIter=${extra?.maxIter ?? "N/A"}, x0=[${x0q.join(", ")}]`,
+        outHex: `x=[${xOutQ.join(", ")}], iter=${iters.toString()}`,
+        expectedDec: expectedLines.join("\n"),
+        outDec: outLines.join("\n"),
+    };
+}
+
+async function buildLUOutput(
+    harness: LinearSolversHarness,
+    n: number,
+    Aq: string[],
+    out: [string[], string[]]
+): Promise<{ inHex: string; outHex: string; expectedDec: string; outDec: string }> {
+    const [Lq, Uq] = out;
+    const AScaled = await toScaledArray(harness, Aq);
+    const LScaled = await toScaledArray(harness, Lq);
+    const UScaled = await toScaledArray(harness, Uq);
+
+    const LU = matMulScaled(LScaled, UScaled, n);
+    const reconErr = maxAbsMatDiff(LU, AScaled);
+
+    return {
+        inHex: `n=${n}, LU factorization`,
+        outHex: `L=[${Lq.join(", ")}], U=[${Uq.join(", ")}]`,
+        expectedDec: formatMatrixScaled(AScaled, n, "A"),
+        outDec: [
+            formatMatrixScaled(LScaled, n, "L"),
+            formatMatrixScaled(UScaled, n, "U"),
+            formatMatrixScaled(LU, n, "L*U"),
+            `max|LU-A|=${formatScaledInt(reconErr)}`,
+        ].join("\n"),
+    };
+}
+
+async function safeToScaled(
+    harness: LinearSolversHarness,
+    q: string
+): Promise<{ ok: true; value: bigint } | { ok: false; raw: string; reason: string }> {
+    try {
+        const value = await harness.toFloat(q);
+        return { ok: true, value };
+    } catch {
+        return { ok: false, raw: q, reason: "toFloat reverted" };
+    }
+}
+
+async function safeToScaledArray(
+    harness: LinearSolversHarness,
+    arr: string[]
+): Promise<Array<{ ok: true; value: bigint } | { ok: false; raw: string; reason: string }>> {
+    return Promise.all(arr.map(v => safeToScaled(harness, v)));
+}
+
+function formatSafeValue(
+    item: { ok: true; value: bigint } | { ok: false; raw: string; reason: string }
+): string {
+    if (item.ok) return formatScaledInt(item.value);
+    return `${item.raw} (${item.reason})`;
+}
+
+function formatSafeVector(
+    arr: Array<{ ok: true; value: bigint } | { ok: false; raw: string; reason: string }>,
+    label = "vec",
+    limit = 8
+): string {
+    const shown = arr.slice(0, limit).map(formatSafeValue);
+    const suffix = arr.length > limit ? ", ..." : "";
+    return `${label}=[${shown.join(", ")}${suffix}]`;
+}
+
+function allSafeOk(
+    arr: Array<{ ok: true; value: bigint } | { ok: false; raw: string; reason: string }>
+): arr is Array<{ ok: true; value: bigint }> {
+    return arr.every(x => x.ok);
 }
 
 // ------------------------------------------------------------
@@ -260,16 +511,21 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
                                 ? await runDirectCase(harness, m.method, n, Aq, bq)
                                 : await runDirectCase(harness, m.method, n, Aq);
 
+                        const printable =
+                            m.method === "gaussianElimination"
+                                ? await buildGaussianOutput(harness, n, Aq, bq, result.out as string[], sys.xTrue)
+                                : await buildLUOutput(harness, n, Aq, result.out as [string[], string[]]);
+
                         printBlockRegular({
                             t,
                             method: m.label,
                             explanation: `Gas growth with respect to matrix dimension for dense diagonally dominant system of size n=${n}.`,
                             gas: result.gas,
-                            inHex: `n=${n}, dense diagonally dominant`,
-                            expectedHex: "N/A",
-                            outHex: m.method === "gaussianElimination" ? `[solution vector]` : `[L,U matrices]`,
-                            expectedDec: "N/A",
-                            outDec: m.method === "gaussianElimination" ? "solution returned" : "decomposition returned",
+                            inHex: printable.inHex,
+                            expectedHex: "Reference solution / factorization structure shown in decimal output",
+                            outHex: printable.outHex,
+                            expectedDec: printable.expectedDec,
+                            outDec: printable.outDec,
                         });
 
                         expect(toGasBigInt(result.gas) > 0n).to.equal(true);
@@ -311,18 +567,30 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
                             GD_ALPHA
                         );
 
-                        const [, iters] = result.out as [string[], bigint];
+                        const printable = await buildIterativeOutput(
+                            harness,
+                            n,
+                            Aq,
+                            bq,
+                            x0q,
+                            result.out as [string[], bigint],
+                            sys.xTrue,
+                            {
+                                alpha: m.method === "gradientDescentLeastSquares" ? GD_ALPHA : undefined,
+                                maxIter: FIXED_MAX_ITER,
+                            }
+                        );
 
                         printBlockRegular({
                             t,
                             method: m.label,
                             explanation: `Gas growth with respect to matrix dimension for dense diagonally dominant system of size n=${n} with fixed iteration budget ${FIXED_MAX_ITER}.`,
                             gas: result.gas,
-                            inHex: `n=${n}, maxIter=${FIXED_MAX_ITER}`,
-                            expectedHex: "N/A",
-                            outHex: `iter=${iters}`,
-                            expectedDec: "N/A",
-                            outDec: "solution returned",
+                            inHex: printable.inHex,
+                            expectedHex: "Reference solution shown in decimal output",
+                            outHex: printable.outHex,
+                            expectedDec: printable.expectedDec,
+                            outDec: printable.outDec,
                         });
 
                         expect(toGasBigInt(result.gas) > 0n).to.equal(true);
@@ -370,18 +638,30 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
                         GD_ALPHA
                     );
 
-                    const [, iters] = result.out as [string[], bigint];
+                    const printable = await buildIterativeOutput(
+                        harness,
+                        n,
+                        Aq,
+                        bq,
+                        x0q,
+                        result.out as [string[], bigint],
+                        sys.xTrue,
+                        {
+                            alpha: m.method === "gradientDescentLeastSquares" ? GD_ALPHA : undefined,
+                            maxIter,
+                        }
+                    );
 
                     printBlockRegular({
                         t,
                         method: m.label,
                         explanation: `Gas growth with respect to iteration budget for fixed 3x3 dense diagonally dominant system with maxIter=${maxIter}.`,
                         gas: result.gas,
-                        inHex: `n=3, maxIter=${maxIter}`,
-                        expectedHex: "N/A",
-                        outHex: `iter=${iters}`,
-                        expectedDec: "N/A",
-                        outDec: "solution returned",
+                        inHex: printable.inHex,
+                        expectedHex: "Reference solution shown in decimal output",
+                        outHex: printable.outHex,
+                        expectedDec: printable.expectedDec,
+                        outDec: printable.outDec,
                     });
 
                     expect(toGasBigInt(result.gas) > 0n).to.equal(true);
@@ -436,18 +716,30 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
                         GD_ALPHA
                     );
 
-                    const [, iters] = result.out as [string[], bigint];
+                    const printable = await buildIterativeOutput(
+                        harness,
+                        n,
+                        Aq,
+                        bq,
+                        x0q,
+                        result.out as [string[], bigint],
+                        sys.xTrue,
+                        {
+                            alpha: m.method === "gradientDescentLeastSquares" ? GD_ALPHA : undefined,
+                            maxIter: FIXED_MAX_ITER,
+                        }
+                    );
 
                     printBlockRegular({
                         t,
                         method: m.label,
                         explanation: `Gas sensitivity to initial guess using fixed 3x3 dense diagonally dominant system, fixed maxIter=${FIXED_MAX_ITER}, and ${g.label}.`,
                         gas: result.gas,
-                        inHex: `n=3, x0=${g.label}`,
-                        expectedHex: "N/A",
-                        outHex: `iter=${iters}`,
-                        expectedDec: "N/A",
-                        outDec: "solution returned",
+                        inHex: printable.inHex,
+                        expectedHex: "Reference solution shown in decimal output",
+                        outHex: printable.outHex,
+                        expectedDec: printable.expectedDec,
+                        outDec: printable.outDec,
                     });
 
                     expect(toGasBigInt(result.gas) > 0n).to.equal(true);
@@ -499,16 +791,24 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
                             ? await runDirectCase(harness, m.method, n, Aq, bq)
                             : await runDirectCase(harness, m.method, n, Aq);
 
+                    const printable =
+                        m.method === "gaussianElimination"
+                            ? await buildGaussianOutput(harness, n, Aq, bq, result.out as string[], base.xTrue)
+                            : await buildLUOutput(harness, n, Aq, result.out as [string[], string[]]);
+
                     printBlockRegular({
                         t,
                         method: m.label,
-                        explanation: `Gas sensitivity to coefficient scale using fixed 3x3 system and ${s.label} scaling.`,
+                        explanation: `Gas sensitivity to coefficient scale using fixed 3x3 system and ${s.label} scaling (factor=${describeScale(
+                            s.factorNum,
+                            s.factorDen
+                        )}).`,
                         gas: result.gas,
-                        inHex: `n=3, scale=${s.label}`,
-                        expectedHex: "N/A",
-                        outHex: m.method === "gaussianElimination" ? `[solution vector]` : `[L,U matrices]`,
-                        expectedDec: "N/A",
-                        outDec: "result returned",
+                        inHex: printable.inHex,
+                        expectedHex: "Reference solution / factorization structure shown in decimal output",
+                        outHex: printable.outHex,
+                        expectedDec: printable.expectedDec,
+                        outDec: printable.outDec,
                     });
 
                     expect(toGasBigInt(result.gas) > 0n).to.equal(true);
@@ -539,18 +839,33 @@ describe("LinearSolversHarness - Gas Growth Tests", function () {
                         GD_ALPHA
                     );
 
-                    const [, iters] = result.out as [string[], bigint];
+                    const printable = await buildIterativeOutput(
+                        harness,
+                        n,
+                        Aq,
+                        bq,
+                        x0q,
+                        result.out as [string[], bigint],
+                        base.xTrue,
+                        {
+                            alpha: m.method === "gradientDescentLeastSquares" ? GD_ALPHA : undefined,
+                            maxIter: 20n,
+                        }
+                    );
 
                     printBlockRegular({
                         t,
                         method: m.label,
-                        explanation: `Gas sensitivity to coefficient scale using fixed 3x3 system, fixed maxIter=20, and ${s.label} scaling.`,
+                        explanation: `Gas sensitivity to coefficient scale using fixed 3x3 system, fixed maxIter=20, and ${s.label} scaling (factor=${describeScale(
+                            s.factorNum,
+                            s.factorDen
+                        )}).`,
                         gas: result.gas,
-                        inHex: `n=3, scale=${s.label}`,
-                        expectedHex: "N/A",
-                        outHex: `iter=${iters}`,
-                        expectedDec: "N/A",
-                        outDec: "solution returned",
+                        inHex: printable.inHex,
+                        expectedHex: "Reference solution shown in decimal output",
+                        outHex: printable.outHex,
+                        expectedDec: printable.expectedDec,
+                        outDec: printable.outDec,
                     });
 
                     expect(toGasBigInt(result.gas) > 0n).to.equal(true);
