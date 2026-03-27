@@ -169,7 +169,7 @@ describe("SteepestDescent — General Solver", function () {
             expectNearMinimum(out);
 
             printBlockOptimization({
-                t,
+                t: `${t}`,
                 method: "solve",
                 explanation: "Steepest descent minimizes g(x)=x1^2+x2^2 starting from [3,4].",
                 gas,
@@ -199,7 +199,7 @@ describe("SteepestDescent — General Solver", function () {
             expectNearMinimum(out);
 
             printBlockOptimization({
-                t,
+                t: `${t}`,
                 method: "solve",
                 explanation: "Handles a 2D starting point with negative and positive components.",
                 gas,
@@ -228,7 +228,7 @@ describe("SteepestDescent — General Solver", function () {
             expectNearMinimum(out);
 
             printBlockOptimization({
-                t,
+                t: `${t}`,
                 method: "solve",
                 explanation: "Converges in 3D for the spherical quadratic objective.",
                 gas,
@@ -257,7 +257,7 @@ describe("SteepestDescent — General Solver", function () {
             expectNearMinimum(out);
 
             printBlockOptimization({
-                t,
+                t: `${t}`,
                 method: "solve",
                 explanation: "Works correctly for a larger-norm starting point.",
                 gas,
@@ -291,7 +291,7 @@ describe("SteepestDescent — General Solver", function () {
             expectNearMinimum(out);
 
             printBlockOptimization({
-                t,
+                t: `${t}`,
                 method: "solve",
                 explanation: "Verifies that the solver reduces the quadratic objective value.",
                 gas,
@@ -322,7 +322,7 @@ describe("SteepestDescent — General Solver", function () {
             expectNearMinimum(out);
 
             printBlockOptimization({
-                t,
+                t: `${t}`,
                 method: "solve",
                 explanation: "Uses the library/config default tolerance when explicit tol = 0.",
                 gas,
@@ -358,7 +358,7 @@ describe("SteepestDescent — General Solver", function () {
             }
 
             printBlockOptimization({
-                t,
+                t: `${t}`,
                 method: "solve",
                 explanation: "Repeated calls with the same input must produce identical output.",
                 gas,
@@ -388,7 +388,7 @@ describe("SteepestDescent — General Solver", function () {
             expectNearMinimum(out);
 
             printBlockOptimization({
-                t,
+                t: `${t}`,
                 method: "solve",
                 explanation: "Extends the same minimization logic to a 4D vector.",
                 gas,
@@ -424,7 +424,7 @@ describe("SteepestDescent — General Solver", function () {
             expect(out.x[1].toLowerCase()).to.equal(qZero.toLowerCase());
 
             printBlockOptimization({
-                t,
+                t: `${t}`,
                 method: "solve",
                 explanation: "If the initial point is already optimal, the solver exits immediately with success.",
                 gas,
@@ -453,7 +453,7 @@ describe("SteepestDescent — General Solver", function () {
             expectNearMinimum(out);
 
             printBlockOptimization({
-                t,
+                t: `${t}`,
                 method: "solve",
                 explanation: "With maxIter = 1, the solver performs one update then exits due to iteration limit.",
                 gas,
@@ -477,4 +477,12 @@ describe("SteepestDescent — General Solver", function () {
             ).to.be.revertedWith("SteepestDescent: empty initial point");
         });
     });
+});
+
+// ------------------------------------------------------------
+//  Comparison
+// ------------------------------------------------------------
+
+    describe("Section 7: Comparison for Iterative Methods", function () {
+
 });

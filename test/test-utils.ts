@@ -150,7 +150,7 @@ export function printBlockRegular({t, method, explanation, gas, inHex = "-", exp
 
 interface printBlockOptimizationData {
     outDec?: string;
-    t: number; 
+    t: string; 
     method: string; 
     explanation: string; 
     gas: bigint | number | string; 
