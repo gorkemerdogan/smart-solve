@@ -95,7 +95,7 @@ library RootFinding {
      * @param  x      Input point
      * @return y      Result of f(x) encoded as bytes16
      */
-    function _eval(address target, bytes4 sel, bytes16 x) private view returns (bytes16 y) {
+    function _eval(address target, bytes4 sel, bytes16 x) internal view returns (bytes16 y) {
         (bool ok, bytes memory data) = target.staticcall(abi.encodeWithSelector(sel, x));
         require(ok && data.length >= 32, "RootFinding: eval failed");
         assembly {
@@ -113,7 +113,7 @@ library RootFinding {
      * @param  requestedTol Tolerance supplied by the caller.
      * @return tol Validated and clamped tolerance, guaranteed > 0.
      */
-    function _clampTol(bytes16 requestedTol) private view returns (bytes16 tol) {
+    function _clampTol(bytes16 requestedTol) internal view returns (bytes16 tol) {
         LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
 
         // Load minimum tolerance from storage or fallback default

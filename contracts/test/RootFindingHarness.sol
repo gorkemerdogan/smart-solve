@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {MathLib} from "../libraries/MathLib.sol";
+import { MathLib } from "../libraries/MathLib.sol";
+import { RootFinding } from "../libraries/numeric/RootFinding.sol";
 
 /**
  * @title RootFindingHarness
@@ -11,6 +12,9 @@ import {MathLib} from "../libraries/MathLib.sol";
  */
 contract RootFindingHarness {
     using MathLib for bytes16;
+
+    /// Scaling factor used for JS-style fixed-decimal conversions.
+    uint256 public constant SCALE = 1e12;
 
     // ------------------------------------------------------------------------
     // Test functions f(x) and df(x) for root-finding
@@ -60,6 +64,63 @@ contract RootFindingHarness {
         y = three.mul(x2).sub(one);
     }
 
+    /**
+     * @notice Evaluates the shifted linear function f(x) = x - 2.
+     * @param x Input value.
+     * @return Function value at x.
+     */
+    function f_shift_small(bytes16 x) external pure returns (bytes16) {
+        return MathLib.sub(x, MathLib.fromUInt(2));
+    }
+
+    /**
+     * @notice Evaluates the derivative of the shifted linear function f'(x) = 1.
+     * @param x Input value.
+     * @return Derivative value at x.
+     */
+    function df_shift_small(bytes16 x) external pure returns (bytes16) {
+        x; // Silence unused parameter warning.
+        return MathLib.fromUInt(1);
+    }
+
+    /**
+     * @notice Evaluates the shifted linear function f(x) = x - 200.
+     * @param x Input value.
+     * @return Function value at x.
+     */
+    function f_shift_medium(bytes16 x) external pure returns (bytes16) {
+        return MathLib.sub(x, MathLib.fromUInt(200));
+    }
+
+    /**
+     * @notice Evaluates the derivative of the shifted linear function f'(x) = 1.
+     * @param x Input value.
+     * @return Derivative value at x.
+     */
+    function df_shift_medium(bytes16 x) external pure returns (bytes16) {
+        x; // Silence unused parameter warning.
+        return MathLib.fromUInt(1);
+    }
+
+    /**
+     * @notice Evaluates the shifted linear function f(x) = x - 20000.
+     * @param x Input value.
+     * @return Function value at x.
+     */
+    function f_shift_large(bytes16 x) external pure returns (bytes16) {
+        return MathLib.sub(x, MathLib.fromUInt(20000));
+    }
+
+    /**
+     * @notice Evaluates the derivative of the shifted linear function f'(x) = 1.
+     * @param x Input value.
+     * @return Derivative value at x.
+     */
+    function df_shift_large(bytes16 x) external pure returns (bytes16) {
+        x; // Silence unused parameter warning.
+        return MathLib.fromUInt(1);
+    }
+ 
     // ------------------------------------------------------------
     //  Numerical Helpers
     // ------------------------------------------------------------
@@ -99,9 +160,6 @@ contract RootFindingHarness {
         q = MathLib.div(qNum, qDen);
     }
 
-    /// Scaling factor used for JS-style fixed-decimal conversions.
-    uint256 public constant SCALE = 1e12;
-
     /**
      * @notice Converts a quadruple-precision number into a scaled integer (scaled by SCALE).
      * @param x Quadruple-precision value.
@@ -127,60 +185,94 @@ contract RootFindingHarness {
         return MathLib.cmp(a, b);
     }
 
+    // ------------------------------------------------------------
+    // RootFinding internal helper wrappers
+    // ------------------------------------------------------------
+
     /**
-     * @notice Evaluates the shifted linear function f(x) = x - 2.
+     * @notice Exposes RootFinding._eval for direct testing.
+     * @dev Calls target.staticcall(selector, x) through the library helper.
+     * @param target Contract exposing a function with signature f(bytes16) -> bytes16.
+     * @param sel Function selector of the target function.
      * @param x Input value.
-     * @return Function value at x.
+     * @return y Evaluated function value.
      */
-    function f_shift_small(bytes16 x) external pure returns (bytes16) {
-        return MathLib.sub(x, MathLib.fromUInt(2));
+    function evalHarness(
+        address target,
+        bytes4 sel,
+        bytes16 x
+    ) external view returns (bytes16 y) {
+        y = RootFinding._eval(target, sel, x);
     }
 
     /**
-     * @notice Evaluates the derivative of the shifted linear function f'(x) = 1.
-     * @param x Input value.
-     * @return Derivative value at x.
+     * @notice Exposes RootFinding._clampTol for direct testing.
+     * @param requestedTol Tolerance supplied by the caller.
+     * @return tol Effective tolerance after config/default/min clamping.
      */
-    function df_shift_small(bytes16 x) external pure returns (bytes16) {
-        x; // silence unused parameter warning
-        return MathLib.fromUInt(1);
+    function clampTolHarness(bytes16 requestedTol) external view returns (bytes16 tol) {
+        tol = RootFinding._clampTol(requestedTol);
+    }
+
+    // ------------------------------------------------------------
+    // RootFinding algorithm wrappers
+    // ------------------------------------------------------------
+
+    /**
+     * @notice Exposes the RootFinding.bisection library method for testing.
+     * @param  target Contract exposing f(bytes16) -> bytes16.
+     * @param  fSelector Function selector of f(bytes16).
+     * @param  a First endpoint.
+     * @param  b Second endpoint.
+     * @param  tol Requested tolerance.
+     * @param  maxIter Maximum iteration count.
+     * @return root Final root approximation.
+     * @return iterations Number of iterations performed.
+     * @return converged Whether convergence criteria were satisfied.
+     * @return fAtRoot Function value at the returned root.
+     */
+    function rootFindingBisection(address target, bytes4 fSelector, bytes16 a, bytes16 b, bytes16 tol, uint256 maxIter)
+        external view returns (bytes16 root, uint256 iterations, bool converged, bytes16 fAtRoot) {
+        RootFinding.RootResult memory r = RootFinding.bisection(target, fSelector, a, b, tol, maxIter);
+        return (r.root, r.iterations, r.converged, r.fAtRoot);
     }
 
     /**
-     * @notice Evaluates the shifted linear function f(x) = x - 200.
-     * @param x Input value.
-     * @return Function value at x.
+     * @notice Exposes the RootFinding.newton library method for testing.
+     * @param  target Contract exposing f(bytes16) -> bytes16.
+     * @param  fSelector Function selector of f(bytes16).
+     * @param  dfTarget Contract exposing f'(bytes16) -> bytes16.
+     * @param  dfSelector Function selector of f'(bytes16).
+     * @param  x0 Initial guess.
+     * @param  tol Requested tolerance.
+     * @param  maxIter Maximum iteration count.
+     * @return root Final root approximation.
+     * @return iterations Number of iterations performed.
+     * @return converged Whether convergence criteria were satisfied.
+     * @return fAtRoot Function value at the returned root.
      */
-    function f_shift_medium(bytes16 x) external pure returns (bytes16) {
-        return MathLib.sub(x, MathLib.fromUInt(200));
+    function rootFindingNewton(address target, bytes4 fSelector, address dfTarget, bytes4 dfSelector, bytes16 x0, bytes16 tol, uint256 maxIter)
+        external view returns (bytes16 root, uint256 iterations, bool converged, bytes16 fAtRoot){
+        RootFinding.RootResult memory r = RootFinding.newton(target, fSelector, dfTarget, dfSelector, x0, tol, maxIter);
+        return (r.root, r.iterations, r.converged, r.fAtRoot);
     }
 
     /**
-     * @notice Evaluates the derivative of the shifted linear function f'(x) = 1.
-     * @param x Input value.
-     * @return Derivative value at x.
+     * @notice Exposes the RootFinding.secant library method for testing.
+     * @param  target Contract exposing f(bytes16) -> bytes16.
+     * @param  fSelector Function selector of f(bytes16).
+     * @param  x0 First initial point.
+     * @param  x1 Second initial point.
+     * @param  tol Requested tolerance.
+     * @param  maxIter Maximum iteration count.
+     * @return root Final root approximation.
+     * @return iterations Number of iterations performed.
+     * @return converged Whether convergence criteria were satisfied.
+     * @return fAtRoot Function value at the returned root.
      */
-    function df_shift_medium(bytes16 x) external pure returns (bytes16) {
-        x; // silence unused parameter warning
-        return MathLib.fromUInt(1);
-    }
-
-    /**
-     * @notice Evaluates the shifted linear function f(x) = x - 20000.
-     * @param x Input value.
-     * @return Function value at x.
-     */
-    function f_shift_large(bytes16 x) external pure returns (bytes16) {
-        return MathLib.sub(x, MathLib.fromUInt(20000));
-    }
-
-    /**
-     * @notice Evaluates the derivative of the shifted linear function f'(x) = 1.
-     * @param x Input value.
-     * @return Derivative value at x.
-     */
-    function df_shift_large(bytes16 x) external pure returns (bytes16) {
-        x; // silence unused parameter warning
-        return MathLib.fromUInt(1);
+    function rootFindingSecant(address target, bytes4 fSelector, bytes16 x0, bytes16 x1, bytes16 tol, uint256 maxIter)
+        external view returns (bytes16 root, uint256 iterations, bool converged, bytes16 fAtRoot) {
+        RootFinding.RootResult memory r = RootFinding.secant(target, fSelector, x0, x1, tol, maxIter);
+        return (r.root, r.iterations, r.converged, r.fAtRoot);
     }
 }

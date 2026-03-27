@@ -17,13 +17,42 @@ type RootFindingHarness = Contract & {
   df_2x(x: string): Promise<string>;
   f_cubic(x: string): Promise<string>;
   df_cubic(x: string): Promise<string>;
+
+  evalHarness(target: string, sel: string, x: string): Promise<string>;
+  clampTolHarness(requestedTol: string): Promise<string>;
+
+  rootFindingBisection(
+    target: string,
+    fSelector: string,
+    a: string,
+    b: string,
+    tol: string,
+    maxIter: bigint
+  ): Promise<[string, bigint, boolean, string]>;
+
+  rootFindingNewton(
+    target: string,
+    fSelector: string,
+    dfTarget: string,
+    dfSelector: string,
+    x0: string,
+    tol: string,
+    maxIter: bigint
+  ): Promise<[string, bigint, boolean, string]>;
+
+  rootFindingSecant(
+    target: string,
+    fSelector: string,
+    x0: string,
+    x1: string,
+    tol: string,
+    maxIter: bigint
+  ): Promise<[string, bigint, boolean, string]>;
 };
 
-type RootFindingFacet = Contract & {
-  rootFindingBisection(target: string, fSelector: string, a: string, b: string): Promise<[string, bigint, boolean, string]>;
-  rootFindingNewton(target: string, fSelector: string, dfTarget: string, dfSelector: string, x0: string): Promise<[string, bigint, boolean, string]>;
-  rootFindingSecant(target: string, fSelector: string, x0: string, x1: string): Promise<[string, bigint, boolean, string]>;
-};
+const MAX_ITER_BISECTION = 200n;
+const MAX_ITER_NEWTON = 100n;
+const MAX_ITER_SECANT = 100n;
 
 // ------------------------------------------------------------
 //  JS Numeric Mirrors (Verification)
@@ -90,7 +119,7 @@ function secantRef(f: (x: number) => number, x0: number, x1: number, eps = 1e-12
 //  Helpers
 // ------------------------------------------------------------
 
-/// Formats a number for reporting, for extreme values and removes redundant trailing zeros from decimals. 
+/// Formats a number for reporting, for extreme values and removes redundant trailing zeros from decimals.
 function trim(n: number) {
   if (!Number.isFinite(n)) return String(n);
   const a = Math.abs(n);
@@ -99,7 +128,7 @@ function trim(n: number) {
   return n.toFixed(12).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-/// Converts a 128-bit quad-precision hex string from the contract into a JS number by dividing the raw integer value by the scale. 
+/// Converts a 128-bit quad-precision hex string from the contract into a JS number by dividing the raw integer value by the scale.
 async function fromQuad(h: RootFindingHarness, hex: string): Promise<number> {
   const raw: bigint = await h.toFloat(hex);
   return Number(raw) / 1e12;
@@ -119,8 +148,8 @@ function approx(a: number, b: number, tol = 1e-12) {
 
 describe("RootFinding — Report (values + gas)", function () {
   let harness: RootFindingHarness;
-  let root: RootFindingFacet;
   let t = 0;
+  let tolDefault: string;
 
   // Selectors
   let sel_fx2m4: string;
@@ -129,8 +158,9 @@ describe("RootFinding — Report (values + gas)", function () {
   let sel_dfcubic: string;
 
   // Helper Wrappers
-  const qInt = async (n: number | string) => await harness.qFromInt(BigInt(n));
-  const qFrac = async (n: number | string, d: number | string) => await harness.qFromFrac(BigInt(n), BigInt(d));
+  const qInt = async (n: number | string | bigint) => await harness.qFromInt(BigInt(n));
+  const qFrac = async (n: number | string | bigint, d: number | string | bigint) =>
+    await harness.qFromFrac(BigInt(n), BigInt(d));
 
   before(async () => {
     const MathLibFactory = await ethers.getContractFactory("MathLib");
@@ -144,16 +174,12 @@ describe("RootFinding — Report (values + gas)", function () {
     harness = (await HarnessFactory.deploy()) as unknown as RootFindingHarness;
     await harness.waitForDeployment();
 
-    const FacetFactory = await ethers.getContractFactory("RootFindingFacet", {
-      libraries: { "contracts/libraries/MathLib.sol:MathLib": mathAddr },
-    });
-    root = (await FacetFactory.deploy()) as unknown as RootFindingFacet;
-    await root.waitForDeployment();
-
     sel_fx2m4 = ethers.id("f_x2_minus_4(bytes16)").slice(0, 10);
     sel_df2x = ethers.id("df_2x(bytes16)").slice(0, 10);
     sel_fcubic = ethers.id("f_cubic(bytes16)").slice(0, 10);
     sel_dfcubic = ethers.id("df_cubic(bytes16)").slice(0, 10);
+
+    tolDefault = await harness.qFromFrac(1n, 1_000_000_000_000n); // 1e-12
   });
 
   // ------------------------------------------------------------
@@ -161,7 +187,6 @@ describe("RootFinding — Report (values + gas)", function () {
   // ------------------------------------------------------------
 
   describe("Section 1: Bisection", function () {
-
     it("Test 1: Standard (x^2-4 on [1,3])", async function () {
       t++;
       const a = await qInt(1);
@@ -169,9 +194,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = bisectionRef(f_x2_minus_4, 1, 3);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
-      const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fx2m4, a, b);
+      await touchGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -199,14 +224,13 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = bisectionRef(f_x2_minus_4, 3, 1);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
-      const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fx2m4, a, b);
+      await touchGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
 
-      // Verify convergence and numerical proximity to the JS mirror
       expect(ok).to.eq(true);
       expect(approx(actualRoot, ref.root, 1e-10)).to.be.true;
 
@@ -230,11 +254,10 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = bisectionRef(f_x2_minus_4, 2, 3);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
-      const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fx2m4, a, b);
+      await touchGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION);
 
-      // Convert actual outputs from the EVM
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
 
@@ -260,7 +283,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const b = await qInt(4);
       const target = await harness.getAddress();
 
-      await expect(root.rootFindingBisection(target, sel_fx2m4, a, b)).to.be.reverted;
+      await expect(
+        harness.rootFindingBisection(target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION)
+      ).to.be.reverted;
 
       printBlockRegular({
         t,
@@ -282,9 +307,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = bisectionRef(f_cubic, 1, 2);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingBisection", [target, sel_fcubic, a, b]);
-      const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fcubic, a, b]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fcubic, a, b);
+      await touchGas(harness, "rootFindingBisection", [target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -311,16 +336,15 @@ describe("RootFinding — Report (values + gas)", function () {
   // ------------------------------------------------------------
 
   describe("Section 2: Newton-Raphson", function () {
-
     it("Test 6: Quadratic Standard (x^2-4, x0=3)", async function () {
       t++;
       const x0 = await qInt(3);
       const ref = newtonRef(f_x2_minus_4, df_2x, 3);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
-      const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0);
+      await touchGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
+      const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -347,9 +371,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = newtonRef(f_cubic, df_cubic, 1);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0]);
-      const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fcubic, target, sel_dfcubic, x0);
+      await touchGas(harness, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON]);
+      const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -376,9 +400,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = newtonRef(f_x2_minus_4, df_2x, 2);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
-      const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0);
+      await touchGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
+      const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -404,8 +428,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const x0 = await qInt(0);
       const target = await harness.getAddress();
 
-      // At x=0, f'(x) = 2x = 0. Update step x - f(x)/f'(x) would divide by zero.
-      await expect(root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0)).to.be.reverted;
+      await expect(
+        harness.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON)
+      ).to.be.reverted;
 
       printBlockRegular({
         t,
@@ -426,9 +451,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = newtonRef(f_x2_minus_4, df_2x, 3);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
-      const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0);
+      await touchGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
+      const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -455,7 +480,6 @@ describe("RootFinding — Report (values + gas)", function () {
   // ------------------------------------------------------------
 
   describe("Section 3: Secant", function () {
-
     it("Test 11: Standard (x^2-4, x0=1, x1=3)", async function () {
       t++;
       const x0 = await qInt(1);
@@ -463,9 +487,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = secantRef(f_x2_minus_4, 1, 3);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingSecant", [target, sel_fx2m4, x0, x1]);
-      const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fx2m4, x0, x1]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fx2m4, x0, x1);
+      await touchGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -493,9 +517,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = secantRef(f_cubic, 1, 2);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingSecant", [target, sel_fcubic, x0, x1]);
-      const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fcubic, x0, x1]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fcubic, x0, x1);
+      await touchGas(harness, "rootFindingSecant", [target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -519,13 +543,13 @@ describe("RootFinding — Report (values + gas)", function () {
     it("Test 13: Immediate Convergence (x1=2)", async function () {
       t++;
       const x0 = await qInt(1);
-      const x1 = await qInt(2); // Root
+      const x1 = await qInt(2);
       const ref = secantRef(f_x2_minus_4, 1, 2);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingSecant", [target, sel_fx2m4, x0, x1]);
-      const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fx2m4, x0, x1]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fx2m4, x0, x1);
+      await touchGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -552,8 +576,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const x1 = await qInt(-1);
       const target = await harness.getAddress();
 
-      // At x0=1 and x1=-1, f(1)= -3 and f(-1)= -3. f(x1)-f(x0) = 0.
-      await expect(root.rootFindingSecant(target, sel_fx2m4, x0, x1)).to.be.reverted;
+      await expect(
+        harness.rootFindingSecant(target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT)
+      ).to.be.reverted;
 
       printBlockRegular({
         t,
@@ -575,9 +600,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = secantRef(f_cubic, -10, 10, 1e-12, 20);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingSecant", [target, sel_fcubic, x0, x1]);
-      const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fcubic, x0, x1]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fcubic, x0, x1);
+      await touchGas(harness, "rootFindingSecant", [target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -601,7 +626,6 @@ describe("RootFinding — Report (values + gas)", function () {
   // ------------------------------------------------------------
 
   describe("Section 4: Comparison", function () {
-
     it("Test 16: Shared Normal Scenario (Bisection, x^2-4 on [1,3])", async function () {
       t++;
       const a = await qInt(1);
@@ -609,9 +633,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = bisectionRef(f_x2_minus_4, 1, 3);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
-      const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fx2m4, a, b]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fx2m4, a, b);
+      await touchGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fx2m4, a, b, tolDefault, MAX_ITER_BISECTION);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -638,9 +662,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = newtonRef(f_x2_minus_4, df_2x, 3);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
-      const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0);
+      await touchGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
+      const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fx2m4, target, sel_df2x, x0, tolDefault, MAX_ITER_NEWTON);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -668,9 +692,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = secantRef(f_x2_minus_4, 1, 3);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingSecant", [target, sel_fx2m4, x0, x1]);
-      const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fx2m4, x0, x1]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fx2m4, x0, x1);
+      await touchGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fx2m4, x0, x1, tolDefault, MAX_ITER_SECANT);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -698,9 +722,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = bisectionRef(f_cubic, 1, 2);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingBisection", [target, sel_fcubic, a, b]);
-      const gas = await estimateGas(root, "rootFindingBisection", [target, sel_fcubic, a, b]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingBisection(target, sel_fcubic, a, b);
+      await touchGas(harness, "rootFindingBisection", [target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fcubic, a, b, tolDefault, MAX_ITER_BISECTION);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -727,9 +751,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = newtonRef(f_cubic, df_cubic, 1);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0]);
-      const gas = await estimateGas(root, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingNewton(target, sel_fcubic, target, sel_dfcubic, x0);
+      await touchGas(harness, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON]);
+      const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fcubic, target, sel_dfcubic, x0, tolDefault, MAX_ITER_NEWTON);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
@@ -757,9 +781,9 @@ describe("RootFinding — Report (values + gas)", function () {
       const ref = secantRef(f_cubic, 1, 2);
       const target = await harness.getAddress();
 
-      await touchGas(root, "rootFindingSecant", [target, sel_fcubic, x0, x1]);
-      const gas = await estimateGas(root, "rootFindingSecant", [target, sel_fcubic, x0, x1]);
-      const [rHex, iters, ok, fHex] = await root.rootFindingSecant(target, sel_fcubic, x0, x1);
+      await touchGas(harness, "rootFindingSecant", [target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT]);
+      const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fcubic, x0, x1, tolDefault, MAX_ITER_SECANT);
 
       const actualRoot = await fromQuad(harness, rHex);
       const actualFAtRoot = await fromQuad(harness, fHex);
