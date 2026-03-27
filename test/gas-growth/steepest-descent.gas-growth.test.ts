@@ -37,6 +37,7 @@ async function newHarnesses(): Promise<{
     solver: SteepestDescentHarness;
     quadratic: ObjectiveHarness;
     weighted: ObjectiveHarness;
+    spherical: ObjectiveHarness
 }> {
     const MathLibFactory = await ethers.getContractFactory("MathLib");
     const math = await MathLibFactory.deploy();
@@ -61,6 +62,12 @@ async function newHarnesses(): Promise<{
         },
     });
 
+    const SphericalFactory = await ethers.getContractFactory("SphericalObjectiveHarness", {
+        libraries: {
+            "contracts/libraries/MathLib.sol:MathLib": mathAddr,
+        },
+    });
+
     const solver = await SolverFactory.deploy();
     await solver.waitForDeployment();
 
@@ -70,10 +77,14 @@ async function newHarnesses(): Promise<{
     const weighted = await WeightedFactory.deploy();
     await weighted.waitForDeployment();
 
+    const spherical = await SphericalFactory.deploy();
+    await spherical.waitForDeployment();
+
     return {
         solver: solver as unknown as SteepestDescentHarness,
         quadratic: quadratic as unknown as ObjectiveHarness,
         weighted: weighted as unknown as ObjectiveHarness,
+        spherical: spherical as unknown as ObjectiveHarness,
     };
 }
 
@@ -137,6 +148,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
     let solver: SteepestDescentHarness;
     let quadratic: ObjectiveHarness;
     let weighted: ObjectiveHarness;
+    let spherical: ObjectiveHarness;
     let t = 0;
 
     let tolTight: string;
@@ -147,6 +159,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
         solver = deployed.solver;
         quadratic = deployed.quadratic;
         weighted = deployed.weighted;
+        spherical = deployed.spherical;
 
         tolTight = await solver.qFromFrac(1n, 1_000_000_000_000_000_000n); // 1e-18
         tolZero = await solver.qFromInt(0n);
@@ -249,34 +262,45 @@ describe("SteepestDescent - Gas Growth Tests", function () {
     // --------------------------------------------------------
 
     describe("Section 3: Gas Sensitivity to Initial Point Magnitude", function () {
-        const MAG_CASES: Array<{ label: string; vals: bigint[] }> = [
-            { label: "small", vals: [1n, 1n, 1n, 1n] },
-            { label: "medium", vals: [10n, 10n, 10n, 10n] },
-            { label: "large", vals: [100n, 100n, 100n, 100n] },
-            { label: "veryLarge", vals: [1000n, 1000n, 1000n, 1000n] },
-            { label: "mixedLarge", vals: [-1000n, 1000n, -1000n, 1000n] },
+        type MagnitudeCase = {
+            label: string;
+            values: number[];
+        };
+
+        const cases: MagnitudeCase[] = [
+            { label: "small", values: [1, 1, 1, 1, 1, 1, 1, 1] },
+            { label: "medium", values: [10, 10, 10, 10, 10, 10, 10, 10] },
+            { label: "large", values: [100, 100, 100, 100, 100, 100, 100, 100] },
+            { label: "veryLarge", values: [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000] },
+            { label: "mixedLarge", values: [-1000, 1000, -1000, 1000, -1000, 1000, -1000, 1000] }
         ];
 
-        for (const c of MAG_CASES) {
-            it(`Test ${++t}: Weighted quadratic gas sensitivity for initial magnitude ${c.label}`, async function () {
-                const x0 = await qVec(solver, c.vals);
-                const objectiveAddr = await weighted.getAddress();
+        for (const p of cases) {
+            it(`Test ${++t}: Spherical quadratic gas sensitivity for initial magnitude ${p.label}`, async function () {
+                const x0 = await Promise.all(p.values.map((v) => solver.qFromInt(BigInt(v))));
+                const tol = await solver.qFromFrac(1n, 1000000000000n); // 1e-12
+                const maxIter = 20n;
 
-                await touchGas(solver, "solve", [objectiveAddr, x0, 20n, tolTight]);
-                const gas = await estimateGas(solver, "solve", [objectiveAddr, x0, 20n, tolTight]);
-                const out = asResult(await solver.solve(objectiveAddr, x0, 20n, tolTight));
+                const objectiveAddr = await spherical.getAddress();
+
+                await touchGas(solver, "solve", [objectiveAddr, x0, maxIter, tol]);
+                const gas = await estimateGas(solver, "solve", [objectiveAddr, x0, maxIter, tol]);
+
+                const out = asResult(await solver.solve(objectiveAddr, x0, maxIter, tol));
+
+                expect(out.status).to.eq(STATUS_SUCCESS);
 
                 printBlockOptimization({
                     t,
                     method: "solve",
-                    explanation: `Gas sensitivity to initial point magnitude for weighted quadratic objective using ${c.label} starting vector.`,
+                    explanation: `Gas sensitivity to initial point magnitude for spherical quadratic objective using ${p.label} starting vector.`,
                     gas,
                     x0: fmtHexArr(x0),
                     xFinal: fmtHexArr(out.x),
                     gx: `${out.gx} (~ ${quadHexToApproxNumber(out.gx)})`,
                     status: `${out.status}`,
                     iters: `${out.iters}`,
-                    extra: `objective=weighted`
+                    extra: `objective=spherical, magnitude=${p.label}`
                 });
             });
         }
@@ -287,39 +311,49 @@ describe("SteepestDescent - Gas Growth Tests", function () {
     // --------------------------------------------------------
 
     describe("Section 4: Gas Sensitivity to Initial Point Pattern", function () {
-        const PATTERNS: Array<{ label: string; kind: "ones" | "increasing" | "large" | "mixed" | "zero" }> = [
-            { label: "ones", kind: "ones" },
-            { label: "increasing", kind: "increasing" },
-            { label: "large", kind: "large" },
-            { label: "mixedSign", kind: "mixed" },
-            { label: "zero", kind: "zero" },
+        type PatternCase = {
+            label: string;
+            values: number[];
+        };
+
+        const cases: PatternCase[] = [
+            { label: "ones", values: [5, 5, 5, 5, 5, 5, 5, 5] },
+            { label: "increasing", values: [1, 2, 3, 4, 5, 6, 7, 8] },
+            { label: "mixedSign", values: [1, -2, 3, -4, 5, -6, 7, -8] },
+            { label: "singleSpike", values: [20, 0, 0, 0, 0, 0, 0, 0] },
+            { label: "twoBlock", values: [8, 8, 8, 8, -8, -8, -8, -8] }
         ];
 
-        for (const p of PATTERNS) {
-            it(`Test ${++t}: Weighted quadratic gas sensitivity for pattern ${p.label}`, async function () {
-                const x0 = await qVec(solver, makeVector(8, p.kind));
-                const objectiveAddr = await weighted.getAddress();
+        for (const p of cases) {
+            it(`Test ${++t}: Spherical quadratic gas sensitivity for initial pattern ${p.label}`, async function () {
+                const x0 = await Promise.all(p.values.map((v) => solver.qFromInt(BigInt(v))));
+                const tol = await solver.qFromFrac(1n, 1000000000000n); // 1e-12
+                const maxIter = 20n;
 
-                await touchGas(solver, "solve", [objectiveAddr, x0, 20n, tolTight]);
-                const gas = await estimateGas(solver, "solve", [objectiveAddr, x0, 20n, tolTight]);
-                const out = asResult(await solver.solve(objectiveAddr, x0, 20n, tolTight));
+                const objectiveAddr = await spherical.getAddress();
+
+                await touchGas(solver, "solve", [objectiveAddr, x0, maxIter, tol]);
+                const gas = await estimateGas(solver, "solve", [objectiveAddr, x0, maxIter, tol]);
+
+                const out = asResult(await solver.solve(objectiveAddr, x0, maxIter, tol));
+
+                expect(out.status).to.eq(STATUS_SUCCESS);
 
                 printBlockOptimization({
                     t,
                     method: "solve",
-                    explanation: `Gas sensitivity to initial point pattern for weighted quadratic objective using ${p.label} vector.`,
+                    explanation: `Gas sensitivity to initial point pattern for spherical quadratic objective using ${p.label} vector.`,
                     gas,
                     x0: fmtHexArr(x0),
                     xFinal: fmtHexArr(out.x),
                     gx: `${out.gx} (~ ${quadHexToApproxNumber(out.gx)})`,
                     status: `${out.status}`,
                     iters: `${out.iters}`,
-                    extra: `objective=weighted, pattern=${p.label}`
+                    extra: `objective=spherical, pattern=${p.label}`
                 });
             });
         }
     });
-
     // --------------------------------------------------------
     //  Section 5: Gas Sensitivity to Objective Structure
     // --------------------------------------------------------
