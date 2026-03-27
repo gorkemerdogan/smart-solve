@@ -35,7 +35,6 @@ const STATUS_MAX_ITER_EXCEEDED = 3n;
 
 async function newHarnesses(): Promise<{
     solver: SteepestDescentHarness;
-    quadratic: ObjectiveHarness;
     weighted: ObjectiveHarness;
     spherical: ObjectiveHarness
     semiWeighted: ObjectiveHarness;
@@ -46,12 +45,6 @@ async function newHarnesses(): Promise<{
     const mathAddr = await math.getAddress();
 
     const SolverFactory = await ethers.getContractFactory("SteepestDescentHarness", {
-        libraries: {
-            "contracts/libraries/MathLib.sol:MathLib": mathAddr,
-        },
-    });
-
-    const QuadraticFactory = await ethers.getContractFactory("QuadraticObjectiveHarness", {
         libraries: {
             "contracts/libraries/MathLib.sol:MathLib": mathAddr,
         },
@@ -78,9 +71,6 @@ async function newHarnesses(): Promise<{
     const solver = await SolverFactory.deploy();
     await solver.waitForDeployment();
 
-    const quadratic = await QuadraticFactory.deploy();
-    await quadratic.waitForDeployment();
-
     const weighted = await WeightedFactory.deploy();
     await weighted.waitForDeployment();
 
@@ -92,7 +82,6 @@ async function newHarnesses(): Promise<{
 
     return {
         solver: solver as unknown as SteepestDescentHarness,
-        quadratic: quadratic as unknown as ObjectiveHarness,
         weighted: weighted as unknown as ObjectiveHarness,
         spherical: spherical as unknown as ObjectiveHarness,
         semiWeighted: semiWeighted as unknown as ObjectiveHarness,
@@ -161,7 +150,6 @@ async function qVec(
 
 describe("SteepestDescent - Gas Growth Tests", function () {
     let solver: SteepestDescentHarness;
-    let quadratic: ObjectiveHarness;
     let weighted: ObjectiveHarness;
     let spherical: ObjectiveHarness;
     let semiWeighted: ObjectiveHarness;
@@ -172,7 +160,6 @@ describe("SteepestDescent - Gas Growth Tests", function () {
     before(async () => {
         const deployed = await newHarnesses();
         solver = deployed.solver;
-        quadratic = deployed.quadratic;
         weighted = deployed.weighted;
         spherical = deployed.spherical;
         semiWeighted = deployed.semiWeighted;
@@ -192,9 +179,9 @@ describe("SteepestDescent - Gas Growth Tests", function () {
         for (const dim of DIMS) {
             const testId = makeTestId(1, ++testIndex);
 
-            it(`Test ${testId}: Quadratic objective gas growth with dimension n=${dim}`, async function () {
+            it(`Test ${testId}: Spherical objective gas growth with dimension n=${dim}`, async function () {
                 const x0 = await qVec(solver, makeVector(dim, "increasing"));
-                const objectiveAddr = await quadratic.getAddress();
+                const objectiveAddr = await spherical.getAddress();
 
                 await touchGas(solver, "solve", [objectiveAddr, x0, 10n, tolTight]);
                 const gas = await estimateGas(solver, "solve", [objectiveAddr, x0, 10n, tolTight]);
@@ -205,7 +192,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
                 printBlockOptimization({
                     t: '1.'+testId,
                     method: "solve",
-                    explanation: `Gas growth with respect to dimension for quadratic objective in n=${dim}.`,
+                    explanation: `Gas growth with respect to dimension for spherical objective in n=${dim}.`,
                     gas,
                     x0: fmtHexArr(x0),
                     xFinal: fmtHexArr(out.x),
@@ -259,9 +246,9 @@ describe("SteepestDescent - Gas Growth Tests", function () {
         for (const maxIter of ITERS) {
             const testId = makeTestId(2, ++testIndex);
 
-            it(`Test ${testId}: Quadratic gas sensitivity with maxIter=${maxIter}`, async function () {
+            it(`Test ${testId}: Spherical gas sensitivity with maxIter=${maxIter}`, async function () {
                 const x0 = await qVec(solver, [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n]);
-                const objectiveAddr = await quadratic.getAddress();
+                const objectiveAddr = await spherical.getAddress();
                 const tol = await solver.qFromFrac(1n, 1_000_000_000_000_000_000n); // 1e-18
 
                 await touchGas(solver, "solve", [objectiveAddr, x0, maxIter, tol]);
@@ -271,7 +258,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
                 printBlockOptimization({
                     t: testId,
                     method: "solve",
-                    explanation: `Gas sensitivity to iteration budget for quadratic objective with fixed dimension n=8 and maxIter=${maxIter}.`,
+                    explanation: `Gas sensitivity to iteration budget for spherical objective with fixed dimension n=8 and maxIter=${maxIter}.`,
                     gas,
                     x0: fmtHexArr(x0),
                     xFinal: fmtHexArr(out.x),
