@@ -17,6 +17,8 @@ type RootFindingHarness = Contract & {
   df_2x(x: string): Promise<string>;
   f_cubic(x: string): Promise<string>;
   df_cubic(x: string): Promise<string>;
+  f_quartic(x: string): Promise<string>;
+  df_quartic(x: string): Promise<string>;
 
   evalHarness(target: string, sel: string, x: string): Promise<string>;
   clampTolHarness(requestedTol: string): Promise<string>;
@@ -88,13 +90,13 @@ describe("RootFinding - Gas Growth Tests", function () {
   let target: string;
   let tolDefault: string;
 
-  // Existing selectors from current harness
   let sel_fx2m4: string;
   let sel_df2x: string;
   let sel_fcubic: string;
   let sel_dfcubic: string;
+  let sel_fquartic: string;
+  let sel_dfquartic: string;
 
-  // Additional selectors expected in harness if you add them
   let sel_fShiftSmall: string;
   let sel_dfShiftSmall: string;
   let sel_fShiftMedium: string;
@@ -124,6 +126,8 @@ describe("RootFinding - Gas Growth Tests", function () {
     sel_df2x = ethers.id("df_2x(bytes16)").slice(0, 10);
     sel_fcubic = ethers.id("f_cubic(bytes16)").slice(0, 10);
     sel_dfcubic = ethers.id("df_cubic(bytes16)").slice(0, 10);
+    sel_fquartic = ethers.id("f_quartic(bytes16)").slice(0, 10);
+    sel_dfquartic = ethers.id("df_quartic(bytes16)").slice(0, 10);
 
     sel_fShiftSmall = ethers.id("f_shift_small(bytes16)").slice(0, 10);
     sel_dfShiftSmall = ethers.id("df_shift_small(bytes16)").slice(0, 10);
@@ -157,6 +161,14 @@ describe("RootFinding - Gas Growth Tests", function () {
         dfSelector: () => sel_dfcubic,
         bisectionArgs: async () => [await qInt(1), await qInt(2)],
         newtonArgs: async () => [await qInt(1)],
+        secantArgs: async () => [await qInt(1), await qInt(2)],
+      },
+      {
+        label: "f(x)=x^4-10",
+        fSelector: () => sel_fquartic,
+        dfSelector: () => sel_dfquartic,
+        bisectionArgs: async () => [await qInt(1), await qInt(2)],
+        newtonArgs: async () => [await qInt(2)],
         secantArgs: async () => [await qInt(1), await qInt(2)],
       },
     ];
@@ -598,6 +610,77 @@ describe("RootFinding - Gas Growth Tests", function () {
           method: "secant",
           explanation: "Shared stress scenario: secant on x^3-x-2 with seeds 1 and 2.",
           inHex: "f=x^3-x-2, x0=1, x1=2",
+          expectedHex: "N/A",
+          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+          expectedDec: "N/A",
+          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+          gas,
+        });
+      });
+    }
+
+    {
+      const t = `4.${++testNo}`;
+      it(`Test ${t}: Shared higher-order scenario (Bisection, x^4-10 on [1,2])`, async function () {
+        const a = await qInt(1);
+        const b = await qInt(2);
+
+        await touchGas(harness, "rootFindingBisection", [target, sel_fquartic, a, b, tolDefault, MAX_ITER_BISECTION]);
+        const gas = await estimateGas(harness, "rootFindingBisection", [target, sel_fquartic, a, b, tolDefault, MAX_ITER_BISECTION]);
+        const [rHex, iters, ok, fHex] = await harness.rootFindingBisection(target, sel_fquartic, a, b, tolDefault, MAX_ITER_BISECTION);
+
+        printBlockRegular({
+          t: `${t}`,
+          method: "bisection",
+          explanation: "Shared higher-order scenario: bisection on x^4-10 over [1,2].",
+          inHex: "f=x^4-10, [1,2]",
+          expectedHex: "N/A",
+          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+          expectedDec: "N/A",
+          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+          gas,
+        });
+      });
+    }
+
+    {
+      const t = `4.${++testNo}`;
+      it(`Test ${t}: Shared higher-order scenario (Newton, x^4-10, x0=2)`, async function () {
+        const x0 = await qInt(2);
+
+        await touchGas(harness, "rootFindingNewton", [target, sel_fquartic, target, sel_dfquartic, x0, tolDefault, MAX_ITER_NEWTON]);
+        const gas = await estimateGas(harness, "rootFindingNewton", [target, sel_fquartic, target, sel_dfquartic, x0, tolDefault, MAX_ITER_NEWTON]);
+        const [rHex, iters, ok, fHex] = await harness.rootFindingNewton(target, sel_fquartic, target, sel_dfquartic, x0, tolDefault, MAX_ITER_NEWTON);
+
+        printBlockRegular({
+          t: `${t}`,
+          method: "newton",
+          explanation: "Shared higher-order scenario: Newton-Raphson on x^4-10 from x0=2.",
+          inHex: "f=x^4-10, df=4x^3, x0=2",
+          expectedHex: "N/A",
+          outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
+          expectedDec: "N/A",
+          outDec: `root=${trim(await fromQuad(harness, rHex))}, f=${trim(await fromQuad(harness, fHex))}, iter=${iters}`,
+          gas,
+        });
+      });
+    }
+
+    {
+      const t = `4.${++testNo}`;
+      it(`Test ${t}: Shared higher-order scenario (Secant, x^4-10, x0=1, x1=2)`, async function () {
+        const x0 = await qInt(1);
+        const x1 = await qInt(2);
+
+        await touchGas(harness, "rootFindingSecant", [target, sel_fquartic, x0, x1, tolDefault, MAX_ITER_SECANT]);
+        const gas = await estimateGas(harness, "rootFindingSecant", [target, sel_fquartic, x0, x1, tolDefault, MAX_ITER_SECANT]);
+        const [rHex, iters, ok, fHex] = await harness.rootFindingSecant(target, sel_fquartic, x0, x1, tolDefault, MAX_ITER_SECANT);
+
+        printBlockRegular({
+          t: `${t}`,
+          method: "secant",
+          explanation: "Shared higher-order scenario: secant on x^4-10 with seeds 1 and 2.",
+          inHex: "f=x^4-10, x0=1, x1=2",
           expectedHex: "N/A",
           outHex: `root=${rHex}, f(root)=${fHex}, iter=${iters}, conv=${ok}`,
           expectedDec: "N/A",
