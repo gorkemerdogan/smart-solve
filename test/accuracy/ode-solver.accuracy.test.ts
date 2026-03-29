@@ -738,19 +738,20 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
     describe("Section 5: Polynomial-in-x benchmark", function () {
         let testNo = 0;
 
-        it(`Test 5.${++testNo}: RK4 accurately integrates cubic polynomial slope`, async function () {
+        it(`Test 5.${++testNo}: Multi-step methods on the polynomial slope benchmark show the expected accuracy ranking`, async function () {
             const x0 = await qInt(0);
             const y0 = await qInt(0);
+            const steps = 500;
+            const h = await qFrac(1, steps);
 
-            // y' = x^3 + x^2 + 2x + 3
-            // y(1) - y(0) = Integral(_0^1 (x^3 + x^2 + 2x + 3) dx)
-            //             = 1/4 + 1/3 + 1 + 3 = 55/12 = 4.583333333333...
+            // Exact:
+            // Integral(_0^1 (x^3 + x^2 + 2x + 3) dx) = 55/12 = 4.583333333333...
             const expectedScaled = 4_583_333_333_333n;
 
-            const outEuler = await runODE(harness, "euler", target, selCubicPoly, x0, y0, H_ONE);
-            const outMid = await runODE(harness, "rk2Midpoint", target, selCubicPoly, x0, y0, H_ONE);
-            const outHeun = await runODE(harness, "rk2Heun", target, selCubicPoly, x0, y0, H_ONE);
-            const outRK4 = await runODE(harness, "rk4", target, selCubicPoly, x0, y0, H_ONE);
+            const outEuler = await runSteps(harness, "euler", target, selCubicPoly, x0, y0, h, steps);
+            const outMid = await runSteps(harness, "rk2Midpoint", target, selCubicPoly, x0, y0, h, steps);
+            const outHeun = await runSteps(harness, "rk2Heun", target, selCubicPoly, x0, y0, h, steps);
+            const outRK4 = await runSteps(harness, "rk4", target, selCubicPoly, x0, y0, h, steps);
 
             const eScaled = await outScaled(harness, outEuler);
             const mScaled = await outScaled(harness, outMid);
@@ -765,8 +766,8 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
             printODEAccuracyBlock({
                 t: `5.${testNo}.1`,
                 method: "Euler",
-                explanation: "Euler on polynomial slope benchmark.",
-                input: "y'=x^3+x^2+2x+3, x0=0, y0=0, h=1",
+                explanation: "Euler with 10 steps of h=0.1 on the polynomial slope benchmark.",
+                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=0.05, steps=${steps}`,
                 expectedHex: await qScaled(harness, expectedScaled),
                 outputHex: outEuler,
                 expectedDec: formatScaledInt(expectedScaled),
@@ -778,8 +779,8 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
             printODEAccuracyBlock({
                 t: `5.${testNo}.2`,
                 method: "RK2 Midpoint",
-                explanation: "RK2 Midpoint on polynomial slope benchmark.",
-                input: "y'=x^3+x^2+2x+3, x0=0, y0=0, h=1",
+                explanation: "RK2 Midpoint with 10 steps of h=0.1 on the polynomial slope benchmark.",
+                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=0.05, steps=${steps}`,
                 expectedHex: await qScaled(harness, expectedScaled),
                 outputHex: outMid,
                 expectedDec: formatScaledInt(expectedScaled),
@@ -791,8 +792,8 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
             printODEAccuracyBlock({
                 t: `5.${testNo}.3`,
                 method: "RK2 Heun",
-                explanation: "RK2 Heun on polynomial slope benchmark.",
-                input: "y'=x^3+x^2+2x+3, x0=0, y0=0, h=1",
+                explanation: "RK2 Heun with 10 steps of h=0.1 on the polynomial slope benchmark.",
+                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=0.05, steps=${steps}`,
                 expectedHex: await qScaled(harness, expectedScaled),
                 outputHex: outHeun,
                 expectedDec: formatScaledInt(expectedScaled),
@@ -804,8 +805,8 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
             printODEAccuracyBlock({
                 t: `5.${testNo}.4`,
                 method: "RK4",
-                explanation: "RK4 on polynomial slope benchmark.",
-                input: "y'=x^3+x^2+2x+3, x0=0, y0=0, h=1",
+                explanation: "RK4 with 10 steps of h=0.1 on the polynomial slope benchmark.",
+                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=0.05, steps=${steps}`,
                 expectedHex: await qScaled(harness, expectedScaled),
                 outputHex: outRK4,
                 expectedDec: formatScaledInt(expectedScaled),
