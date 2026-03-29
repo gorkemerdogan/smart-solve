@@ -678,13 +678,13 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
 
             // A * x  for A = diag(5,2,1)
             const Ax = [
-                (5n * xScaled[0]) / SCALE,
-                (2n * xScaled[1]) / SCALE,
-                (1n * xScaled[2]) / SCALE,
+                5n * xScaled[0],
+                2n * xScaled[1],
+                1n * xScaled[2],
             ];
 
             // lambda * x
-            const lambdaX = xScaled.map(v => (lambdaScaled * v) / SCALE);
+            const lambdaX = xScaled.map(v => ((lambdaScaled * v) + SCALE / 2n) / SCALE);
 
             // residual = Ax - lambda*x
             const residual = subVec(Ax, lambdaX);
