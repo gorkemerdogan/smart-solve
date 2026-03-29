@@ -286,6 +286,65 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
 
             expect(err).to.equal(0n);
         });
+
+        it(`Test 2.${++testNo}: dense matrix multiplication remains accurate for fractional entries`, async function () {
+            // A = [[1/2, 1/4],
+            //      [3/2, 2/5]]
+            //
+            // B = [[2/3, 4/5],
+            //      [1/2, 3/10]]
+            //
+            // AB =
+            // [ [11/24, 19/40],
+            //   [6/5,   33/25] ]
+
+            const A = [
+                [500000000000n, 250000000000n],
+                [1500000000000n, 400000000000n],
+            ];
+
+            const B = [
+                [666666666666n, 800000000000n],
+                [500000000000n, 300000000000n],
+            ];
+
+            const expected = [
+                [458333333333n, 475000000000n],
+                [1200000000000n, 1320000000000n],
+            ];
+
+            const Adata = [
+                await harness.fromFloat(500000000000n),
+                await harness.fromFloat(250000000000n),
+                await harness.fromFloat(1500000000000n),
+                await harness.fromFloat(400000000000n),
+            ];
+
+            const Bdata = [
+                await harness.fromFloat(666666666666n),
+                await harness.fromFloat(800000000000n),
+                await harness.fromFloat(500000000000n),
+                await harness.fromFloat(300000000000n),
+            ];
+
+            const [, , out] = await harness.mulMatrixHarness(2n, 2n, Adata, 2n, 2n, Bdata);
+            const outScaled = await scaledVec(harness, out);
+
+            const expectedFlat = flatten(expected);
+            const err = vecInfNorm(subVec(outScaled, expectedFlat));
+
+            printMatrixBlock({
+                t: `2.${testNo}`,
+                method: "dense matmul",
+                explanation: "Dense matrix multiplication should remain numerically accurate for fractional matrix entries.",
+                input: "A=[[0.5,0.25],[1.5,0.4]], B=[[0.666666666666,0.8],[0.5,0.3]]",
+                expected: fmtMatFlat(expectedFlat, 2, 2),
+                output: fmtMatFlat(outScaled, 2, 2),
+                errorNorm: formatScaledInt(err),
+            });
+
+            expect(err <= 2n).to.equal(true);
+        });
     });
 
     // ------------------------------------------------------------
@@ -322,6 +381,53 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             });
 
             expect(err).to.equal(0n);
+        });
+
+        it(`Test 3.${++testNo}: sparse matrix-vector multiplication remains accurate for fractional entries`, async function () {
+            // A =
+            // [ [1/2, 0,   0  ],
+            //   [0,   3/2, 0  ],
+            //   [0,   0,   2/5] ]
+            //
+            // x = [3/2, 4/5, 5/2]
+            //
+            // y = [3/4, 6/5, 1]
+
+            const expected = [750000000000n, 1200000000000n, 1000000000000n];
+
+            const rowPtr = [0n, 1n, 2n, 3n];
+            const colInd = [0n, 1n, 2n];
+
+            const values = [
+                await harness.fromFloat(500000000000n),   // 1/2
+                await harness.fromFloat(1500000000000n),  // 3/2
+                await harness.fromFloat(400000000000n),   // 2/5
+            ];
+
+            const xData = [
+                await harness.fromFloat(1500000000000n),  // 3/2
+                await harness.fromFloat(800000000000n),   // 4/5
+                await harness.fromFloat(2500000000000n),  // 5/2
+            ];
+
+            const [, , out] = await harness.mulSparseMatrixVectorHarness(
+                3n, 3n, rowPtr, colInd, values, 3n, xData
+            );
+
+            const outScaled = await scaledVec(harness, out);
+            const err = vecInfNorm(subVec(outScaled, expected));
+
+            printMatrixBlock({
+                t: `3.${testNo}`,
+                method: "sparse matvec",
+                explanation: "Sparse matrix-vector multiplication should remain numerically accurate for fractional entries.",
+                input: "A=diag(0.5,1.5,0.4), x=[1.5,0.8,2.5]",
+                expected: fmtVec(expected),
+                output: fmtVec(outScaled),
+                errorNorm: formatScaledInt(err),
+            });
+
+            expect(err <= 2n).to.equal(true);
         });
     });
 
@@ -374,6 +480,41 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             });
 
             expect(err).to.equal(0n);
+        });
+
+        it(`Test 4.${++testNo}: determinant remains accurate for fractional 2x2 entries`, async function () {
+            // A = [[1/2, 1/5],
+            //      [3/4, 2/3]]
+            //
+            // det(A) = (1/2)*(2/3) - (1/5)*(3/4)
+            //        = 1/3 - 3/20
+            //        = 11/60
+            //        = 0.183333333333...
+
+            const Adata = [
+                await harness.fromFloat(500000000000n),   // 1/2
+                await harness.fromFloat(200000000000n),   // 1/5
+                await harness.fromFloat(750000000000n),   // 3/4
+                await harness.fromFloat(666666666666n),   // 2/3 approx
+            ];
+
+            const out = await harness.detHarness(2n, 2n, Adata);
+            const outScaled = await harness.toFloat(out);
+
+            const expected = 183333333333n;
+            const err = absBigInt(outScaled - expected);
+
+            printScalarBlock({
+                t: `4.${testNo}`,
+                method: "det",
+                explanation: "Determinant should remain numerically accurate for fractional matrix entries.",
+                input: "A=[[0.5,0.2],[0.75,0.666666666666]]",
+                expected: formatScaledInt(expected),
+                output: formatScaledInt(outScaled),
+                absError: formatScaledInt(err),
+            });
+
+            expect(err <= 3n).to.equal(true);
         });
     });
 
@@ -518,6 +659,53 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             console.log("------------------------------------------------------------");
 
             expect(itLoose <= itTight).to.equal(true);
+        });
+
+        it(`Test 6.${++testNo}: power iteration returns a small eigenpair residual`, async function () {
+            // A = diag(5,2,1), dominant eigenvalue = 5
+            const Adata = await qVecFromInts(harness, [
+                5, 0, 0,
+                0, 2, 0,
+                0, 0, 1
+            ]);
+
+            const [lambda, xRows, xCols, xData] = await harness.powerIterationHarness(
+                3n, 3n, Adata, SEED, TOL_1E_9
+            );
+
+            const lambdaScaled = await harness.toFloat(lambda);
+            const xScaled = await scaledVec(harness, xData);
+
+            // A * x  for A = diag(5,2,1)
+            const Ax = [
+                (5n * xScaled[0]) / SCALE,
+                (2n * xScaled[1]) / SCALE,
+                (1n * xScaled[2]) / SCALE,
+            ];
+
+            // lambda * x
+            const lambdaX = xScaled.map(v => (lambdaScaled * v) / SCALE);
+
+            // residual = Ax - lambda*x
+            const residual = subVec(Ax, lambdaX);
+            const residualNorm = vecInfNorm(residual);
+
+            console.log("------------------------------------------------------------");
+            console.log(`Test: 6.${testNo}`);
+            console.log("Method: power iteration residual");
+            console.log("Explanation: The returned eigenpair should satisfy Ax ≈ λx, so the residual norm should be small.");
+            console.log(`Input: A=diag(5,2,1)`);
+            console.log(`Lambda approx: ${formatScaledInt(lambdaScaled)}`);
+            console.log(`Eigenvector approx: ${fmtVec(xScaled)}`);
+            console.log(`Ax: ${fmtVec(Ax)}`);
+            console.log(`lambda*x: ${fmtVec(lambdaX)}`);
+            console.log(`Residual (Ax-lambda*x): ${fmtVec(residual)}`);
+            console.log(`Residual Norm ||Ax-lambda*x||_inf: ${formatScaledInt(residualNorm)}`);
+            console.log("------------------------------------------------------------");
+
+            expect(xRows).to.equal(3n);
+            expect(xCols).to.equal(1n);
+            expect(residualNorm < 1_000_000n).to.equal(true); // 1e-6
         });
     });
 });
