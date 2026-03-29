@@ -207,6 +207,44 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
             expect(result.absErr <= 1n).to.equal(true);
         });
 
+        it(`Test 1.${++testNo}: Simpson 1/3 is exact for constant function f(x)=1`, async function () {
+            const a = await qInt(0);
+            const b = await qInt(5);
+
+            const out = await runIntegration(harness, "simpson13", target, selOne, a, b, 12n);
+
+            const result = await executeAndPrint({
+                harness,
+                t: `1.${testNo}`,
+                method: "S13",
+                explanation: "Composite Simpson's 1/3 rule is exact for constant functions.",
+                inputLabel: "f(x)=1, interval=[0,5], n=12",
+                outputHex: out,
+                expectedScaled: 5n * SCALE,
+            });
+
+            expect(result.absErr <= 1n).to.equal(true);
+        });
+
+        it(`Test 1.${++testNo}: Simpson 3/8 is exact for constant function f(x)=1`, async function () {
+            const a = await qInt(0);
+            const b = await qInt(5);
+
+            const out = await runIntegration(harness, "simpson38", target, selOne, a, b, 12n);
+
+            const result = await executeAndPrint({
+                harness,
+                t: `1.${testNo}`,
+                method: "S38",
+                explanation: "Composite Simpson's 3/8 rule is exact for constant functions.",
+                inputLabel: "f(x)=1, interval=[0,5], n=12",
+                outputHex: out,
+                expectedScaled: 5n * SCALE,
+            });
+
+            expect(result.absErr <= 1n).to.equal(true);
+        });
+
         it(`Test 1.${++testNo}: Simpson 1/3 is exact for linear function f(x)=x`, async function () {
             const a = await qInt(0);
             const b = await qInt(2);
@@ -391,59 +429,36 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
             const b = await qInt(1);
             const expectedScaled = SCALE / 3n;
 
-            const outN6 = await runIntegration(harness, "trapezoidal", target, selSquare, a, b, 6n);
-            const outN30 = await runIntegration(harness, "trapezoidal", target, selSquare, a, b, 30n);
-            const outN120 = await runIntegration(harness, "trapezoidal", target, selSquare, a, b, 120n);
+            const N_VALUES = [5n, 10n, 20n, 50n, 100n, 150n, 200n, 250n, 300n, 500n, 750n, 1000n, 1500n, 2000n];
 
-            const n6Scaled = await outScaled(harness, outN6);
-            const n30Scaled = await outScaled(harness, outN30);
-            const n120Scaled = await outScaled(harness, outN120);
+            const errors: bigint[] = [];
 
-            const err6 = scaledAbsError(n6Scaled, expectedScaled);
-            const err30 = scaledAbsError(n30Scaled, expectedScaled);
-            const err120 = scaledAbsError(n120Scaled, expectedScaled);
+            for (let i = 0; i < N_VALUES.length; i++) {
+                const n = N_VALUES[i];
 
-            printAccuracyBlock({
-                t: `3.${testNo}.1`,
-                method: "TRAP",
-                explanation: "Trapezoidal rule with n=6.",
-                input: "f(x)=x^2, interval=[0,1], n=6",
-                expectedHex: await qScaled(harness, expectedScaled),
-                outputHex: outN6,
-                expectedDec: formatScaledInt(expectedScaled),
-                outputDec: formatScaledInt(n6Scaled),
-                absError: formatScaledInt(err6),
-                relError: scaledRelError(n6Scaled, expectedScaled),
-            });
+                const out = await runIntegration(harness, "trapezoidal", target, selSquare, a, b, n);
+                const outScaledVal = await outScaled(harness, out);
+                const err = scaledAbsError(outScaledVal, expectedScaled);
 
-            printAccuracyBlock({
-                t: `3.${testNo}.2`,
-                method: "TRAP",
-                explanation: "Trapezoidal rule with n=30.",
-                input: "f(x)=x^2, interval=[0,1], n=30",
-                expectedHex: await qScaled(harness, expectedScaled),
-                outputHex: outN30,
-                expectedDec: formatScaledInt(expectedScaled),
-                outputDec: formatScaledInt(n30Scaled),
-                absError: formatScaledInt(err30),
-                relError: scaledRelError(n30Scaled, expectedScaled),
-            });
+                errors.push(err);
 
-            printAccuracyBlock({
-                t: `3.${testNo}.3`,
-                method: "TRAP",
-                explanation: "Trapezoidal rule with n=120.",
-                input: "f(x)=x^2, interval=[0,1], n=120",
-                expectedHex: await qScaled(harness, expectedScaled),
-                outputHex: outN120,
-                expectedDec: formatScaledInt(expectedScaled),
-                outputDec: formatScaledInt(n120Scaled),
-                absError: formatScaledInt(err120),
-                relError: scaledRelError(n120Scaled, expectedScaled),
-            });
+                printAccuracyBlock({
+                    t: `3.${testNo}.${i + 1}`,
+                    method: "TRAP",
+                    explanation: `Trapezoidal rule with n=${n.toString()}.`,
+                    input: `f(x)=x^2, interval=[0,1], n=${n.toString()}`,
+                    expectedHex: await qScaled(harness, expectedScaled),
+                    outputHex: out,
+                    expectedDec: formatScaledInt(expectedScaled),
+                    outputDec: formatScaledInt(outScaledVal),
+                    absError: formatScaledInt(err),
+                    relError: scaledRelError(outScaledVal, expectedScaled),
+                });
+            }
 
-            expect(err30 < err6).to.equal(true);
-            expect(err120 < err30).to.equal(true);
+            for (let i = 1; i < errors.length; i++) {
+                expect(errors[i] < errors[i - 1]).to.equal(true);
+            }
         });
 
         it(`Test 3.${++testNo}: Simpson 1/3 remains highly accurate as n increases for f(x)=sin(x)`, async function () {
@@ -516,45 +531,132 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
     describe("Section 4: Smooth non-polynomial benchmarks", function () {
         let testNo = 0;
 
-        it(`Test 4.${++testNo}: Simpson 1/3 accurately integrates sin(x) over [0,pi]`, async function () {
+        const t1 = `4.${++testNo}`;
+        it(`Test ${t1}: Trapezoidal, Simpson 1/3, and Simpson 3/8 integrate sin(x) over [0,pi] with different accuracy`, async function () {
             const a = await qInt(0);
             const b = await harness.PI();
+            const expectedScaled = 2n * SCALE;
 
-            const out = await runIntegration(harness, "simpson13", target, selSin, a, b, 30n);
+            const outTrap = await runIntegration(harness, "trapezoidal", target, selSin, a, b, 30n);
+            const outS13 = await runIntegration(harness, "simpson13", target, selSin, a, b, 30n);
+            const outS38 = await runIntegration(harness, "simpson38", target, selSin, a, b, 30n);
 
-            const result = await executeAndPrint({
-                harness,
-                t: `4.${testNo}`,
-                method: "S13",
-                explanation: "The integral of sin(x) over [0,pi] equals 2, providing a clean smooth-function benchmark.",
-                inputLabel: "f(x)=sin(x), interval=[0,pi], n=30",
-                outputHex: out,
-                expectedScaled: 2n * SCALE,
+            const trapScaled = await outScaled(harness, outTrap);
+            const s13Scaled = await outScaled(harness, outS13);
+            const s38Scaled = await outScaled(harness, outS38);
+
+            const trapErr = scaledAbsError(trapScaled, expectedScaled);
+            const s13Err = scaledAbsError(s13Scaled, expectedScaled);
+            const s38Err = scaledAbsError(s38Scaled, expectedScaled);
+
+            printAccuracyBlock({
+                t: `${t1}.1`,
+                method: "TRAP",
+                explanation: "The integral of sin(x) over [0,pi] equals 2, providing a smooth non-polynomial benchmark.",
+                input: "f(x)=sin(x), interval=[0,pi], n=30",
+                expectedHex: await qScaled(harness, expectedScaled),
+                outputHex: outTrap,
+                expectedDec: formatScaledInt(expectedScaled),
+                outputDec: formatScaledInt(trapScaled),
+                absError: formatScaledInt(trapErr),
+                relError: scaledRelError(trapScaled, expectedScaled),
             });
 
-            expect(result.absErr < 100_000_000n).to.equal(true); // 1e-4
+            printAccuracyBlock({
+                t: `${t1}.2`,
+                method: "S13",
+                explanation: "The integral of sin(x) over [0,pi] equals 2, providing a smooth non-polynomial benchmark.",
+                input: "f(x)=sin(x), interval=[0,pi], n=30",
+                expectedHex: await qScaled(harness, expectedScaled),
+                outputHex: outS13,
+                expectedDec: formatScaledInt(expectedScaled),
+                outputDec: formatScaledInt(s13Scaled),
+                absError: formatScaledInt(s13Err),
+                relError: scaledRelError(s13Scaled, expectedScaled),
+            });
+
+            printAccuracyBlock({
+                t: `${t1}.3`,
+                method: "S38",
+                explanation: "The integral of sin(x) over [0,pi] equals 2, providing a smooth non-polynomial benchmark.",
+                input: "f(x)=sin(x), interval=[0,pi], n=30",
+                expectedHex: await qScaled(harness, expectedScaled),
+                outputHex: outS38,
+                expectedDec: formatScaledInt(expectedScaled),
+                outputDec: formatScaledInt(s38Scaled),
+                absError: formatScaledInt(s38Err),
+                relError: scaledRelError(s38Scaled, expectedScaled),
+            });
+
+            expect(s13Err < trapErr).to.equal(true);
+            expect(s38Err < trapErr).to.equal(true);
+            expect(s13Err < 100_000_000n).to.equal(true); // 1e-4
+            expect(s38Err < 100_000_000n).to.equal(true); // 1e-4
         });
 
-        it(`Test 4.${++testNo}: Simpson 1/3 accurately integrates 1/x over [1,2]`, async function () {
+        const t2 = `4.${++testNo}`;
+        it(`Test ${t2}: Trapezoidal, Simpson 1/3, and Simpson 3/8 integrate 1/x over [1,2] with different accuracy`, async function () {
             const a = await qInt(1);
             const b = await qInt(2);
 
-            const out = await runIntegration(harness, "simpson13", target, selInv, a, b, 30n);
-
-            // ln(2) scaled to 1e12 -> 693147180559
+            // ln(2) scaled to 1e12
             const expectedScaled = 693147180559n;
 
-            const result = await executeAndPrint({
-                harness,
-                t: `4.${testNo}`,
-                method: "S13",
+            const outTrap = await runIntegration(harness, "trapezoidal", target, selInv, a, b, 30n);
+            const outS13 = await runIntegration(harness, "simpson13", target, selInv, a, b, 30n);
+            const outS38 = await runIntegration(harness, "simpson38", target, selInv, a, b, 30n);
+
+            const trapScaled = await outScaled(harness, outTrap);
+            const s13Scaled = await outScaled(harness, outS13);
+            const s38Scaled = await outScaled(harness, outS38);
+
+            const trapErr = scaledAbsError(trapScaled, expectedScaled);
+            const s13Err = scaledAbsError(s13Scaled, expectedScaled);
+            const s38Err = scaledAbsError(s38Scaled, expectedScaled);
+
+            printAccuracyBlock({
+                t: `${t2}.1`,
+                method: "TRAP",
                 explanation: "The integral of 1/x over [1,2] equals ln(2), serving as a smooth non-polynomial benchmark.",
-                inputLabel: "f(x)=1/x, interval=[1,2], n=30",
-                outputHex: out,
-                expectedScaled,
+                input: "f(x)=1/x, interval=[1,2], n=30",
+                expectedHex: await qScaled(harness, expectedScaled),
+                outputHex: outTrap,
+                expectedDec: formatScaledInt(expectedScaled),
+                outputDec: formatScaledInt(trapScaled),
+                absError: formatScaledInt(trapErr),
+                relError: scaledRelError(trapScaled, expectedScaled),
             });
 
-            expect(result.absErr < 100_000_000n).to.equal(true); // 1e-4
+            printAccuracyBlock({
+                t: `${t2}.2`,
+                method: "S13",
+                explanation: "The integral of 1/x over [1,2] equals ln(2), serving as a smooth non-polynomial benchmark.",
+                input: "f(x)=1/x, interval=[1,2], n=30",
+                expectedHex: await qScaled(harness, expectedScaled),
+                outputHex: outS13,
+                expectedDec: formatScaledInt(expectedScaled),
+                outputDec: formatScaledInt(s13Scaled),
+                absError: formatScaledInt(s13Err),
+                relError: scaledRelError(s13Scaled, expectedScaled),
+            });
+
+            printAccuracyBlock({
+                t: `${t2}.3`,
+                method: "S38",
+                explanation: "The integral of 1/x over [1,2] equals ln(2), serving as a smooth non-polynomial benchmark.",
+                input: "f(x)=1/x, interval=[1,2], n=30",
+                expectedHex: await qScaled(harness, expectedScaled),
+                outputHex: outS38,
+                expectedDec: formatScaledInt(expectedScaled),
+                outputDec: formatScaledInt(s38Scaled),
+                absError: formatScaledInt(s38Err),
+                relError: scaledRelError(s38Scaled, expectedScaled),
+            });
+
+            expect(s13Err < trapErr).to.equal(true);
+            expect(s38Err < trapErr).to.equal(true);
+            expect(s13Err < 100_000_000n).to.equal(true); // 1e-4
+            expect(s38Err < 100_000_000n).to.equal(true); // 1e-4
         });
     });
 
