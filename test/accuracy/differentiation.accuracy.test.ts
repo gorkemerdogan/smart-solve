@@ -402,67 +402,83 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
     describe("Section 4: Step size sensitivity", function () {
         let testNo = 0;
 
-        it(`Test 4.${++testNo}: Forward difference error grows with large h on cubic`, async function () {
+        const t = `4.${++testNo}`;
+        it(`Test ${t}: Finite-difference error changes with step size on the cubic benchmark`, async function () {
             const x = await qInt(10);
+            const expectedScaled = 300n * SCALE; // f'(x)=3x^2 at x=10
 
-            const outSmall = await runDiff(harness, "forwardDiffHarness", target, selCube, x, H_SMALL);
-            const outOne = await runDiff(harness, "forwardDiffHarness", target, selCube, x, H_ONE);
-            const outTen = await runDiff(harness, "forwardDiffHarness", target, selCube, x, H_TEN);
+            const STEP_CASES: Array<{ label: string; h: string }> = [
+                { label: "h=1e-3", h: H_SMALL },
+                { label: "h=1", h: H_ONE },
+                { label: "h=10", h: H_TEN },
+                { label: "h=20", h: await qInt(20) },
+                { label: "h=50", h: await qInt(50) },
+                { label: "h=100", h: await qInt(100) },
+                { label: "h=200", h: await qInt(200) },
+            ];
 
-            const expectedScaled = 300n * SCALE;
+            const METHODS: Array<{
+                method: DiffMethodName;
+                label: DiffLabel;
+                explanationPrefix: string;
+            }> = [
+                    {
+                        method: "forwardDiffHarness",
+                        label: "FW",
+                        explanationPrefix: "Forward difference"
+                    },
+                    {
+                        method: "backwardDiffHarness",
+                        label: "BW",
+                        explanationPrefix: "Backward difference"
+                    },
+                    {
+                        method: "centeredDiffHarness",
+                        label: "CENT",
+                        explanationPrefix: "Centered difference"
+                    },
+                ];
 
-            const smallScaled = await outScaled(harness, outSmall);
-            const oneScaled = await outScaled(harness, outOne);
-            const tenScaled = await outScaled(harness, outTen);
+            for (let m = 0; m < METHODS.length; m++) {
+                const methodInfo = METHODS[m];
+                const errors: bigint[] = [];
 
-            const errSmall = scaledAbsError(smallScaled, expectedScaled);
-            const errOne = scaledAbsError(oneScaled, expectedScaled);
-            const errTen = scaledAbsError(tenScaled, expectedScaled);
+                for (let i = 0; i < STEP_CASES.length; i++) {
+                    const s = STEP_CASES[i];
 
-            printAccuracyBlock({
-                t: `4.${testNo}.1`,
-                method: "FW",
-                explanation: "Forward difference with h=1e-3.",
-                input: "f(x)=x^3, x=10",
-                hLabel: "h=1e-3",
-                expectedHex: await qScaled(harness, expectedScaled),
-                outputHex: outSmall,
-                expectedDec: formatScaledInt(expectedScaled),
-                outputDec: formatScaledInt(smallScaled),
-                absError: formatScaledInt(errSmall),
-                relError: scaledRelError(smallScaled, expectedScaled),
-            });
+                    const out = await runDiff(
+                        harness,
+                        methodInfo.method,
+                        target,
+                        selCube,
+                        x,
+                        s.h
+                    );
 
-            printAccuracyBlock({
-                t: `4.${testNo}.2`,
-                method: "FW",
-                explanation: "Forward difference with h=1.",
-                input: "f(x)=x^3, x=10",
-                hLabel: "h=1",
-                expectedHex: await qScaled(harness, expectedScaled),
-                outputHex: outOne,
-                expectedDec: formatScaledInt(expectedScaled),
-                outputDec: formatScaledInt(oneScaled),
-                absError: formatScaledInt(errOne),
-                relError: scaledRelError(oneScaled, expectedScaled),
-            });
+                    const outScaledVal = await outScaled(harness, out);
+                    const err = scaledAbsError(outScaledVal, expectedScaled);
+                    errors.push(err);
 
-            printAccuracyBlock({
-                t: `4.${testNo}.3`,
-                method: "FW",
-                explanation: "Forward difference with h=10.",
-                input: "f(x)=x^3, x=10",
-                hLabel: "h=10",
-                expectedHex: await qScaled(harness, expectedScaled),
-                outputHex: outTen,
-                expectedDec: formatScaledInt(expectedScaled),
-                outputDec: formatScaledInt(tenScaled),
-                absError: formatScaledInt(errTen),
-                relError: scaledRelError(tenScaled, expectedScaled),
-            });
+                    printAccuracyBlock({
+                        t: `${t}.${m + 1}.${i + 1}`,
+                        method: methodInfo.label,
+                        explanation: `${methodInfo.explanationPrefix} with ${s.label} on the cubic benchmark.`,
+                        input: "f(x)=x^3, x=10",
+                        hLabel: s.label,
+                        expectedHex: await qScaled(harness, expectedScaled),
+                        outputHex: out,
+                        expectedDec: formatScaledInt(expectedScaled),
+                        outputDec: formatScaledInt(outScaledVal),
+                        absError: formatScaledInt(err),
+                        relError: scaledRelError(outScaledVal, expectedScaled),
+                    });
+                }
 
-            expect(errSmall < errOne).to.equal(true);
-            expect(errOne < errTen).to.equal(true);
+                // For this benchmark, error should generally grow as h becomes large.
+                for (let i = 1; i < errors.length; i++) {
+                    expect(errors[i] >= errors[i - 1]).to.equal(true);
+                }
+            }
         });
     });
 
