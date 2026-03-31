@@ -11,7 +11,7 @@ type RootFindingHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromUInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
-    toFloat(q: string): Promise<bigint>;
+    toFloat(q: string): Promise<unknown>;
     cmp(a: string, b: string): Promise<bigint>;
     evalHarness(target: string, sel: string, x: string): Promise<string>;
 
@@ -48,8 +48,31 @@ type RootFindingHarness = Contract & {
 // Helpers
 // ------------------------------------------------------------
 
-const SCALE_DECIMALS = 12n;
-const SCALE = 10n ** SCALE_DECIMALS;
+let SCALE_DECIMALS = 12n;
+let SCALE = 10n ** SCALE_DECIMALS;
+
+function asBigInt(v: unknown): bigint {
+    if (typeof v === "bigint") return v;
+    if (typeof v === "number") return BigInt(v);
+    if (typeof v === "string") return BigInt(v);
+
+    if (v && typeof v === "object") {
+        const maybeToString = (v as { toString?: () => string }).toString;
+        if (typeof maybeToString === "function") {
+            return BigInt(maybeToString.call(v));
+        }
+    }
+
+    throw new Error(`Cannot convert value to bigint: ${String(v)}`);
+}
+
+function inferScaleDecimals(scale: bigint): bigint {
+    const s = scale.toString();
+    if (!/^10*$/.test(s) || s[0] !== "1") {
+        return SCALE_DECIMALS;
+    }
+    return BigInt(s.length - 1);
+}
 
 function absBigInt(x: bigint): bigint {
     return x < 0n ? -x : x;
@@ -81,7 +104,8 @@ function scaledRelError(actual: bigint, expected: bigint): string {
 }
 
 async function outScaled(harness: RootFindingHarness, q: string): Promise<bigint> {
-    return await harness.toFloat(q);
+    const raw = await harness.toFloat(q);
+    return asBigInt(raw);
 }
 
 function printRootAccuracyBlock(args: {
@@ -120,7 +144,7 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
     let harness: RootFindingHarness;
     let target: string;
 
-    let TOL_1E_9: string;
+    let TOL_1E_15: string;
 
     let selX2Minus4: string;
     let selDf2x: string;
@@ -170,7 +194,11 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
         selShiftLarge = harness.interface.getFunction("f_shift_large")!.selector;
         selDfShiftLarge = harness.interface.getFunction("df_shift_large")!.selector;
 
-        TOL_1E_9 = await qFrac(1, 1_000_000_000);
+        TOL_1E_15 = await qFrac(1n, 1_000_000_000_000_000n);
+
+        const oneScaled = asBigInt(await harness.toFloat(await harness.qFromInt(1n)));
+        SCALE = oneScaled;
+        SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
     // ------------------------------------------------------------
@@ -181,12 +209,12 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 1.${++testNo}: Bisection converges to root x=2 for x^2-4`, async function () {
-            const a = await qInt(1);
-            const b = await qInt(3);
+            const a = await qInt(1n);
+            const b = await qInt(3n);
             const expectedRoot = 2n * SCALE;
 
             const [root, iterations, converged, fAtRoot] =
-                await harness.rootFindingBisection(target, selX2Minus4, a, b, TOL_1E_9, 100n);
+                await harness.rootFindingBisection(target, selX2Minus4, a, b, TOL_1E_15, 100n);
 
             const rootScaled = await outScaled(harness, root);
             const residualScaled = absBigInt(await outScaled(harness, fAtRoot));
@@ -207,16 +235,16 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
             });
 
             expect(converged).to.equal(true);
-            expect(rootErr < 10_000n).to.equal(true);      // 1e-8
+            expect(rootErr < 10_000n).to.equal(true);
             expect(residualScaled < 10_000n).to.equal(true);
         });
 
         it(`Test 1.${++testNo}: Newton converges rapidly to root x=2 for x^2-4`, async function () {
-            const x0 = await qInt(3);
+            const x0 = await qInt(3n);
             const expectedRoot = 2n * SCALE;
 
             const [root, iterations, converged, fAtRoot] =
-                await harness.rootFindingNewton(target, selX2Minus4, target, selDf2x, x0, TOL_1E_9, 50n);
+                await harness.rootFindingNewton(target, selX2Minus4, target, selDf2x, x0, TOL_1E_15, 50n);
 
             const rootScaled = await outScaled(harness, root);
             const residualScaled = absBigInt(await outScaled(harness, fAtRoot));
@@ -243,12 +271,12 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: Secant converges to root x=2 for x^2-4`, async function () {
-            const x0 = await qInt(1);
-            const x1 = await qInt(3);
+            const x0 = await qInt(1n);
+            const x1 = await qInt(3n);
             const expectedRoot = 2n * SCALE;
 
             const [root, iterations, converged, fAtRoot] =
-                await harness.rootFindingSecant(target, selX2Minus4, x0, x1, TOL_1E_9, 50n);
+                await harness.rootFindingSecant(target, selX2Minus4, x0, x1, TOL_1E_15, 50n);
 
             const rootScaled = await outScaled(harness, root);
             const residualScaled = absBigInt(await outScaled(harness, fAtRoot));
@@ -282,23 +310,22 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 2.${++testNo}: All methods converge on cubic benchmark x^3-x-2=0`, async function () {
-            const a = await qInt(1);
-            const b = await qInt(2);
-            const x0Newton = await qInt(1);
-            const x0Secant = await qInt(1);
-            const x1Secant = await qInt(2);
+            const a = await qInt(1n);
+            const b = await qInt(2n);
+            const x0Newton = await qInt(1n);
+            const x0Secant = await qInt(1n);
+            const x1Secant = await qInt(2n);
 
-            // Real root ≈ 1.521379706805
             const expectedRoot = 1_521_379_706_805n;
 
             const [rootB, iterB, convB, fB] =
-                await harness.rootFindingBisection(target, selCubic, a, b, TOL_1E_9, 100n);
+                await harness.rootFindingBisection(target, selCubic, a, b, TOL_1E_15, 100n);
 
             const [rootN, iterN, convN, fN] =
-                await harness.rootFindingNewton(target, selCubic, target, selDfCubic, x0Newton, TOL_1E_9, 50n);
+                await harness.rootFindingNewton(target, selCubic, target, selDfCubic, x0Newton, TOL_1E_15, 50n);
 
             const [rootS, iterS, convS, fS] =
-                await harness.rootFindingSecant(target, selCubic, x0Secant, x1Secant, TOL_1E_9, 50n);
+                await harness.rootFindingSecant(target, selCubic, x0Secant, x1Secant, TOL_1E_15, 50n);
 
             const rootBScaled = await outScaled(harness, rootB);
             const rootNScaled = await outScaled(harness, rootN);
@@ -358,7 +385,7 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
             expect(convN).to.equal(true);
             expect(convS).to.equal(true);
 
-            expect(errB < 100_000n).to.equal(true); // 1e-7
+            expect(errB < 100_000n).to.equal(true);
             expect(errN < 100_000n).to.equal(true);
             expect(errS < 100_000n).to.equal(true);
 
@@ -414,18 +441,18 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
             it(`Test 3.${++testNo}: Newton exactly recovers ${c.label} shifted linear root`, async function () {
                 const fSel =
                     c.fSel === "small" ? selShiftSmall :
-                        c.fSel === "medium" ? selShiftMedium :
-                            selShiftLarge;
+                    c.fSel === "medium" ? selShiftMedium :
+                    selShiftLarge;
 
                 const dfSel =
                     c.dfSel === "small" ? selDfShiftSmall :
-                        c.dfSel === "medium" ? selDfShiftMedium :
-                            selDfShiftLarge;
+                    c.dfSel === "medium" ? selDfShiftMedium :
+                    selDfShiftLarge;
 
                 const x0 = await qUInt(c.x0);
 
                 const [root, iterations, converged, fAtRoot] =
-                    await harness.rootFindingNewton(target, fSel, target, dfSel, x0, TOL_1E_9, 20n);
+                    await harness.rootFindingNewton(target, fSel, target, dfSel, x0, TOL_1E_15, 20n);
 
                 const rootScaled = await outScaled(harness, root);
                 const residualScaled = absBigInt(await outScaled(harness, fAtRoot));
@@ -461,13 +488,12 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 4.${++testNo}: Newton converges accurately on x^4-10=0`, async function () {
-            const x0 = await qInt(2);
+            const x0 = await qInt(2n);
 
-            // Positive root = 10^(1/4) ≈ 1.778279410038
             const expectedRoot = 1_778_279_410_038n;
 
             const [root, iterations, converged, fAtRoot] =
-                await harness.rootFindingNewton(target, selQuartic, target, selDfQuartic, x0, TOL_1E_9, 50n);
+                await harness.rootFindingNewton(target, selQuartic, target, selDfQuartic, x0, TOL_1E_15, 50n);
 
             const rootScaled = await outScaled(harness, root);
             const residualScaled = absBigInt(await outScaled(harness, fAtRoot));
@@ -488,7 +514,7 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
             });
 
             expect(converged).to.equal(true);
-            expect(rootErr < 100_000n).to.equal(true);      // 1e-7
+            expect(rootErr < 100_000n).to.equal(true);
             expect(residualScaled < 100_000n).to.equal(true);
         });
     });
@@ -500,21 +526,21 @@ describe("RootFinding Library - Numerical Accuracy Tests", function () {
     describe("Section 5: Direct method comparison on same benchmark", function () {
         let testNo = 0;
 
-        it(`Test 5.1: All methods converge successfully on x^2-4 and iteration counts are compared`, async function () {
-            const a = await qInt(1);
-            const b = await qInt(3);
-            const x0N = await qInt(3);
-            const x0S = await qInt(1);
-            const x1S = await qInt(3);
+        it(`Test 5.${++testNo}: All methods converge successfully on x^2-4 and iteration counts are compared`, async function () {
+            const a = await qInt(1n);
+            const b = await qInt(3n);
+            const x0N = await qInt(3n);
+            const x0S = await qInt(1n);
+            const x1S = await qInt(3n);
 
             const [, iterB, convB] =
-                await harness.rootFindingBisection(target, selX2Minus4, a, b, TOL_1E_9, 100n);
+                await harness.rootFindingBisection(target, selX2Minus4, a, b, TOL_1E_15, 100n);
 
             const [, iterN, convN] =
-                await harness.rootFindingNewton(target, selX2Minus4, target, selDf2x, x0N, TOL_1E_9, 50n);
+                await harness.rootFindingNewton(target, selX2Minus4, target, selDf2x, x0N, TOL_1E_15, 50n);
 
             const [, iterS, convS] =
-                await harness.rootFindingSecant(target, selX2Minus4, x0S, x1S, TOL_1E_9, 50n);
+                await harness.rootFindingSecant(target, selX2Minus4, x0S, x1S, TOL_1E_15, 50n);
 
             console.log("------------------------------------------------------------");
             console.log(`Test: 5.${testNo}`);

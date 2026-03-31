@@ -11,7 +11,7 @@ type PolynomialHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromUInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
-    toFloat(q: string): Promise<bigint>;
+    toFloat(q: string): Promise<unknown>;
     fromFloat(n: bigint): Promise<string>;
 
     evaluateHorners(coeffs: string[], x: string): Promise<string>;
@@ -34,8 +34,31 @@ type PolynomialHarness = Contract & {
 // Helpers
 // ------------------------------------------------------------
 
-const SCALE_DECIMALS = 12n;
-const SCALE = 10n ** SCALE_DECIMALS;
+let SCALE_DECIMALS = 12n;
+let SCALE = 10n ** SCALE_DECIMALS;
+
+function asBigInt(v: unknown): bigint {
+    if (typeof v === "bigint") return v;
+    if (typeof v === "number") return BigInt(v);
+    if (typeof v === "string") return BigInt(v);
+
+    if (v && typeof v === "object") {
+        const maybeToString = (v as { toString?: () => string }).toString;
+        if (typeof maybeToString === "function") {
+            return BigInt(maybeToString.call(v));
+        }
+    }
+
+    throw new Error(`Cannot convert value to bigint: ${String(v)}`);
+}
+
+function inferScaleDecimals(scale: bigint): bigint {
+    const s = scale.toString();
+    if (!/^10*$/.test(s) || s[0] !== "1") {
+        return SCALE_DECIMALS;
+    }
+    return BigInt(s.length - 1);
+}
 
 function absBigInt(x: bigint): bigint {
     return x < 0n ? -x : x;
@@ -51,7 +74,8 @@ function formatScaledInt(v: bigint): string {
 }
 
 async function outScaled(harness: PolynomialHarness, q: string): Promise<bigint> {
-    return await harness.toFloat(q);
+    const raw = await harness.toFloat(q);
+    return asBigInt(raw);
 }
 
 function scaledAbsError(actual: bigint, expected: bigint): bigint {
@@ -87,7 +111,7 @@ async function qVecFromFracs(
 }
 
 async function scaledVec(harness: PolynomialHarness, values: string[]): Promise<bigint[]> {
-    return Promise.all(values.map(v => outScaled(harness, v)));
+    return Promise.all(values.map(async v => asBigInt(await harness.toFloat(v))));
 }
 
 function printScalarBlock(args: {
@@ -150,6 +174,10 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
         });
 
         harness = (await HF.deploy()) as unknown as PolynomialHarness;
+
+        const oneScaled = asBigInt(await harness.toFloat(await harness.qFromInt(1n)));
+        SCALE = oneScaled;
+        SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
     // ------------------------------------------------------------
@@ -160,9 +188,9 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 1.${++testNo}: Horner evaluation matches exact scalar result`, async function () {
-            // p(x) = 2 + 3x + x^2, evaluated at x=2 => 2 + 6 + 4 = 12
-            const coeffs = await qVecFromInts(harness, [2, 3, 1]);
-            const x = await qInt(2);
+            // p(x) = 2 + 3x + x^2, evaluated at x=2 => 12
+            const coeffs = await qVecFromInts(harness, [2n, 3n, 1n]);
+            const x = await qInt(2n);
 
             const out = await harness.evaluateHorners(coeffs, x);
             const outScaledVal = await outScaled(harness, out);
@@ -185,8 +213,8 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
         it(`Test 1.${++testNo}: Extended Horner returns exact value and derivative`, async function () {
             // p(x)=1+2x+3x^2, p'(x)=2+6x
             // at x=2 => p(2)=17, p'(2)=14
-            const coeffs = await qVecFromInts(harness, [1, 2, 3]);
-            const x = await qInt(2);
+            const coeffs = await qVecFromInts(harness, [1n, 2n, 3n]);
+            const x = await qInt(2n);
 
             const [px, dpx] = await harness.evaluateWithDerivative(coeffs, x);
             const pxScaled = await outScaled(harness, px);
@@ -224,9 +252,9 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
 
         it(`Test 1.${++testNo}: Monic Horner evaluation matches exact result`, async function () {
             // monic polynomial: x^3 + 2x^2 + 3x + 4
-            // lowerCoeffs = [4,3,2], x=2 => 8+8+6+4 = 26
-            const lowerCoeffs = await qVecFromInts(harness, [4, 3, 2]);
-            const x = await qInt(2);
+            // lowerCoeffs = [4,3,2], x=2 => 26
+            const lowerCoeffs = await qVecFromInts(harness, [4n, 3n, 2n]);
+            const x = await qInt(2n);
 
             const out = await harness.evalHornerMonic(lowerCoeffs, x);
             const outScaledVal = await outScaled(harness, out);
@@ -256,8 +284,8 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
 
         it(`Test 2.${++testNo}: Polynomial addition is exact`, async function () {
             // (1+2x+3x^2) + (4+5x) = 5+7x+3x^2
-            const a = await qVecFromInts(harness, [1, 2, 3]);
-            const b = await qVecFromInts(harness, [4, 5]);
+            const a = await qVecFromInts(harness, [1n, 2n, 3n]);
+            const b = await qVecFromInts(harness, [4n, 5n]);
             const expected = [5n * SCALE, 7n * SCALE, 3n * SCALE];
 
             const out = await harness.add(a, b);
@@ -279,8 +307,8 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
 
         it(`Test 2.${++testNo}: Polynomial subtraction is exact`, async function () {
             // (5+7x+3x^2) - (1+2x+3x^2) = 4+5x
-            const a = await qVecFromInts(harness, [5, 7, 3]);
-            const b = await qVecFromInts(harness, [1, 2, 3]);
+            const a = await qVecFromInts(harness, [5n, 7n, 3n]);
+            const b = await qVecFromInts(harness, [1n, 2n, 3n]);
             const expected = [4n * SCALE, 5n * SCALE, 0n];
 
             const out = await harness.sub(a, b);
@@ -302,8 +330,8 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
 
         it(`Test 2.${++testNo}: Scalar multiplication is exact`, async function () {
             // 2*(1+2x+3x^2) = 2+4x+6x^2
-            const coeffs = await qVecFromInts(harness, [1, 2, 3]);
-            const k = await qInt(2);
+            const coeffs = await qVecFromInts(harness, [1n, 2n, 3n]);
+            const k = await qInt(2n);
             const expected = [2n * SCALE, 4n * SCALE, 6n * SCALE];
 
             const out = await harness.mulScalar(coeffs, k);
@@ -325,8 +353,8 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
 
         it(`Test 2.${++testNo}: Polynomial multiplication is exact`, async function () {
             // (1+x)(1+2x) = 1+3x+2x^2
-            const a = await qVecFromInts(harness, [1, 1]);
-            const b = await qVecFromInts(harness, [1, 2]);
+            const a = await qVecFromInts(harness, [1n, 1n]);
+            const b = await qVecFromInts(harness, [1n, 2n]);
             const expected = [1n * SCALE, 3n * SCALE, 2n * SCALE];
 
             const out = await harness.mul(a, b);
@@ -356,10 +384,9 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
 
         it(`Test 3.${++testNo}: Synthetic division recovers quotient and zero remainder for exact root`, async function () {
             // p(x)=x^2-3x+2 = (x-1)(x-2)
-            // ascending coeffs = [2,-3,1]
             // divide by (x-1) => quotient x-2 => [-2,1], remainder 0
-            const coeffs = await qVecFromInts(harness, [2, -3, 1]);
-            const root = await qInt(1);
+            const coeffs = await qVecFromInts(harness, [2n, -3n, 1n]);
+            const root = await qInt(1n);
 
             const [q, r] = await harness.syntheticDivide(coeffs, root);
             const qScaledVec = await scaledVec(harness, q);
@@ -403,7 +430,7 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
 
         it(`Test 4.${++testNo}: Derivative coefficients are exact`, async function () {
             // p(x)=1+2x+3x^2 => p'(x)=2+6x
-            const coeffs = await qVecFromInts(harness, [1, 2, 3]);
+            const coeffs = await qVecFromInts(harness, [1n, 2n, 3n]);
             const expected = [2n * SCALE, 6n * SCALE];
 
             const out = await harness.derivative(coeffs);
@@ -424,10 +451,9 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 4.${++testNo}: Integral coefficients are exact`, async function () {
-            // p(x)=2+6x
-            // ∫p dx + 5 = 5 + 2x + 3x^2
-            const coeffs = await qVecFromInts(harness, [2, 6]);
-            const C = await qInt(5);
+            // p(x)=2+6x ; integral + C=5 => 5+2x+3x^2
+            const coeffs = await qVecFromInts(harness, [2n, 6n]);
+            const C = await qInt(5n);
             const expected = [5n * SCALE, 2n * SCALE, 3n * SCALE];
 
             const out = await harness.integral(coeffs, C);
@@ -448,13 +474,11 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 4.${++testNo}: Derivative and integral are mutually consistent on polynomial benchmark`, async function () {
-            // p(x)=1+2x+3x^2
-            // derivative => [2,6]
-            // integral([2,6],1) => [1,2,3]
-            const p = await qVecFromInts(harness, [1, 2, 3]);
+            // p(x)=1+2x+3x^2 -> derivative -> [2,6] -> integral(...,1) -> [1,2,3]
+            const p = await qVecFromInts(harness, [1n, 2n, 3n]);
             const dp = await harness.derivative(p);
             const dpArray = Array.from(dp);
-            const one = await qInt(1);
+            const one = await qInt(1n);
             const recovered = await harness.integral(dpArray, one);
 
             const recoveredScaled = await scaledVec(harness, recovered);
@@ -483,7 +507,7 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 5.${++testNo}: degree ignores trailing zeros`, async function () {
-            const coeffs = await qVecFromInts(harness, [1, 2, 0, 0]);
+            const coeffs = await qVecFromInts(harness, [1n, 2n, 0n, 0n]);
             const deg = await harness.degree(coeffs);
 
             console.log("------------------------------------------------------------");
@@ -499,7 +523,7 @@ describe("Polynomial Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 5.${++testNo}: trimTrailingZeros returns canonical representation`, async function () {
-            const coeffs = await qVecFromInts(harness, [1, 2, 0, 0]);
+            const coeffs = await qVecFromInts(harness, [1n, 2n, 0n, 0n]);
             const out = await harness.trimTrailingZeros(coeffs);
             const outScaledVec = await scaledVec(harness, out);
             const expected = [1n * SCALE, 2n * SCALE];

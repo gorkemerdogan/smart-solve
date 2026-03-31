@@ -10,6 +10,7 @@ import type { Contract } from "ethers";
 type SteepestDescentHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
+    toFloat(q: string): Promise<unknown>;
 
     solve(
         objective: string,
@@ -24,6 +25,10 @@ type ObjectiveHarness = Contract & {
     grad(x: string[]): Promise<string[]>;
 };
 
+// ------------------------------------------------------------
+// Constants
+// ------------------------------------------------------------
+
 const STATUS_SUCCESS = 0n;
 const STATUS_ZERO_GRADIENT = 1n;
 const STATUS_NO_LIKELY_IMPROVEMENT = 2n;
@@ -33,8 +38,31 @@ const STATUS_MAX_ITER_EXCEEDED = 3n;
 // Helpers
 // ------------------------------------------------------------
 
-const SCALE_DECIMALS = 12n;
-const SCALE = 10n ** SCALE_DECIMALS;
+let SCALE_DECIMALS = 12n;
+let SCALE = 10n ** SCALE_DECIMALS;
+
+function asBigInt(v: unknown): bigint {
+    if (typeof v === "bigint") return v;
+    if (typeof v === "number") return BigInt(v);
+    if (typeof v === "string") return BigInt(v);
+
+    if (v && typeof v === "object") {
+        const maybeToString = (v as { toString?: () => string }).toString;
+        if (typeof maybeToString === "function") {
+            return BigInt(maybeToString.call(v));
+        }
+    }
+
+    throw new Error(`Cannot convert value to bigint: ${String(v)}`);
+}
+
+function inferScaleDecimals(scale: bigint): bigint {
+    const s = scale.toString();
+    if (!/^10*$/.test(s) || s[0] !== "1") {
+        return SCALE_DECIMALS;
+    }
+    return BigInt(s.length - 1);
+}
 
 function absBigInt(x: bigint): bigint {
     return x < 0n ? -x : x;
@@ -66,8 +94,8 @@ function fmtVec(v: bigint[]): string {
     return `[${v.map(formatScaledInt).join(", ")}]`;
 }
 
-async function scaledVec(harness: { toFloat?: any }, values: string[]): Promise<bigint[]> {
-    return Promise.all(values.map(v => harness.toFloat(v)));
+async function scaledVec(harness: { toFloat: (q: string) => Promise<unknown> }, values: string[]): Promise<bigint[]> {
+    return Promise.all(values.map(async v => asBigInt(await harness.toFloat(v))));
 }
 
 function printSDResult(args: {
@@ -103,7 +131,7 @@ function printSDResult(args: {
 // ------------------------------------------------------------
 
 describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
-    let solver: (SteepestDescentHarness & { toFloat(q: string): Promise<bigint> });
+    let solver: SteepestDescentHarness & { toFloat(q: string): Promise<unknown> };
     let spherical: ObjectiveHarness;
     let weighted: ObjectiveHarness;
     let semiWeighted: ObjectiveHarness;
@@ -124,8 +152,8 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
         const SolverFactory = await ethers.getContractFactory("SteepestDescentHarness", {
             libraries: { MathLib: await mathlib.getAddress() },
         });
-        solver = (await SolverFactory.deploy()) as unknown as SteepestDescentHarness & {
-            toFloat(q: string): Promise<bigint>;
+        const deployedSolver = (await SolverFactory.deploy()) as unknown as SteepestDescentHarness & {
+            toFloat(q: string): Promise<unknown>;
         };
 
         const helperAbi = [
@@ -136,7 +164,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
 
         const combinedAbi = [...helperAbi, ...SolverFactory.interface.fragments];
 
-        solver = new ethers.Contract(await solver.getAddress(), combinedAbi, ethers.provider) as any;
+        solver = new ethers.Contract(await deployedSolver.getAddress(), combinedAbi, ethers.provider) as any;
 
         const SphericalFactory = await ethers.getContractFactory("SphericalObjectiveHarness", {
             libraries: { MathLib: await mathlib.getAddress() },
@@ -153,7 +181,11 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
         });
         semiWeighted = (await SemiFactory.deploy()) as unknown as ObjectiveHarness;
 
-        TOL_1E_9 = await solver.qFromFrac(1, 1_000_000_000);
+        TOL_1E_9 = await solver.qFromFrac(1n, 1_000_000_000n);
+
+        const oneScaled = asBigInt(await solver.toFloat(await solver.qFromInt(1n)));
+        SCALE = oneScaled;
+        SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
     // ------------------------------------------------------------
@@ -164,7 +196,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 1.${++testNo}: solver converges close to zero on spherical objective`, async function () {
-            const x0 = await qVecFromInts([4, -3, 2, -1]);
+            const x0 = await qVecFromInts([4n, -3n, 2n, -1n]);
             const xTrue = [0n, 0n, 0n, 0n];
 
             const [xRaw, gxRaw, iters, status] = await solver.solve(
@@ -175,7 +207,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
             );
 
             const xComp = await scaledVec(solver, xRaw);
-            const gx = await solver.toFloat(gxRaw);
+            const gx = asBigInt(await solver.toFloat(gxRaw));
 
             const dist = vecInfNorm(subVec(xComp, xTrue));
 
@@ -193,7 +225,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
                 status: status.toString(),
             });
 
-            expect(dist < 100_000n).to.equal(true);   // 1e-7
+            expect(dist < 100_000n).to.equal(true);
             expect(absBigInt(gx) < 100_000n).to.equal(true);
             expect(
                 status === STATUS_SUCCESS ||
@@ -203,7 +235,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: zero initial point is recognized as optimum on spherical objective`, async function () {
-            const x0 = await qVecFromInts([0, 0, 0, 0]);
+            const x0 = await qVecFromInts([0n, 0n, 0n, 0n]);
             const xTrue = [0n, 0n, 0n, 0n];
 
             const [xRaw, gxRaw, iters, status] = await solver.solve(
@@ -214,7 +246,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
             );
 
             const xComp = await scaledVec(solver, xRaw);
-            const gx = await solver.toFloat(gxRaw);
+            const gx = asBigInt(await solver.toFloat(gxRaw));
             const dist = vecInfNorm(subVec(xComp, xTrue));
 
             printSDResult({
@@ -248,7 +280,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 2.${++testNo}: solver converges on softly weighted quadratic objective`, async function () {
-            const x0 = await qVecFromInts([5, -4, 3, -2, 1, -1, 2, -3]);
+            const x0 = await qVecFromInts([5n, -4n, 3n, -2n, 1n, -1n, 2n, -3n]);
             const xTrue = new Array<bigint>(8).fill(0n);
 
             const [xRaw, gxRaw, iters, status] = await solver.solve(
@@ -259,7 +291,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
             );
 
             const xComp = await scaledVec(solver, xRaw);
-            const gx = await solver.toFloat(gxRaw);
+            const gx = asBigInt(await solver.toFloat(gxRaw));
             const dist = vecInfNorm(subVec(xComp, xTrue));
 
             printSDResult({
@@ -276,7 +308,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
                 status: status.toString(),
             });
 
-            expect(dist < 100_000_000n).to.equal(true); // 1e-4
+            expect(dist < 100_000_000n).to.equal(true);
             expect(absBigInt(gx) < 100_000_000n).to.equal(true);
             expect(
                 status === STATUS_SUCCESS ||
@@ -286,7 +318,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 2.${++testNo}: strongly weighted quadratic is harder than spherical`, async function () {
-            const x0 = await qVecFromInts([5, -4, 3, -2]);
+            const x0 = await qVecFromInts([5n, -4n, 3n, -2n]);
 
             const [xSRaw, gSRaw, itS] = await solver.solve(
                 await spherical.getAddress(),
@@ -308,16 +340,16 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
             const distS = vecInfNorm(xS);
             const distW = vecInfNorm(xW);
 
-            const gS = absBigInt(await solver.toFloat(gSRaw));
-            const gW = absBigInt(await solver.toFloat(gWRaw));
+            const gS = absBigInt(asBigInt(await solver.toFloat(gSRaw)));
+            const gW = absBigInt(asBigInt(await solver.toFloat(gWRaw)));
 
             printSDResult({
                 t: `2.${testNo}.1`,
                 method: "Steepest Descent",
                 explanation: "Spherical objective baseline.",
                 objective: "g(x)=sum x_i^2",
-                x0: "[5,-4,3,-2,1,-1,2,-3]",
-                expectedX: fmtVec(new Array<bigint>(8).fill(0n)),
+                x0: "[5,-4,3,-2]",
+                expectedX: fmtVec(new Array<bigint>(4).fill(0n)),
                 outputX: fmtVec(xS),
                 distanceToOptimum: formatScaledInt(distS),
                 finalObjective: formatScaledInt(gS),
@@ -330,8 +362,8 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
                 method: "Steepest Descent",
                 explanation: "Strongly weighted quadratic benchmark.",
                 objective: "weighted quadratic",
-                x0: "[5,-4,3,-2,1,-1,2,-3]",
-                expectedX: fmtVec(new Array<bigint>(8).fill(0n)),
+                x0: "[5,-4,3,-2]",
+                expectedX: fmtVec(new Array<bigint>(4).fill(0n)),
                 outputX: fmtVec(xW),
                 distanceToOptimum: formatScaledInt(distW),
                 finalObjective: formatScaledInt(gW),
@@ -339,7 +371,6 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
                 status: "comparison",
             });
 
-            // Weighted case should generally be no easier than the spherical one.
             expect(distW >= distS || gW >= gS).to.equal(true);
         });
     });
@@ -352,8 +383,8 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 3.${++testNo}: different initial points still converge close to the same minimizer`, async function () {
-            const x0A = await qVecFromInts([2, -2, 1, -1]);
-            const x0B = await qVecFromInts([10, -10, 5, -5]);
+            const x0A = await qVecFromInts([2n, -2n, 1n, -1n]);
+            const x0B = await qVecFromInts([10n, -10n, 5n, -5n]);
             const xTrue = [0n, 0n, 0n, 0n];
 
             const [xARaw, gARaw] = await solver.solve(
@@ -377,8 +408,8 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
             const distB = vecInfNorm(subVec(xB, xTrue));
             const between = vecInfNorm(subVec(xA, xB));
 
-            const gA = absBigInt(await solver.toFloat(gARaw));
-            const gB = absBigInt(await solver.toFloat(gBRaw));
+            const gA = absBigInt(asBigInt(await solver.toFloat(gARaw)));
+            const gB = absBigInt(asBigInt(await solver.toFloat(gBRaw)));
 
             printSDResult({
                 t: `3.${testNo}.1`,
@@ -422,10 +453,10 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 4.${++testNo}: final objective is lower than initial objective on spherical benchmark`, async function () {
-            const x0 = await qVecFromInts([6, -5, 4, -3]);
+            const x0 = await qVecFromInts([6n, -5n, 4n, -3n]);
 
             const g0Raw = await spherical.g(x0);
-            const g0 = await solver.toFloat(g0Raw);
+            const g0 = asBigInt(await solver.toFloat(g0Raw));
 
             const [xRaw, gFinalRaw, iters, status] = await solver.solve(
                 await spherical.getAddress(),
@@ -435,7 +466,7 @@ describe("SteepestDescent Library - Numerical Accuracy Tests", function () {
             );
 
             const xComp = await scaledVec(solver, xRaw);
-            const gFinal = await solver.toFloat(gFinalRaw);
+            const gFinal = asBigInt(await solver.toFloat(gFinalRaw));
 
             printSDResult({
                 t: `4.${testNo}`,

@@ -10,10 +10,10 @@ import type { Contract } from "ethers";
 type TrigonometryHarness = Contract & {
     fromDouble(x: number | bigint): Promise<string>;
     fromUInt(x: number | bigint): Promise<string>;
-    toDouble(x: string): Promise<bigint>;
+    toDouble(x: string): Promise<unknown>;
 
     fromFloat(x: bigint): Promise<string>;
-    toFloat(x: string): Promise<bigint>;
+    toFloat(x: string): Promise<unknown>;
 
     abs(x: string): Promise<string>;
     neg(x: string): Promise<string>;
@@ -41,8 +41,31 @@ type TrigonometryHarness = Contract & {
 // Helpers
 // ------------------------------------------------------------
 
-const SCALE_DECIMALS = 12n;
-const SCALE = 10n ** SCALE_DECIMALS;
+let SCALE_DECIMALS = 32n;
+let SCALE = 10n ** SCALE_DECIMALS;
+
+function asBigInt(v: unknown): bigint {
+    if (typeof v === "bigint") return v;
+    if (typeof v === "number") return BigInt(v);
+    if (typeof v === "string") return BigInt(v);
+
+    if (v && typeof v === "object") {
+        const maybeToString = (v as { toString?: () => string }).toString;
+        if (typeof maybeToString === "function") {
+            return BigInt(maybeToString.call(v));
+        }
+    }
+
+    throw new Error(`Cannot convert value to bigint: ${String(v)}`);
+}
+
+function inferScaleDecimals(scale: bigint): bigint {
+    const s = scale.toString();
+    if (!/^10*$/.test(s) || s[0] !== "1") {
+        return SCALE_DECIMALS;
+    }
+    return BigInt(s.length - 1);
+}
 
 function absBigInt(x: bigint): bigint {
     return x < 0n ? -x : x;
@@ -58,11 +81,12 @@ function formatScaledInt(v: bigint): string {
 }
 
 async function outScaled(harness: TrigonometryHarness, q: string): Promise<bigint> {
-    return await harness.toFloat(q);
+    const raw = await harness.toFloat(q);
+    return asBigInt(raw);
 }
 
 async function qScaled(harness: TrigonometryHarness, scaledValue: bigint): Promise<string> {
-    return await harness.fromFloat(scaledValue);
+    return await harness.fromFloat(asBigInt(scaledValue));
 }
 
 function scaledAbsError(actual: bigint, expected: bigint): bigint {
@@ -168,15 +192,19 @@ describe("Trigonometry Library - Numerical Accuracy Tests", function () {
 
         harness = (await HF.deploy()) as unknown as TrigonometryHarness;
 
-        QZERO = await harness.fromDouble(0);
-        QONE = await harness.fromDouble(1);
-        QNEG_ONE = await harness.fromDouble(-1);
-        QHALF = await harness.fromFloat(500000000000n); // 0.5
+        QZERO = await harness.fromDouble(0n);
+        QONE = await harness.fromDouble(1n);
+        QNEG_ONE = await harness.fromDouble(-1n);
+        QHALF = await harness.fromFloat(500000000000n);
 
         QPI = await harness.QPI();
         QHALF_PI = await harness.QHALF_PI();
         QQUARTER_PI = await harness.QQUARTER_PI();
         QTWO_PI = await harness.QTWO_PI();
+
+        const oneScaled = asBigInt(await harness.toFloat(await harness.fromDouble(1n)));
+        SCALE = oneScaled;
+        SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
     // ------------------------------------------------------------
@@ -284,7 +312,7 @@ describe("Trigonometry Library - Numerical Accuracy Tests", function () {
             console.log(`|sin-cos|: ${formatScaledInt(diff)}`);
             console.log("------------------------------------------------------------");
 
-            expect(diff < 1_000_000n).to.equal(true); // 1e-6
+            expect(diff < 1_000_000n).to.equal(true);
         });
     });
 
@@ -346,7 +374,7 @@ describe("Trigonometry Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 2.${++testNo}: atan(-x) = -atan(x)`, async function () {
-            const x = QHALF; // 0.5
+            const x = QHALF;
             const negX = await harness.neg(x);
 
             const aPos = await harness.atan(x);
@@ -556,7 +584,7 @@ describe("Trigonometry Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 5.${++testNo}: tan(atan(x)) ≈ x`, async function () {
-            const x = QHALF; // 0.5
+            const x = QHALF;
 
             const a = await harness.atan(x);
             const recovered = await harness.tan(a);
@@ -617,7 +645,7 @@ describe("Trigonometry Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 6.${++testNo}: asin outside [-1,1] returns NaN`, async function () {
-            const x = await harness.fromDouble(2);
+            const x = await harness.fromDouble(2n);
             const out = await harness.asin(x);
             const isNaN = await harness.isNaN(out);
 
@@ -633,7 +661,7 @@ describe("Trigonometry Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 6.${++testNo}: acos outside [-1,1] returns NaN`, async function () {
-            const x = await harness.fromDouble(-2);
+            const x = await harness.fromDouble(-2n);
             const out = await harness.acos(x);
             const isNaN = await harness.isNaN(out);
 

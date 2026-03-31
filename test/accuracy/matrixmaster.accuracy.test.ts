@@ -11,7 +11,8 @@ type MatrixMasterHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromUInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
-    toFloat(q: string): Promise<bigint>;
+    fromFloat(x: number | bigint): Promise<string>;
+    toFloat(q: string): Promise<unknown>;
 
     transposeHarness(rows: bigint, cols: bigint, dataFlat: string[]): Promise<[bigint, bigint, string[]]>;
     mulMatrixHarness(
@@ -50,11 +51,34 @@ type MatrixMasterHarness = Contract & {
 // Helpers
 // ------------------------------------------------------------
 
-const SCALE_DECIMALS = 12n;
-const SCALE = 10n ** SCALE_DECIMALS;
+let SCALE_DECIMALS = 32n;
+let SCALE = 10n ** SCALE_DECIMALS;
+
+function asBigInt(v: unknown): bigint {
+    if (typeof v === "bigint") return v;
+    if (typeof v === "number") return BigInt(v);
+    if (typeof v === "string") return BigInt(v);
+
+    if (v && typeof v === "object") {
+        const maybeToString = (v as { toString?: () => string }).toString;
+        if (typeof maybeToString === "function") {
+            return BigInt(maybeToString.call(v));
+        }
+    }
+
+    throw new Error(`Cannot convert value to bigint: ${String(v)}`);
+}
 
 function absBigInt(x: bigint): bigint {
     return x < 0n ? -x : x;
+}
+
+function inferScaleDecimals(scale: bigint): bigint {
+    const s = scale.toString();
+    if (!/^10*$/.test(s) || s[0] !== "1") {
+        return SCALE_DECIMALS;
+    }
+    return BigInt(s.length - 1);
 }
 
 function formatScaledInt(v: bigint): string {
@@ -88,6 +112,7 @@ function matMulScaled(A: bigint[][], B: bigint[][]): bigint[][] {
     const cols = B[0].length;
     const inner = B.length;
     const out: bigint[][] = Array.from({ length: rows }, () => Array(cols).fill(0n));
+
     for (let i = 0; i < rows; i++) {
         for (let j = 0; j < cols; j++) {
             let s = 0n;
@@ -104,6 +129,7 @@ function transposeScaled(A: bigint[][]): bigint[][] {
     const rows = A.length;
     const cols = A[0].length;
     const T: bigint[][] = Array.from({ length: cols }, () => Array(rows).fill(0n));
+
     for (let i = 0; i < rows; i++) {
         for (let j = 0; j < cols; j++) {
             T[j][i] = A[i][j];
@@ -125,6 +151,19 @@ function fmtMatFlat(v: bigint[], rows: number, cols: number): string {
     return `[${parts.join(", ")}]`;
 }
 
+function fmtHexVec(v: string[]): string {
+    return `[${v.join(", ")}]`;
+}
+
+function fmtHexMatFlat(v: string[], rows: number, cols: number): string {
+    const parts: string[] = [];
+    for (let i = 0; i < rows; i++) {
+        const row = v.slice(i * cols, (i + 1) * cols);
+        parts.push(`[${row.join(", ")}]`);
+    }
+    return `[${parts.join(", ")}]`;
+}
+
 async function qVecFromInts(h: MatrixMasterHarness, vals: Array<number | bigint>): Promise<string[]> {
     return Promise.all(vals.map(v => h.qFromInt(v)));
 }
@@ -137,7 +176,7 @@ async function qVecFromFracs(
 }
 
 async function scaledVec(h: MatrixMasterHarness, vals: string[]): Promise<bigint[]> {
-    return Promise.all(vals.map(v => h.toFloat(v)));
+    return Promise.all(vals.map(async v => asBigInt(await h.toFloat(v))));
 }
 
 function printMatrixBlock(args: {
@@ -145,6 +184,8 @@ function printMatrixBlock(args: {
     method: string;
     explanation: string;
     input: string;
+    expectedHex: string;
+    outputHex: string;
     expected: string;
     output: string;
     errorNorm: string;
@@ -154,8 +195,10 @@ function printMatrixBlock(args: {
     console.log(`Method: ${args.method}`);
     console.log(`Explanation: ${args.explanation}`);
     console.log(`Input: ${args.input}`);
-    console.log(`Expected: ${args.expected}`);
-    console.log(`Output: ${args.output}`);
+    console.log(`Expected Output (hex): ${args.expectedHex}`);
+    console.log(`Output (hex): ${args.outputHex}`);
+    console.log(`Expected Output (dec): ${args.expected}`);
+    console.log(`Output (dec): ${args.output}`);
     console.log(`Error Norm (inf): ${args.errorNorm}`);
     console.log("------------------------------------------------------------");
 }
@@ -165,6 +208,8 @@ function printScalarBlock(args: {
     method: string;
     explanation: string;
     input: string;
+    expectedHex: string;
+    outputHex: string;
     expected: string;
     output: string;
     absError: string;
@@ -174,8 +219,10 @@ function printScalarBlock(args: {
     console.log(`Method: ${args.method}`);
     console.log(`Explanation: ${args.explanation}`);
     console.log(`Input: ${args.input}`);
-    console.log(`Expected: ${args.expected}`);
-    console.log(`Output: ${args.output}`);
+    console.log(`Expected Output (hex): ${args.expectedHex}`);
+    console.log(`Output (hex): ${args.outputHex}`);
+    console.log(`Expected Output (dec): ${args.expected}`);
+    console.log(`Output (dec): ${args.output}`);
     console.log(`Absolute Error: ${args.absError}`);
     console.log("------------------------------------------------------------");
 }
@@ -186,7 +233,7 @@ function printScalarBlock(args: {
 
 describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
     let harness: MatrixMasterHarness;
-    let TOL_1E_9: string;
+    let TOL_1E_18: string;
     let SEED: string;
 
     before(async () => {
@@ -205,8 +252,12 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         });
 
         harness = (await HF.deploy()) as unknown as MatrixMasterHarness;
-        TOL_1E_9 = await harness.qFromFrac(1, 1_000_000_000);
+        TOL_1E_18 = await harness.qFromFrac(1, 1_000_000_000_000_000_000n);
         SEED = ethers.id("matrixmaster-accuracy-seed");
+
+        const oneScaled = asBigInt(await harness.toFloat(await harness.qFromInt(1)));
+        SCALE = oneScaled;
+        SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
     // ------------------------------------------------------------
@@ -217,7 +268,6 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 1.${++testNo}: transpose produces the exact transposed matrix`, async function () {
-            // A = [[1,2,3],[4,5,6]]
             const A = [
                 [1n * SCALE, 2n * SCALE, 3n * SCALE],
                 [4n * SCALE, 5n * SCALE, 6n * SCALE],
@@ -229,6 +279,7 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             const outScaled = await scaledVec(harness, out);
 
             const expectedFlat = flatten(expected);
+            const expectedHex = await qVecFromInts(harness, [1, 4, 2, 5, 3, 6]);
             const err = vecInfNorm(subVec(outScaled, expectedFlat));
 
             printMatrixBlock({
@@ -236,6 +287,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "transpose",
                 explanation: "Transpose should swap rows and columns exactly.",
                 input: "A=[[1,2,3],[4,5,6]]",
+                expectedHex: fmtHexMatFlat(expectedHex, 3, 2),
+                outputHex: fmtHexMatFlat(out, 3, 2),
                 expected: fmtMatFlat(expectedFlat, 3, 2),
                 output: fmtMatFlat(outScaled, 3, 2),
                 errorNorm: formatScaledInt(err),
@@ -253,8 +306,6 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 2.${++testNo}: dense matrix multiplication matches exact result`, async function () {
-            // A = [[1,2],[3,4]], B = [[5,6],[7,8]]
-            // AB = [[19,22],[43,50]]
             const A = [
                 [1n * SCALE, 2n * SCALE],
                 [3n * SCALE, 4n * SCALE],
@@ -272,6 +323,7 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             const outScaled = await scaledVec(harness, out);
 
             const expectedFlat = flatten(expected);
+            const expectedHex = await qVecFromInts(harness, [19, 22, 43, 50]);
             const err = vecInfNorm(subVec(outScaled, expectedFlat));
 
             printMatrixBlock({
@@ -279,6 +331,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "dense matmul",
                 explanation: "Dense matrix multiplication should reproduce the exact product on a small benchmark.",
                 input: "A=[[1,2],[3,4]], B=[[5,6],[7,8]]",
+                expectedHex: fmtHexMatFlat(expectedHex, 2, 2),
+                outputHex: fmtHexMatFlat(out, 2, 2),
                 expected: fmtMatFlat(expectedFlat, 2, 2),
                 output: fmtMatFlat(outScaled, 2, 2),
                 errorNorm: formatScaledInt(err),
@@ -288,26 +342,6 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 2.${++testNo}: dense matrix multiplication remains accurate for fractional entries`, async function () {
-            // A = [[1/2, 1/4],
-            //      [3/2, 2/5]]
-            //
-            // B = [[2/3, 4/5],
-            //      [1/2, 3/10]]
-            //
-            // AB =
-            // [ [11/24, 19/40],
-            //   [6/5,   33/25] ]
-
-            const A = [
-                [500000000000n, 250000000000n],
-                [1500000000000n, 400000000000n],
-            ];
-
-            const B = [
-                [666666666666n, 800000000000n],
-                [500000000000n, 300000000000n],
-            ];
-
             const expected = [
                 [458333333333n, 475000000000n],
                 [1200000000000n, 1320000000000n],
@@ -338,6 +372,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "dense matmul",
                 explanation: "Dense matrix multiplication should remain numerically accurate for fractional matrix entries.",
                 input: "A=[[0.5,0.25],[1.5,0.4]], B=[[0.666666666666,0.8],[0.5,0.3]]",
+                expectedHex: "N/A",
+                outputHex: fmtHexMatFlat(out, 2, 2),
                 expected: fmtMatFlat(expectedFlat, 2, 2),
                 output: fmtMatFlat(outScaled, 2, 2),
                 errorNorm: formatScaledInt(err),
@@ -355,7 +391,6 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 3.${++testNo}: sparse matrix-vector multiplication matches exact result`, async function () {
-            // A = [[10,0,0],[0,20,0],[0,0,30]], x=[1,2,3], y=[10,40,90]
             const expected = [10n * SCALE, 40n * SCALE, 90n * SCALE];
 
             const rowPtr = [0n, 1n, 2n, 3n];
@@ -368,6 +403,7 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             );
             const outScaled = await scaledVec(harness, out);
 
+            const expectedHex = await qVecFromInts(harness, [10, 40, 90]);
             const err = vecInfNorm(subVec(outScaled, expected));
 
             printMatrixBlock({
@@ -375,6 +411,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "sparse matvec",
                 explanation: "Sparse matrix-vector multiplication should reproduce the exact diagonal action.",
                 input: "A=diag(10,20,30), x=[1,2,3]",
+                expectedHex: fmtHexVec(expectedHex),
+                outputHex: fmtHexVec(out),
                 expected: fmtVec(expected),
                 output: fmtVec(outScaled),
                 errorNorm: formatScaledInt(err),
@@ -384,30 +422,21 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 3.${++testNo}: sparse matrix-vector multiplication remains accurate for fractional entries`, async function () {
-            // A =
-            // [ [1/2, 0,   0  ],
-            //   [0,   3/2, 0  ],
-            //   [0,   0,   2/5] ]
-            //
-            // x = [3/2, 4/5, 5/2]
-            //
-            // y = [3/4, 6/5, 1]
-
             const expected = [750000000000n, 1200000000000n, 1000000000000n];
 
             const rowPtr = [0n, 1n, 2n, 3n];
             const colInd = [0n, 1n, 2n];
 
             const values = [
-                await harness.fromFloat(500000000000n),   // 1/2
-                await harness.fromFloat(1500000000000n),  // 3/2
-                await harness.fromFloat(400000000000n),   // 2/5
+                await harness.fromFloat(500000000000n),
+                await harness.fromFloat(1500000000000n),
+                await harness.fromFloat(400000000000n),
             ];
 
             const xData = [
-                await harness.fromFloat(1500000000000n),  // 3/2
-                await harness.fromFloat(800000000000n),   // 4/5
-                await harness.fromFloat(2500000000000n),  // 5/2
+                await harness.fromFloat(1500000000000n),
+                await harness.fromFloat(800000000000n),
+                await harness.fromFloat(2500000000000n),
             ];
 
             const [, , out] = await harness.mulSparseMatrixVectorHarness(
@@ -415,6 +444,11 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             );
 
             const outScaled = await scaledVec(harness, out);
+            const expectedHex = await qVecFromFracs(harness, [
+                [3, 4],
+                [6, 5],
+                [1, 1],
+            ]);
             const err = vecInfNorm(subVec(outScaled, expected));
 
             printMatrixBlock({
@@ -422,6 +456,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "sparse matvec",
                 explanation: "Sparse matrix-vector multiplication should remain numerically accurate for fractional entries.",
                 input: "A=diag(0.5,1.5,0.4), x=[1.5,0.8,2.5]",
+                expectedHex: fmtHexVec(expectedHex),
+                outputHex: fmtHexVec(out),
                 expected: fmtVec(expected),
                 output: fmtVec(outScaled),
                 errorNorm: formatScaledInt(err),
@@ -439,12 +475,12 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 4.${++testNo}: determinant is exact on a 2x2 benchmark`, async function () {
-            // det [[1,2],[3,4]] = -2
             const Adata = await qVecFromInts(harness, [1, 2, 3, 4]);
             const out = await harness.detHarness(2n, 2n, Adata);
-            const outScaled = await harness.toFloat(out);
+            const outScaled = asBigInt(await harness.toFloat(out));
 
             const expected = -2n * SCALE;
+            const expectedHex = await harness.qFromInt(-2);
             const err = absBigInt(outScaled - expected);
 
             printScalarBlock({
@@ -452,6 +488,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "det",
                 explanation: "Determinant should match the exact closed-form value on a 2x2 matrix.",
                 input: "A=[[1,2],[3,4]]",
+                expectedHex,
+                outputHex: out,
                 expected: formatScaledInt(expected),
                 output: formatScaledInt(outScaled),
                 absError: formatScaledInt(err),
@@ -461,12 +499,12 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 4.${++testNo}: determinant is exact on a triangular matrix`, async function () {
-            // det = product of diagonal = 2*3*4 = 24
             const Adata = await qVecFromInts(harness, [2, 1, 1, 0, 3, 2, 0, 0, 4]);
             const out = await harness.detHarness(3n, 3n, Adata);
-            const outScaled = await harness.toFloat(out);
+            const outScaled = asBigInt(await harness.toFloat(out));
 
             const expected = 24n * SCALE;
+            const expectedHex = await harness.qFromInt(24);
             const err = absBigInt(outScaled - expected);
 
             printScalarBlock({
@@ -474,6 +512,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "det",
                 explanation: "Determinant of an upper-triangular matrix should equal the product of diagonal entries.",
                 input: "A=[[2,1,1],[0,3,2],[0,0,4]]",
+                expectedHex,
+                outputHex: out,
                 expected: formatScaledInt(expected),
                 output: formatScaledInt(outScaled),
                 absError: formatScaledInt(err),
@@ -483,23 +523,15 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 4.${++testNo}: determinant remains accurate for fractional 2x2 entries`, async function () {
-            // A = [[1/2, 1/5],
-            //      [3/4, 2/3]]
-            //
-            // det(A) = (1/2)*(2/3) - (1/5)*(3/4)
-            //        = 1/3 - 3/20
-            //        = 11/60
-            //        = 0.183333333333...
-
             const Adata = [
-                await harness.fromFloat(500000000000n),   // 1/2
-                await harness.fromFloat(200000000000n),   // 1/5
-                await harness.fromFloat(750000000000n),   // 3/4
-                await harness.fromFloat(666666666666n),   // 2/3 approx
+                await harness.fromFloat(500000000000n),
+                await harness.fromFloat(200000000000n),
+                await harness.fromFloat(750000000000n),
+                await harness.fromFloat(666666666666n),
             ];
 
             const out = await harness.detHarness(2n, 2n, Adata);
-            const outScaled = await harness.toFloat(out);
+            const outScaled = asBigInt(await harness.toFloat(out));
 
             const expected = 183333333333n;
             const err = absBigInt(outScaled - expected);
@@ -509,6 +541,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "det",
                 explanation: "Determinant should remain numerically accurate for fractional matrix entries.",
                 input: "A=[[0.5,0.2],[0.75,0.666666666666]]",
+                expectedHex: "N/A",
+                outputHex: out,
                 expected: formatScaledInt(expected),
                 output: formatScaledInt(outScaled),
                 absError: formatScaledInt(err),
@@ -526,7 +560,6 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 5.${++testNo}: inverse matches exact 2x2 inverse`, async function () {
-            // A = [[4,7],[2,6]], A^{-1} = 1/10 * [[6,-7],[-2,4]]
             const expected = [
                 [600000000000n, -700000000000n],
                 [-200000000000n, 400000000000n],
@@ -537,6 +570,12 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             const outScaled = await scaledVec(harness, out);
 
             const expectedFlat = flatten(expected);
+            const expectedHex = await qVecFromFracs(harness, [
+                [3, 5],
+                [-7, 10],
+                [-1, 5],
+                [2, 5],
+            ]);
             const err = vecInfNorm(subVec(outScaled, expectedFlat));
 
             printMatrixBlock({
@@ -544,6 +583,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "inverse",
                 explanation: "Inverse should match the exact 2x2 analytical inverse.",
                 input: "A=[[4,7],[2,6]]",
+                expectedHex: fmtHexMatFlat(expectedHex, 2, 2),
+                outputHex: fmtHexMatFlat(out, 2, 2),
                 expected: fmtMatFlat(expectedFlat, 2, 2),
                 output: fmtMatFlat(outScaled, 2, 2),
                 errorNorm: formatScaledInt(err),
@@ -574,6 +615,7 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             const prod = matMulScaled(A, inv);
             const prodFlat = flatten(prod);
             const expectedFlat = flatten(I);
+            const expectedHex = await qVecFromInts(harness, [1, 0, 0, 1]);
             const err = vecInfNorm(subVec(prodFlat, expectedFlat));
 
             printMatrixBlock({
@@ -581,6 +623,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "inverse identity check",
                 explanation: "Multiplying a matrix by its inverse should recover the identity matrix up to roundoff.",
                 input: "A=[[4,7],[2,6]]",
+                expectedHex: fmtHexMatFlat(expectedHex, 2, 2),
+                outputHex: "N/A",
                 expected: fmtMatFlat(expectedFlat, 2, 2),
                 output: fmtMatFlat(prodFlat, 2, 2),
                 errorNorm: formatScaledInt(err),
@@ -598,7 +642,6 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 6.${++testNo}: power iteration recovers dominant eigenvalue of diagonal matrix`, async function () {
-            // A = diag(5,2,1), dominant eigenvalue = 5
             const Adata = await qVecFromInts(harness, [
                 5, 0, 0,
                 0, 2, 0,
@@ -606,11 +649,12 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             ]);
 
             const [lambda, xRows, xCols, xData] = await harness.powerIterationHarness(
-                3n, 3n, Adata, SEED, TOL_1E_9
+                3n, 3n, Adata, SEED, TOL_1E_18
             );
 
-            const lambdaScaled = await harness.toFloat(lambda);
+            const lambdaScaled = asBigInt(await harness.toFloat(lambda));
             const expected = 5n * SCALE;
+            const expectedHex = await harness.qFromInt(5);
             const err = absBigInt(lambdaScaled - expected);
 
             const xScaled = await scaledVec(harness, xData);
@@ -620,27 +664,29 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
                 method: "power iteration eigenvalue",
                 explanation: "Power iteration should recover the dominant eigenvalue on a diagonal matrix.",
                 input: "A=diag(5,2,1)",
+                expectedHex,
+                outputHex: lambda,
                 expected: formatScaledInt(expected),
                 output: formatScaledInt(lambdaScaled),
                 absError: formatScaledInt(err),
             });
 
             console.log(`Eigenvector shape: ${xRows.toString()}x${xCols.toString()}`);
+            console.log(`Eigenvector Output (hex): ${fmtHexVec(xData)}`);
             console.log(`Eigenvector approx: ${fmtVec(xScaled)}`);
 
-            expect(err < 100_000n).to.equal(true); // 1e-7
+            expect(err < 100_000n).to.equal(true);
         });
 
         it(`Test 6.${++testNo}: power iteration converges faster with a looser tolerance`, async function () {
-            // Same diagonal benchmark
             const Adata = await qVecFromInts(harness, [
                 5, 0, 0,
                 0, 2, 0,
                 0, 0, 1
             ]);
 
-            const tolLoose = await harness.qFromFrac(1, 1_000_000);      // 1e-6
-            const tolTight = await harness.qFromFrac(1, 1_000_000_000);  // 1e-9
+            const tolLoose = await harness.qFromFrac(1, 1_000_000n);
+            const tolTight = await harness.qFromFrac(1, 1_000_000_000n);
 
             const [, , , , itLoose] = await harness.powerIterationWithIterHarness(
                 3n, 3n, Adata, SEED, tolLoose, 500n
@@ -654,6 +700,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             console.log(`Test: 6.${testNo}.2`);
             console.log("Method: power iteration iteration-count sensitivity");
             console.log("Explanation: A looser convergence tolerance should require no more iterations than a tighter tolerance.");
+            console.log("Expected Output (hex): N/A");
+            console.log("Output (hex): N/A");
             console.log(`Iterations (tol=1e-6): ${itLoose.toString()}`);
             console.log(`Iterations (tol=1e-9): ${itTight.toString()}`);
             console.log("------------------------------------------------------------");
@@ -662,7 +710,6 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 6.${++testNo}: power iteration returns a small eigenpair residual`, async function () {
-            // A = diag(5,2,1), dominant eigenvalue = 5
             const Adata = await qVecFromInts(harness, [
                 5, 0, 0,
                 0, 2, 0,
@@ -670,23 +717,19 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             ]);
 
             const [lambda, xRows, xCols, xData] = await harness.powerIterationHarness(
-                3n, 3n, Adata, SEED, TOL_1E_9
+                3n, 3n, Adata, SEED, TOL_1E_18
             );
 
-            const lambdaScaled = await harness.toFloat(lambda);
+            const lambdaScaled = asBigInt(await harness.toFloat(lambda));
             const xScaled = await scaledVec(harness, xData);
 
-            // A * x  for A = diag(5,2,1)
             const Ax = [
                 5n * xScaled[0],
                 2n * xScaled[1],
                 1n * xScaled[2],
             ];
 
-            // lambda * x
             const lambdaX = xScaled.map(v => ((lambdaScaled * v) + SCALE / 2n) / SCALE);
-
-            // residual = Ax - lambda*x
             const residual = subVec(Ax, lambdaX);
             const residualNorm = vecInfNorm(residual);
 
@@ -694,6 +737,8 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
             console.log(`Test: 6.${testNo}`);
             console.log("Method: power iteration residual");
             console.log("Explanation: The returned eigenpair should satisfy Ax ≈ λx, so the residual norm should be small.");
+            console.log("Expected Output (hex): N/A");
+            console.log(`Output (hex): lambda=${lambda}, eigenvector=${fmtHexVec(xData)}`);
             console.log(`Input: A=diag(5,2,1)`);
             console.log(`Lambda approx: ${formatScaledInt(lambdaScaled)}`);
             console.log(`Eigenvector approx: ${fmtVec(xScaled)}`);
@@ -705,7 +750,7 @@ describe("MatrixMaster Library - Numerical Accuracy Tests", function () {
 
             expect(xRows).to.equal(3n);
             expect(xCols).to.equal(1n);
-            expect(residualNorm < 1_000_000n).to.equal(true); // 1e-6
+            expect(residualNorm < 1_000_000n).to.equal(true);
         });
     });
 });

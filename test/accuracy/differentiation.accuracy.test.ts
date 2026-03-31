@@ -10,7 +10,7 @@ import type { Contract } from "ethers";
 type DifferentiationHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
-    toFloat(q: string): Promise<bigint>;
+    toFloat(q: string): Promise<unknown>;
     fromFloat(n: bigint): Promise<string>;
 
     forwardDiffHarness(target: string, selector: string, x: string, h: string): Promise<string>;
@@ -22,8 +22,31 @@ type DifferentiationHarness = Contract & {
 // Helpers
 // ------------------------------------------------------------
 
-const SCALE_DECIMALS = 12n;
-const SCALE = 10n ** SCALE_DECIMALS;
+let SCALE_DECIMALS = 12n;
+let SCALE = 10n ** SCALE_DECIMALS;
+
+function asBigInt(v: unknown): bigint {
+    if (typeof v === "bigint") return v;
+    if (typeof v === "number") return BigInt(v);
+    if (typeof v === "string") return BigInt(v);
+
+    if (v && typeof v === "object") {
+        const maybeToString = (v as { toString?: () => string }).toString;
+        if (typeof maybeToString === "function") {
+            return BigInt(maybeToString.call(v));
+        }
+    }
+
+    throw new Error(`Cannot convert value to bigint: ${String(v)}`);
+}
+
+function inferScaleDecimals(scale: bigint): bigint {
+    const s = scale.toString();
+    if (!/^10*$/.test(s) || s[0] !== "1") {
+        return SCALE_DECIMALS;
+    }
+    return BigInt(s.length - 1);
+}
 
 function formatScaledInt(v: bigint): string {
     const neg = v < 0n;
@@ -39,11 +62,12 @@ function absBigInt(x: bigint): bigint {
 }
 
 async function qScaled(harness: DifferentiationHarness, scaledValue: bigint): Promise<string> {
-    return await harness.fromFloat(scaledValue);
+    return await harness.fromFloat(asBigInt(scaledValue));
 }
 
 async function outScaled(harness: DifferentiationHarness, q: string): Promise<bigint> {
-    return await harness.toFloat(q);
+    const raw = await harness.toFloat(q);
+    return asBigInt(raw);
 }
 
 function scaledAbsError(actual: bigint, expected: bigint): bigint {
@@ -177,9 +201,13 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         selAbs = harness.interface.getFunction("f_abs")!.selector;
         selConstFive = harness.interface.getFunction("f_constFive")!.selector;
 
-        H_SMALL = await harness.qFromFrac(1, 1000); // 1e-3
-        H_ONE = await harness.qFromInt(1);
-        H_TEN = await harness.qFromInt(10);
+        H_SMALL = await harness.qFromFrac(1n, 1000n); // 1e-3
+        H_ONE = await harness.qFromInt(1n);
+        H_TEN = await harness.qFromInt(10n);
+
+        const oneScaled = asBigInt(await harness.toFloat(await harness.qFromInt(1n)));
+        SCALE = oneScaled;
+        SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
     // ------------------------------------------------------------
@@ -190,7 +218,7 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 1.${++testNo}: FW is exact for linear function f(x)=3x-2`, async function () {
-            const x = await qInt(37);
+            const x = await qInt(37n);
             const out = await runDiff(harness, "forwardDiffHarness", target, selLinear, x, H_ONE);
 
             const result = await executeAndPrint({
@@ -208,7 +236,7 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: BW is exact for linear function f(x)=3x-2`, async function () {
-            const x = await qInt(-12);
+            const x = await qInt(-12n);
             const out = await runDiff(harness, "backwardDiffHarness", target, selLinear, x, H_ONE);
 
             const result = await executeAndPrint({
@@ -226,7 +254,7 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: CENT is exact for linear function f(x)=3x-2`, async function () {
-            const x = await qInt(0);
+            const x = await qInt(0n);
             const out = await runDiff(harness, "centeredDiffHarness", target, selLinear, x, H_ONE);
 
             const result = await executeAndPrint({
@@ -244,7 +272,7 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: CENT is exact for constant function`, async function () {
-            const x = await qInt(25);
+            const x = await qInt(25n);
             const out = await runDiff(harness, "centeredDiffHarness", target, selConstFive, x, H_ONE);
 
             const result = await executeAndPrint({
@@ -270,7 +298,7 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 2.${++testNo}: CENT is exact for quadratic function`, async function () {
-            const x = await qInt(7);
+            const x = await qInt(7n);
             const out = await runDiff(harness, "centeredDiffHarness", target, selSquare, x, H_ONE);
 
             const result = await executeAndPrint({
@@ -288,7 +316,7 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 2.${++testNo}: FW on quadratic gives predictable biased result`, async function () {
-            const x = await qInt(7);
+            const x = await qInt(7n);
             const out = await runDiff(harness, "forwardDiffHarness", target, selSquare, x, H_ONE);
 
             const result = await executeAndPrint({
@@ -306,7 +334,7 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 2.${++testNo}: BW on quadratic gives predictable biased result`, async function () {
-            const x = await qInt(7);
+            const x = await qInt(7n);
             const out = await runDiff(harness, "backwardDiffHarness", target, selSquare, x, H_ONE);
 
             const result = await executeAndPrint({
@@ -332,7 +360,7 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 3.${++testNo}: Centered difference is most accurate on cubic benchmark`, async function () {
-            const x = await qInt(10);
+            const x = await qInt(10n);
 
             const outFW = await runDiff(harness, "forwardDiffHarness", target, selCube, x, H_SMALL);
             const outBW = await runDiff(harness, "backwardDiffHarness", target, selCube, x, H_SMALL);
@@ -402,19 +430,18 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
     describe("Section 4: Step size sensitivity", function () {
         let testNo = 0;
 
-        const t = `4.${++testNo}`;
-        it(`Test ${t}: Finite-difference error changes with step size on the cubic benchmark`, async function () {
-            const x = await qInt(10);
-            const expectedScaled = 300n * SCALE; // f'(x)=3x^2 at x=10
+        it(`Test 4.${++testNo}: Finite-difference error changes with step size on the cubic benchmark`, async function () {
+            const x = await qInt(10n);
+            const expectedScaled = 300n * SCALE;
 
             const STEP_CASES: Array<{ label: string; h: string }> = [
                 { label: "h=1e-3", h: H_SMALL },
                 { label: "h=1", h: H_ONE },
                 { label: "h=10", h: H_TEN },
-                { label: "h=20", h: await qInt(20) },
-                { label: "h=50", h: await qInt(50) },
-                { label: "h=100", h: await qInt(100) },
-                { label: "h=200", h: await qInt(200) },
+                { label: "h=20", h: await qInt(20n) },
+                { label: "h=50", h: await qInt(50n) },
+                { label: "h=100", h: await qInt(100n) },
+                { label: "h=200", h: await qInt(200n) },
             ];
 
             const METHODS: Array<{
@@ -422,22 +449,22 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
                 label: DiffLabel;
                 explanationPrefix: string;
             }> = [
-                    {
-                        method: "forwardDiffHarness",
-                        label: "FW",
-                        explanationPrefix: "Forward difference"
-                    },
-                    {
-                        method: "backwardDiffHarness",
-                        label: "BW",
-                        explanationPrefix: "Backward difference"
-                    },
-                    {
-                        method: "centeredDiffHarness",
-                        label: "CENT",
-                        explanationPrefix: "Centered difference"
-                    },
-                ];
+                {
+                    method: "forwardDiffHarness",
+                    label: "FW",
+                    explanationPrefix: "Forward difference"
+                },
+                {
+                    method: "backwardDiffHarness",
+                    label: "BW",
+                    explanationPrefix: "Backward difference"
+                },
+                {
+                    method: "centeredDiffHarness",
+                    label: "CENT",
+                    explanationPrefix: "Centered difference"
+                },
+            ];
 
             for (let m = 0; m < METHODS.length; m++) {
                 const methodInfo = METHODS[m];
@@ -460,7 +487,7 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
                     errors.push(err);
 
                     printAccuracyBlock({
-                        t: `${t}.${m + 1}.${i + 1}`,
+                        t: `4.${testNo}.${m + 1}.${i + 1}`,
                         method: methodInfo.label,
                         explanation: `${methodInfo.explanationPrefix} with ${s.label} on the cubic benchmark.`,
                         input: "f(x)=x^3, x=10",
@@ -474,7 +501,6 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
                     });
                 }
 
-                // For this benchmark, error should generally grow as h becomes large.
                 for (let i = 1; i < errors.length; i++) {
                     expect(errors[i] >= errors[i - 1]).to.equal(true);
                 }
@@ -490,7 +516,7 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 5.${++testNo}: |x| at x=0 gives one-sided and symmetric finite-difference behavior`, async function () {
-            const x = await qInt(0);
+            const x = await qInt(0n);
 
             const outFW = await runDiff(harness, "forwardDiffHarness", target, selAbs, x, H_ONE);
             const outBW = await runDiff(harness, "backwardDiffHarness", target, selAbs, x, H_ONE);
@@ -556,8 +582,8 @@ describe("Differentiation Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 6.${++testNo}: Centered difference recovers derivative of |x| away from x=0`, async function () {
-            const xPos = await qInt(5);
-            const xNeg = await qInt(-5);
+            const xPos = await qInt(5n);
+            const xNeg = await qInt(-5n);
 
             const outPos = await runDiff(harness, "centeredDiffHarness", target, selAbs, xPos, H_ONE);
             const outNeg = await runDiff(harness, "centeredDiffHarness", target, selAbs, xNeg, H_ONE);

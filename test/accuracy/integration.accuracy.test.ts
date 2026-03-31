@@ -10,7 +10,7 @@ import type { Contract } from "ethers";
 type IntegrationHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
-    toFloat(q: string): Promise<bigint>;
+    toFloat(q: string): Promise<unknown>;
     fromFloat(n: bigint): Promise<string>;
     PI(): Promise<string>;
 
@@ -23,8 +23,31 @@ type IntegrationHarness = Contract & {
 // Helpers
 // ------------------------------------------------------------
 
-const SCALE_DECIMALS = 12n;
-const SCALE = 10n ** SCALE_DECIMALS;
+let SCALE_DECIMALS = 12n;
+let SCALE = 10n ** SCALE_DECIMALS;
+
+function asBigInt(v: unknown): bigint {
+    if (typeof v === "bigint") return v;
+    if (typeof v === "number") return BigInt(v);
+    if (typeof v === "string") return BigInt(v);
+
+    if (v && typeof v === "object") {
+        const maybeToString = (v as { toString?: () => string }).toString;
+        if (typeof maybeToString === "function") {
+            return BigInt(maybeToString.call(v));
+        }
+    }
+
+    throw new Error(`Cannot convert value to bigint: ${String(v)}`);
+}
+
+function inferScaleDecimals(scale: bigint): bigint {
+    const s = scale.toString();
+    if (!/^10*$/.test(s) || s[0] !== "1") {
+        return SCALE_DECIMALS;
+    }
+    return BigInt(s.length - 1);
+}
 
 function absBigInt(x: bigint): bigint {
     return x < 0n ? -x : x;
@@ -40,11 +63,12 @@ function formatScaledInt(v: bigint): string {
 }
 
 async function outScaled(harness: IntegrationHarness, q: string): Promise<bigint> {
-    return await harness.toFloat(q);
+    const raw = await harness.toFloat(q);
+    return asBigInt(raw);
 }
 
 async function qScaled(harness: IntegrationHarness, scaledValue: bigint): Promise<string> {
-    return await harness.fromFloat(scaledValue);
+    return await harness.fromFloat(asBigInt(scaledValue));
 }
 
 function scaledAbsError(actual: bigint, expected: bigint): bigint {
@@ -179,6 +203,10 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         selSin = harness.interface.getFunction("f_sin")!.selector;
         selInv = harness.interface.getFunction("f_inv")!.selector;
         selPiecewise = harness.interface.getFunction("f_piecewise")!.selector;
+
+        const oneScaled = asBigInt(await harness.toFloat(await harness.qFromInt(1n)));
+        SCALE = oneScaled;
+        SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
     // ------------------------------------------------------------
@@ -189,8 +217,8 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 1.${++testNo}: Trapezoidal is exact for constant function f(x)=1`, async function () {
-            const a = await qInt(0);
-            const b = await qInt(5);
+            const a = await qInt(0n);
+            const b = await qInt(5n);
 
             const out = await runIntegration(harness, "trapezoidal", target, selOne, a, b, 12n);
 
@@ -208,8 +236,8 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: Simpson 1/3 is exact for constant function f(x)=1`, async function () {
-            const a = await qInt(0);
-            const b = await qInt(5);
+            const a = await qInt(0n);
+            const b = await qInt(5n);
 
             const out = await runIntegration(harness, "simpson13", target, selOne, a, b, 12n);
 
@@ -227,8 +255,8 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: Simpson 3/8 is exact for constant function f(x)=1`, async function () {
-            const a = await qInt(0);
-            const b = await qInt(5);
+            const a = await qInt(0n);
+            const b = await qInt(5n);
 
             const out = await runIntegration(harness, "simpson38", target, selOne, a, b, 12n);
 
@@ -246,12 +274,11 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: Simpson 1/3 is exact for linear function f(x)=x`, async function () {
-            const a = await qInt(0);
-            const b = await qInt(2);
+            const a = await qInt(0n);
+            const b = await qInt(2n);
 
             const out = await runIntegration(harness, "simpson13", target, selLinear, a, b, 12n);
 
-            // integral_0^2 x dx = 2
             const result = await executeAndPrint({
                 harness,
                 t: `1.${testNo}`,
@@ -266,12 +293,11 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: Simpson 1/3 is exact for quadratic function f(x)=x^2`, async function () {
-            const a = await qInt(0);
-            const b = await qInt(1);
+            const a = await qInt(0n);
+            const b = await qInt(1n);
 
             const out = await runIntegration(harness, "simpson13", target, selSquare, a, b, 12n);
 
-            // integral_0^1 x^2 dx = 1/3
             const expectedScaled = SCALE / 3n;
 
             const result = await executeAndPrint({
@@ -288,12 +314,11 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: Simpson 3/8 is exact for cubic function f(x)=x^3`, async function () {
-            const a = await qInt(0);
-            const b = await qInt(1);
+            const a = await qInt(0n);
+            const b = await qInt(1n);
 
             const out = await runIntegration(harness, "simpson38", target, selCube, a, b, 12n);
 
-            // integral_0^1 x^3 dx = 1/4
             const expectedScaled = SCALE / 4n;
 
             const result = await executeAndPrint({
@@ -310,8 +335,8 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: Trapezoidal is exact for zero function`, async function () {
-            const a = await qInt(-3);
-            const b = await qInt(7);
+            const a = await qInt(-3n);
+            const b = await qInt(7n);
 
             const out = await runIntegration(harness, "trapezoidal", target, selZero, a, b, 20n);
 
@@ -329,12 +354,11 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: Trapezoidal is exact for constant function f(x)=5`, async function () {
-            const a = await qInt(1);
-            const b = await qInt(4);
+            const a = await qInt(1n);
+            const b = await qInt(4n);
 
             const out = await runIntegration(harness, "trapezoidal", target, selConst5, a, b, 9n);
 
-            // integral_1^4 5 dx = 15
             const result = await executeAndPrint({
                 harness,
                 t: `1.${testNo}`,
@@ -357,8 +381,8 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 2.${++testNo}: Simpson methods outperform trapezoidal on f(x)=x^2`, async function () {
-            const a = await qInt(0);
-            const b = await qInt(1);
+            const a = await qInt(0n);
+            const b = await qInt(1n);
             const expectedScaled = SCALE / 3n;
 
             const outTrap = await runIntegration(harness, "trapezoidal", target, selSquare, a, b, 12n);
@@ -425,8 +449,8 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 3.${++testNo}: Trapezoidal accuracy improves as n increases for f(x)=x^2`, async function () {
-            const a = await qInt(0);
-            const b = await qInt(1);
+            const a = await qInt(0n);
+            const b = await qInt(1n);
             const expectedScaled = SCALE / 3n;
 
             const N_VALUES = [5n, 10n, 20n, 50n, 100n, 150n, 200n, 250n, 300n, 500n, 750n, 1000n, 1500n, 2000n];
@@ -462,10 +486,9 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 3.${++testNo}: Simpson 1/3 remains highly accurate as n increases for f(x)=sin(x)`, async function () {
-            const a = await qInt(0);
+            const a = await qInt(0n);
             const b = await harness.PI();
 
-            // integral_0^pi sin(x) dx = 2
             const expectedScaled = 2n * SCALE;
 
             const outN6 = await runIntegration(harness, "simpson13", target, selSin, a, b, 6n);
@@ -533,7 +556,7 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
 
         const t1 = `4.${++testNo}`;
         it(`Test ${t1}: Trapezoidal, Simpson 1/3, and Simpson 3/8 integrate sin(x) over [0,pi] with different accuracy`, async function () {
-            const a = await qInt(0);
+            const a = await qInt(0n);
             const b = await harness.PI();
             const expectedScaled = 2n * SCALE;
 
@@ -590,16 +613,16 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
 
             expect(s13Err < trapErr).to.equal(true);
             expect(s38Err < trapErr).to.equal(true);
-            expect(s13Err < 100_000_000n).to.equal(true); // 1e-4
-            expect(s38Err < 100_000_000n).to.equal(true); // 1e-4
+            expect(s13Err < 100_000_000n).to.equal(true);
+            expect(s38Err < 100_000_000n).to.equal(true);
         });
 
         const t2 = `4.${++testNo}`;
         it(`Test ${t2}: Trapezoidal, Simpson 1/3, and Simpson 3/8 integrate 1/x over [1,2] with different accuracy`, async function () {
-            const a = await qInt(1);
-            const b = await qInt(2);
+            const a = await qInt(1n);
+            const b = await qInt(2n);
 
-            // ln(2) scaled to 1e12
+            // ln(2) scaled approximately in the current decimal display domain
             const expectedScaled = 693147180559n;
 
             const outTrap = await runIntegration(harness, "trapezoidal", target, selInv, a, b, 30n);
@@ -655,8 +678,8 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
 
             expect(s13Err < trapErr).to.equal(true);
             expect(s38Err < trapErr).to.equal(true);
-            expect(s13Err < 100_000_000n).to.equal(true); // 1e-4
-            expect(s38Err < 100_000_000n).to.equal(true); // 1e-4
+            expect(s13Err < 100_000_000n).to.equal(true);
+            expect(s38Err < 100_000_000n).to.equal(true);
         });
     });
 
@@ -668,14 +691,13 @@ describe("Integration Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 5.${++testNo}: Piecewise integrand is handled with bounded error`, async function () {
-            const a = await qInt(0);
-            const b = await qInt(2);
+            const a = await qInt(0n);
+            const b = await qInt(2n);
 
             const outTrap = await runIntegration(harness, "trapezoidal", target, selPiecewise, a, b, 12n);
             const outS13 = await runIntegration(harness, "simpson13", target, selPiecewise, a, b, 12n);
             const outS38 = await runIntegration(harness, "simpson38", target, selPiecewise, a, b, 12n);
 
-            // exact integral = ∫0^1 1 dx + ∫1^2 3 dx = 4
             const expectedScaled = 4n * SCALE;
 
             const trapScaled = await outScaled(harness, outTrap);

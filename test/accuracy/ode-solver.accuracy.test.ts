@@ -10,7 +10,7 @@ import type { Contract } from "ethers";
 type ODESolverHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
-    toFloat(q: string): Promise<bigint>;
+    toFloat(q: string): Promise<unknown>;
     fromFloat(n: bigint): Promise<string>;
 
     euler(target: string, selector: string, x: string, y: string, h: string): Promise<string>;
@@ -23,8 +23,31 @@ type ODESolverHarness = Contract & {
 // Helpers
 // ------------------------------------------------------------
 
-const SCALE_DECIMALS = 12n;
-const SCALE = 10n ** SCALE_DECIMALS;
+let SCALE_DECIMALS = 18n;
+let SCALE = 10n ** SCALE_DECIMALS;
+
+function asBigInt(v: unknown): bigint {
+    if (typeof v === "bigint") return v;
+    if (typeof v === "number") return BigInt(v);
+    if (typeof v === "string") return BigInt(v);
+
+    if (v && typeof v === "object") {
+        const maybeToString = (v as { toString?: () => string }).toString;
+        if (typeof maybeToString === "function") {
+            return BigInt(maybeToString.call(v));
+        }
+    }
+
+    throw new Error(`Cannot convert value to bigint: ${String(v)}`);
+}
+
+function inferScaleDecimals(scale: bigint): bigint {
+    const s = scale.toString();
+    if (!/^10*$/.test(s) || s[0] !== "1") {
+        return SCALE_DECIMALS;
+    }
+    return BigInt(s.length - 1);
+}
 
 function absBigInt(x: bigint): bigint {
     return x < 0n ? -x : x;
@@ -40,11 +63,12 @@ function formatScaledInt(v: bigint): string {
 }
 
 async function outScaled(harness: ODESolverHarness, q: string): Promise<bigint> {
-    return await harness.toFloat(q);
+    const raw = await harness.toFloat(q);
+    return asBigInt(raw);
 }
 
 async function qScaled(harness: ODESolverHarness, scaledValue: bigint): Promise<string> {
-    return await harness.fromFloat(scaledValue);
+    return await harness.fromFloat(asBigInt(scaledValue));
 }
 
 function scaledAbsError(actual: bigint, expected: bigint): bigint {
@@ -201,10 +225,14 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
         selSquare = harness.interface.getFunction("f_square")!.selector;
         selCubicPoly = harness.interface.getFunction("f_cubic_poly")!.selector;
 
-        H_HALF = await qFrac(1, 2);
-        H_ONE = await qInt(1);
-        H_TWO = await qInt(2);
-        H_TENTH = await qFrac(1, 10);
+        H_HALF = await qFrac(1n, 2n);
+        H_ONE = await qInt(1n);
+        H_TWO = await qInt(2n);
+        H_TENTH = await qFrac(1n, 10n);
+
+        const oneScaled = asBigInt(await harness.toFloat(await harness.qFromInt(1n)));
+        SCALE = oneScaled;
+        SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
     // ------------------------------------------------------------
@@ -215,11 +243,9 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 1.${++testNo}: All one-step methods are exact for the constant ODE y'=5`, async function () {
+            const x0 = await qInt(0n);
+            const y0 = await qInt(2n);
 
-            const x0 = await qInt(0);
-            const y0 = await qInt(2);
-
-            // y_{n+1} = y_n + 5h, for h=1 => 7
             const expectedScaled = 7n * SCALE;
 
             const outEuler = await runODE(harness, "euler", target, selConst5, x0, y0, H_ONE);
@@ -250,11 +276,9 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 1.${++testNo}: One-step methods show different accuracy on y'=x^2 from x=0 with h=1`, async function () {
-            const x0 = await qInt(0);
-            const y0 = await qInt(0);
+            const x0 = await qInt(0n);
+            const y0 = await qInt(0n);
 
-            // Exact one-step solution:
-            // y1 = y0 + ∫_0^1 x^2 dx = 1/3
             const expectedScaled = SCALE / 3n;
 
             const outEuler = await runODE(harness, "euler", target, selSquare, x0, y0, H_ONE);
@@ -324,7 +348,6 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
                 relError: scaledRelError(rk4Scaled, expectedScaled),
             });
 
-            // Since x^2 depends only on x, higher-order methods should be more accurate than Euler.
             expect(mErr <= eErr).to.equal(true);
             expect(hErr <= eErr).to.equal(true);
             expect(rErr <= eErr).to.equal(true);
@@ -339,10 +362,9 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 2.${++testNo}: RK methods outperform Euler on y'=y with h=0.5`, async function () {
-            const x0 = await qInt(0);
-            const y0 = await qInt(1);
+            const x0 = await qInt(0n);
+            const y0 = await qInt(1n);
 
-            // Exact: y(0.5) = e^0.5 ≈ 1.648721270700
             const expectedScaled = 1_648_721_270_700n;
 
             const outEuler = await runODE(harness, "euler", target, selLinear, x0, y0, H_HALF);
@@ -427,17 +449,13 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 3.${++testNo}: Euler error grows with larger h on y'=y`, async function () {
-            const x0 = await qInt(0);
-            const y0 = await qInt(1);
+            const x0 = await qInt(0n);
+            const y0 = await qInt(1n);
 
             const outH01 = await runODE(harness, "euler", target, selLinear, x0, y0, H_TENTH);
             const outH05 = await runODE(harness, "euler", target, selLinear, x0, y0, H_HALF);
             const outH1 = await runODE(harness, "euler", target, selLinear, x0, y0, H_ONE);
 
-            // exact values:
-            // e^0.1 ≈ 1.105170918076
-            // e^0.5 ≈ 1.648721270700
-            // e^1   ≈ 2.718281828459
             const exp01 = 1_105_170_918_076n;
             const exp05 = 1_648_721_270_700n;
             const exp1 = 2_718_281_828_459n;
@@ -494,8 +512,8 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
         });
 
         it(`Test 3.${++testNo}: RK4 remains highly accurate under smaller h on y'=y`, async function () {
-            const x0 = await qInt(0);
-            const y0 = await qInt(1);
+            const x0 = await qInt(0n);
+            const y0 = await qInt(1n);
 
             const outH01 = await runODE(harness, "rk4", target, selLinear, x0, y0, H_TENTH);
             const outH05 = await runODE(harness, "rk4", target, selLinear, x0, y0, H_HALF);
@@ -542,7 +560,7 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
             printODEAccuracyBlock({
                 t: `3.${testNo}.3`,
                 method: "RK4",
-                explanation: "RK4 with h=0.5 on y'=y.",
+                explanation: "RK4 with h=1.0 on y'=y.",
                 input: "y'=y, x0=0, y0=1, h=1.0",
                 expectedHex: await qScaled(harness, exp1),
                 outputHex: outH1,
@@ -553,7 +571,7 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
             });
 
             expect(err01 < err05).to.equal(true);
-            expect(err01 < 1_000_000n).to.equal(true); // 1e-8
+            expect(err01 < 1_000_000n).to.equal(true);
         });
     });
 
@@ -566,12 +584,11 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
 
         const t1 = `4.${++testNo}`;
         it(`Test ${t1}: Multi-step methods on y'=y over [0,1] show the expected accuracy ranking`, async function () {
-            const x0 = await qInt(0);
-            const y0 = await qInt(1);
-            const h = H_TENTH;   // 0.1
+            const x0 = await qInt(0n);
+            const y0 = await qInt(1n);
+            const h = H_TENTH;
             const steps = 10;
 
-            // Exact: y(1)=e
             const expectedScaled = 2_718_281_828_459n;
 
             const outEuler = await runSteps(harness, "euler", target, selLinear, x0, y0, h, steps);
@@ -649,12 +666,11 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
 
         const t2 = `4.${++testNo}`;
         it(`Test ${t2}: Multi-step methods on y'=x^2 over [0,1] converge toward the exact integral`, async function () {
-            const x0 = await qInt(0);
-            const y0 = await qInt(0);
-            const h = H_TENTH;   // 0.1
+            const x0 = await qInt(0n);
+            const y0 = await qInt(0n);
+            const h = H_TENTH;
             const steps = 10;
 
-            // Exact: ∫_0^1 x^2 dx = 1/3
             const expectedScaled = SCALE / 3n;
 
             const outEuler = await runSteps(harness, "euler", target, selSquare, x0, y0, h, steps);
@@ -739,13 +755,11 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
         let testNo = 0;
 
         it(`Test 5.${++testNo}: Multi-step methods on the polynomial slope benchmark show the expected accuracy ranking`, async function () {
-            const x0 = await qInt(0);
-            const y0 = await qInt(0);
-            const steps = 500;
-            const h = await qFrac(1, steps);
+            const x0 = await qInt(0n);
+            const y0 = await qInt(0n);
+            const steps = 1000;
+            const h = await qFrac(1n, BigInt(steps));
 
-            // Exact:
-            // Integral(_0^1 (x^3 + x^2 + 2x + 3) dx) = 55/12 = 4.583333333333...
             const expectedScaled = 4_583_333_333_333n;
 
             const outEuler = await runSteps(harness, "euler", target, selCubicPoly, x0, y0, h, steps);
@@ -766,8 +780,8 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
             printODEAccuracyBlock({
                 t: `5.${testNo}.1`,
                 method: "Euler",
-                explanation: "Euler with 10 steps of h=0.1 on the polynomial slope benchmark.",
-                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=0.05, steps=${steps}`,
+                explanation: "Euler on the polynomial slope benchmark.",
+                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=${1 / steps}, steps=${steps}`,
                 expectedHex: await qScaled(harness, expectedScaled),
                 outputHex: outEuler,
                 expectedDec: formatScaledInt(expectedScaled),
@@ -779,8 +793,8 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
             printODEAccuracyBlock({
                 t: `5.${testNo}.2`,
                 method: "RK2 Midpoint",
-                explanation: "RK2 Midpoint with 10 steps of h=0.1 on the polynomial slope benchmark.",
-                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=0.05, steps=${steps}`,
+                explanation: "RK2 Midpoint on the polynomial slope benchmark.",
+                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=${1 / steps}, steps=${steps}`,
                 expectedHex: await qScaled(harness, expectedScaled),
                 outputHex: outMid,
                 expectedDec: formatScaledInt(expectedScaled),
@@ -792,8 +806,8 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
             printODEAccuracyBlock({
                 t: `5.${testNo}.3`,
                 method: "RK2 Heun",
-                explanation: "RK2 Heun with 10 steps of h=0.1 on the polynomial slope benchmark.",
-                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=0.05, steps=${steps}`,
+                explanation: "RK2 Heun on the polynomial slope benchmark.",
+                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=${1 / steps}, steps=${steps}`,
                 expectedHex: await qScaled(harness, expectedScaled),
                 outputHex: outHeun,
                 expectedDec: formatScaledInt(expectedScaled),
@@ -805,8 +819,8 @@ describe("ODESolver Library - Numerical Accuracy Tests", function () {
             printODEAccuracyBlock({
                 t: `5.${testNo}.4`,
                 method: "RK4",
-                explanation: "RK4 with 10 steps of h=0.1 on the polynomial slope benchmark.",
-                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=0.05, steps=${steps}`,
+                explanation: "RK4 on the polynomial slope benchmark.",
+                input: `y'=x^3+x^2+2x+3, x0=0, y0=0, h=${1 / steps}, steps=${steps}`,
                 expectedHex: await qScaled(harness, expectedScaled),
                 outputHex: outRK4,
                 expectedDec: formatScaledInt(expectedScaled),
