@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { MathLib } from "../MathLib.sol";
-import { QuadConstants as QC } from "../QuadConstants.sol";
+import {MathLib} from "../MathLib.sol";
+import {QuadConstants as QC} from "../QuadConstants.sol";
 
 /**
  * @title TrigonometrySinCos
@@ -12,12 +12,19 @@ import { QuadConstants as QC } from "../QuadConstants.sol";
  *         used by higher-level trigonometry modules.
  */
 library TrigonometrySinCos {
-
     // ------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------
 
     bytes16 internal constant QZERO = 0x00000000000000000000000000000000;
+
+    function _floorToInt(bytes16 x) private pure returns (int256) {
+        int256 k = MathLib.toInt(x);
+        if (MathLib.cmp(x, MathLib.fromInt(k)) < 0) {
+            k -= 1;
+        }
+        return k;
+    }
 
     /**
      * @notice Reduces an angle into the core range [-π/4, +π/4] and encodes
@@ -35,33 +42,31 @@ library TrigonometrySinCos {
      * @return xr Reduced angle in [-π/4, +π/4]
      * @return mask Encoded quadrant and swap information
      */
-    function reduceAngle(bytes16 x) internal pure returns (bytes16 xr, uint8 mask) {
-        bytes16 halfpi  = QC.HALF_PI();
-        bytes16 twopi   = QC.TWO_PI();
+    function reduceAngle(
+        bytes16 x
+    ) internal pure returns (bytes16 xr, uint8 mask) {
+        bytes16 halfpi = QC.HALF_PI();
+        bytes16 twopi = QC.TWO_PI();
 
-        // 1) mod 2π
+        // 1) floor-based mod 2π
         bytes16 t = MathLib.div(x, twopi);
-        int256 k = MathLib.toInt(t);
+        int256 k = _floorToInt(t);
         bytes16 kq = MathLib.fromInt(k);
         bytes16 xm = MathLib.sub(x, MathLib.mul(kq, twopi));
 
-        // 2) mod π/2
+        // 2) floor-based mod π/2
         bytes16 t2 = MathLib.div(xm, halfpi);
-        int256 k2 = MathLib.toInt(t2);
+        int256 k2 = _floorToInt(t2);
         bytes16 k2q = MathLib.fromInt(k2);
         xr = MathLib.sub(xm, MathLib.mul(k2q, halfpi));
 
-        // 3) quadrant
         uint8 q = uint8(uint256(k2 & 3));
 
-        uint8 swap   = (q == 1 || q == 3) ? 1 : 0; // bit0
-        uint8 sinNeg = (q == 2 || q == 3) ? 1 : 0; // bit1
-        uint8 cosNeg = (q == 1 || q == 2) ? 1 : 0; // bit2
+        uint8 swap = (q == 1 || q == 3) ? 1 : 0;
+        uint8 sinNeg = (q == 2 || q == 3) ? 1 : 0;
+        uint8 cosNeg = (q == 1 || q == 2) ? 1 : 0;
 
-        mask = (swap)
-            | (sinNeg << 1)
-            | (cosNeg << 2);
-
+        mask = swap | (sinNeg << 1) | (cosNeg << 2);
         return (xr, mask);
     }
 
@@ -85,7 +90,7 @@ library TrigonometrySinCos {
         // Should not happen; default to Q0
         return 0;
     }
-    
+
     /**
      * @notice Evaluates the core sine polynomial on the reduced domain.
      * @dev Uses a truncated Taylor expansion expressed in Horner form:
@@ -111,12 +116,21 @@ library TrigonometrySinCos {
         // c5 = -1/11!
         // c6 =  1/13!
 
-        bytes16 c1 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(6)));         // 3! = 6
-        bytes16 c2 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(120));        // 5! = 120
-        bytes16 c3 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(5040)));      // 7! = 5040
-        bytes16 c4 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(362880));     // 9! = 362880
-        bytes16 c5 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(39916800)));  // 11! = 39916800
-        bytes16 c6 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(6227020800)); // 13! = 6227020800
+        bytes16 c1 = MathLib.neg(
+            MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(6))
+        ); // 3! = 6
+        bytes16 c2 = MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(120)); // 5! = 120
+        bytes16 c3 = MathLib.neg(
+            MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(5040))
+        ); // 7! = 5040
+        bytes16 c4 = MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(362880)); // 9! = 362880
+        bytes16 c5 = MathLib.neg(
+            MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(39916800))
+        ); // 11! = 39916800
+        bytes16 c6 = MathLib.div(
+            MathLib.fromUInt(1),
+            MathLib.fromUInt(6227020800)
+        ); // 13! = 6227020800
 
         // Horner: y = c6; y = c5 + z*y; ...; y = c1 + z*y;
         bytes16 y = c6;
@@ -156,12 +170,21 @@ library TrigonometrySinCos {
         // d5 = -1/10!
         // d6 =  1/12!
 
-        bytes16 d1 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(2)));        // 2! = 2
-        bytes16 d2 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(24));        // 4! = 24
-        bytes16 d3 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(720)));      // 6! = 720
-        bytes16 d4 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(40320));     // 8! = 40320
-        bytes16 d5 = MathLib.neg(MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(3628800)));  // 10! = 3628800
-        bytes16 d6 = MathLib.div(MathLib.fromUInt(1),             MathLib.fromUInt(479001600)); // 12! = 479001600
+        bytes16 d1 = MathLib.neg(
+            MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(2))
+        ); // 2! = 2
+        bytes16 d2 = MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(24)); // 4! = 24
+        bytes16 d3 = MathLib.neg(
+            MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(720))
+        ); // 6! = 720
+        bytes16 d4 = MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(40320)); // 8! = 40320
+        bytes16 d5 = MathLib.neg(
+            MathLib.div(MathLib.fromUInt(1), MathLib.fromUInt(3628800))
+        ); // 10! = 3628800
+        bytes16 d6 = MathLib.div(
+            MathLib.fromUInt(1),
+            MathLib.fromUInt(479001600)
+        ); // 12! = 479001600
 
         // Horner: q = d6; q = d5 + z*q; ...; q = d1 + z*q;
         bytes16 q = d6;
@@ -199,12 +222,12 @@ library TrigonometrySinCos {
         //    xr == 0 => x = k * (π/2)
         if (MathLib.isZero(xr)) {
             uint8 q = _quadrant(mask);
-            if (q == 1) return MathLib.fromUInt(1);                // +π/2, 5π/2, ...
-            if (q == 3) return MathLib.neg(MathLib.fromUInt(1));   // -π/2, 3π/2, ...
+            if (q == 1) return MathLib.fromUInt(1); // +π/2, 5π/2, ...
+            if (q == 3) return MathLib.neg(MathLib.fromUInt(1)); // -π/2, 3π/2, ...
             return QZERO; // 0, π, 2π, ...
         }
 
-        bool swap   = (mask & 1) != 0; // bit0
+        bool swap = (mask & 1) != 0; // bit0
         bool sinNeg = (mask & 2) != 0; // bit1
 
         // 3) Core mapping: |xr| > π/4 → use complementary angle
@@ -252,12 +275,12 @@ library TrigonometrySinCos {
         // 2) Special case: exact multiples of π/2
         if (MathLib.isZero(xr)) {
             uint8 q = _quadrant(mask);
-            if (q == 0) return MathLib.fromUInt(1);               // 0, 2π, ...
-            if (q == 2) return MathLib.neg(MathLib.fromUInt(1));  // π, 3π, ...
+            if (q == 0) return MathLib.fromUInt(1); // 0, 2π, ...
+            if (q == 2) return MathLib.neg(MathLib.fromUInt(1)); // π, 3π, ...
             return QZERO; // ±π/2, ...
         }
 
-        bool swap   = (mask & 1) != 0; // bit0
+        bool swap = (mask & 1) != 0; // bit0
         bool cosNeg = (mask & 4) != 0; // bit2
 
         // 3) Core mapping to [-π/4, +π/4]

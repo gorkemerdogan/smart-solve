@@ -87,7 +87,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         await harness.waitForDeployment();
 
         QZERO = await harness.fromFloat(0n);
-        QONE  = await harness.fromFloat(BigInt(SCALE));
+        QONE = await harness.fromFloat(BigInt(SCALE));
     });
 
     // ------------------------------------------------------------
@@ -249,7 +249,7 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
     //  Decimal & Identities
     // ------------------------------------------------------------
 
-    it("Test 7: HEX sin(-x) symmetry", async function () {
+    it("Test 7: DEC sin(-x) symmetry", async function () {
         t++;
         const x = 0.345;
         const qx = await toQuad(harness, x);
@@ -263,21 +263,21 @@ describe("Trigonometry — Report (HEX + DEC + Identities + NaN)", function () {
         const negHex = (await harness.sin(qn)).toLowerCase();
         const negDec = await fromQuad(harness, negHex);
 
-        const expectedNegHex = flipSign(posHex);
         const expectedNegDec = -posDec;
 
         printBlockRegular({
             t,
             method: "sin",
-            explanation: "Verifies sin(−x) is bit-wise sign-flipped sin(x), and numerically −sin(x).",
+            explanation: "Verifies numerically that sin(−x) ≈ −sin(x).",
             inHex: `x=${x}`,
-            expectedHex: expectedNegHex,
+            expectedHex: "~",
             outHex: negHex,
             expectedDec: formatDec(expectedNegDec),
             outDec: formatDec(negDec),
             gas,
         });
-        expect(negHex).to.equal(expectedNegHex);
+
+        expect(negDec).to.be.closeTo(expectedNegDec, 1e-12);
     });
 
     it("Test 8: DEC sin(x^2)", async function () {
