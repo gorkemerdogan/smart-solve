@@ -42,6 +42,20 @@ contract ODESolverFacet {
         yNext = ODESolver.euler(target, selectorF, x, y, h);
     }
 
+    /**
+     * @notice Perform multiple Euler steps and return the final y value.
+     * @param target Address implementing f(x,y)
+     * @param selectorF Function selector for f(x,y)
+     * @param x0 Initial x
+     * @param y0 Initial y
+     * @param h Step size
+     * @param steps Number of steps
+     * @return yFinal Final y after 'steps' Euler iterations
+     */
+    function eulerIter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) external view returns (bytes16 yFinal) {
+        yFinal = ODESolver.eulerIter(target, selectorF, x0, y0, h, steps);
+    }
+
     // ------------------------------------------------------------
     // RK2 — Midpoint Method
     // ------------------------------------------------------------
@@ -57,6 +71,20 @@ contract ODESolverFacet {
      */
     function rk2Midpoint(address target, bytes4 selectorF, bytes16 x, bytes16 y, bytes16 h) external view returns (bytes16 yNext) {
         yNext = ODESolver.rk2Midpoint(target, selectorF, x, y, h);
+    }
+
+    /**
+     * @notice Perform multiple RK2 midpoint steps and return the final y value.
+     * @param target Address implementing f(x,y)
+     * @param selectorF Function selector for f(x,y)
+     * @param x0 Initial x
+     * @param y0 Initial y
+     * @param h Step size
+     * @param steps Number of steps
+     * @return yFinal Final y after 'steps' RK2 midpoint iterations
+     */
+    function rk2MidpointIter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) external view returns (bytes16 yFinal) {
+        yFinal = ODESolver.rk2MidpointIter(target, selectorF, x0, y0, h, steps);
     }
 
     // ------------------------------------------------------------
@@ -76,6 +104,20 @@ contract ODESolverFacet {
         yNext = ODESolver.rk2Heun(target, selectorF, x, y, h);
     }
 
+    /**
+     * @notice Perform multiple RK2 Heun steps and return the final y value.
+     * @param target Address implementing f(x,y)
+     * @param selectorF Function selector for f(x,y)
+     * @param x0 Initial x
+     * @param y0 Initial y
+     * @param h Step size
+     * @param steps Number of steps
+     * @return yFinal Final y after 'steps' RK2 Heun iterations
+     */
+    function rk2HeunIter( address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) external view returns (bytes16 yFinal) {
+        yFinal = ODESolver.rk2HeunIter(target, selectorF, x0, y0, h, steps);
+    }
+
     // ------------------------------------------------------------
     // Classic RK4
     // ------------------------------------------------------------
@@ -91,5 +133,19 @@ contract ODESolverFacet {
      */
     function rk4(address target, bytes4 selectorF, bytes16 x, bytes16 y, bytes16 h) external view returns (bytes16 yNext) {
         yNext = ODESolver.rk4(target, selectorF, x, y, h);
+    }
+
+    /**
+     * @notice Perform multiple classical RK4 steps and return the final y value.
+     * @param target Address implementing f(x,y)
+     * @param selectorF Function selector for f(x,y)
+     * @param x0 Initial x
+     * @param y0 Initial y
+     * @param h Step size
+     * @param steps Number of steps
+     * @return yFinal Final y after 'steps' RK4 iterations
+     */
+    function rk4Iter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) external view returns (bytes16 yFinal) {
+        yFinal = ODESolver.rk4Iter(target, selectorF, x0, y0, h, steps);
     }
 }

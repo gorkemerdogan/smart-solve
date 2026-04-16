@@ -32,6 +32,26 @@ contract ODESolverHarness {
     }
 
     // ------------------------------------------------------------
+    // ODE Solver with iterations passthroughs
+    // ------------------------------------------------------------
+
+    function eulerIter(address target, bytes4 selector, bytes16 x, bytes16 y, bytes16 h, uint256 steps) external view returns (bytes16) {
+        return ODESolver.eulerIter(target, selector, x, y, h, steps);
+    }
+
+    function rk2MidpointIter(address target, bytes4 selector, bytes16 x, bytes16 y, bytes16 h, uint256 steps) external view returns (bytes16) {
+        return ODESolver.rk2MidpointIter(target, selector, x, y, h, steps);
+    }
+
+    function rk2HeunIter(address target, bytes4 selector, bytes16 x, bytes16 y, bytes16 h, uint256 steps) external view returns (bytes16) {
+        return ODESolver.rk2HeunIter(target, selector, x, y, h, steps);
+    }
+
+    function rk4Iter(address target, bytes4 selector, bytes16 x, bytes16 y, bytes16 h, uint256 steps) external view returns (bytes16) {
+        return ODESolver.rk4Iter(target, selector, x, y, h, steps);
+    }
+
+    // ------------------------------------------------------------
     //  ODE functions f(x)
     // ------------------------------------------------------------
 
