@@ -185,4 +185,112 @@ library ODESolver {
 
         return y.add(h.mul(weighted).mul(QC.ONESIXTH()));
     }
+
+    // ------------------------------------------------------------
+    // Iterative / Multi-Step Wrappers
+    // ------------------------------------------------------------
+
+    /**
+     * @notice Perform multiple Euler steps and return the final y value.
+     *.        Repeatedly applies:
+     *            y <- euler(target, selectorF, x, y, h)
+     *            x <- x + h
+     *
+     * @param target Address implementing f(x,y)
+     * @param selectorF Selector for f(x,y)
+     * @param x0 Initial x
+     * @param y0 Initial y
+     * @param h Step size
+     * @param steps Number of steps to execute
+     * @return y Final y value after `steps` Euler iterations
+     */
+    function eulerIter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) internal view returns (bytes16 y) {
+        require(steps > 0, "ODESolver: steps must be > 0");
+
+        bytes16 x = x0;
+        y = y0;
+
+        for (uint256 i = 0; i < steps; ++i) {
+            y = euler(target, selectorF, x, y, h);
+            x = x.add(h);
+        }
+    }
+
+    /**
+     * @notice Perform multiple RK2 Midpoint steps and return the final y value.
+     *         Repeatedly applies:
+     *            y <- rk2Midpoint(target, selectorF, x, y, h)
+     *            x <- x + h
+     *
+     * @param target Address implementing f(x,y)
+     * @param selectorF Selector for f(x,y)
+     * @param x0 Initial x
+     * @param y0 Initial y
+     * @param h Step size
+     * @param steps Number of steps to execute
+     * @return y Final y value after `steps` RK2 Midpoint iterations
+     */
+    function rk2MidpointIter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) internal view returns (bytes16 y) {
+        require(steps > 0, "ODESolver: steps must be > 0");
+
+        bytes16 x = x0;
+        y = y0;
+
+        for (uint256 i = 0; i < steps; ++i) {
+            y = rk2Midpoint(target, selectorF, x, y, h);
+            x = x.add(h);
+        }
+    }
+
+    /**
+     * @notice Perform multiple RK2 Heun steps and return the final y value.
+     *         Repeatedly applies:
+     *            y <- rk2Heun(target, selectorF, x, y, h)
+     *            x <- x + h
+     *
+     * @param target Address implementing f(x,y)
+     * @param selectorF Selector for f(x,y)
+     * @param x0 Initial x
+     * @param y0 Initial y
+     * @param h Step size
+     * @param steps Number of steps to execute
+     * @return y Final y value after `steps` RK2 Heun iterations
+     */
+    function rk2HeunIter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) internal view returns (bytes16 y) {
+        require(steps > 0, "ODESolver: steps must be > 0");
+
+        bytes16 x = x0;
+        y = y0;
+
+        for (uint256 i = 0; i < steps; ++i) {
+            y = rk2Heun(target, selectorF, x, y, h);
+            x = x.add(h);
+        }
+    }
+
+    /**
+     * @notice Perform multiple RK4 steps and return the final y value.
+     *         Repeatedly applies:
+     *           y <- rk4(target, selectorF, x, y, h)
+     *           x <- x + h
+     *
+     * @param target Address implementing f(x,y)
+     * @param selectorF Selector for f(x,y)
+     * @param x0 Initial x
+     * @param y0 Initial y
+     * @param h Step size
+     * @param steps Number of steps to execute
+     * @return y Final y value after `steps` RK4 iterations
+     */
+    function rk4Iter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) internal view returns (bytes16 y) {
+        require(steps > 0, "ODESolver: steps must be > 0");
+
+        bytes16 x = x0;
+        y = y0;
+
+        for (uint256 i = 0; i < steps; ++i) {
+            y = rk4(target, selectorF, x, y, h);
+            x = x.add(h);
+        }
+    }
 }
