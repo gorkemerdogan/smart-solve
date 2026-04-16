@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { Trigonometry } from "../libraries/Trigonometry/Trigonometry.sol";
-import { QuadConstants as QC } from "../libraries/QuadConstants.sol";
-import { MathLib } from "../libraries/MathLib.sol";
-import { Integration } from "../libraries/numeric/Integration.sol";
+import {Trigonometry} from "../libraries/Trigonometry/Trigonometry.sol";
+import {QuadConstants as QC} from "../libraries/QuadConstants.sol";
+import {MathLib} from "../libraries/MathLib.sol";
+import {Integration} from "../libraries/numeric/Integration.sol";
 
 /**
  * @title IntegrationHarness
@@ -104,7 +104,7 @@ contract IntegrationHarness {
      * @return v Scaled quad-precision result.
      */
     function f_tiny(bytes16 x) external pure returns (bytes16) {
-        bytes16 scale = MathLib.fromUInt(1).div(MathLib.fromUInt(10**30));
+        bytes16 scale = MathLib.fromUInt(1).div(MathLib.fromUInt(10 ** 30));
         return x.mul(scale);
     }
 
@@ -114,7 +114,7 @@ contract IntegrationHarness {
      * @return v Scaled quad-precision result.
      */
     function f_verySmall(bytes16 x) external pure returns (bytes16 v) {
-        bytes16 scale = MathLib.fromUInt(1).div(MathLib.fromUInt(10**20));
+        bytes16 scale = MathLib.fromUInt(1).div(MathLib.fromUInt(10 ** 20));
         return x.mul(scale);
     }
 
@@ -124,7 +124,7 @@ contract IntegrationHarness {
      * @return v Scaled quad-precision result.
      */
     function f_small(bytes16 x) external pure returns (bytes16 v) {
-        bytes16 scale = MathLib.fromUInt(1).div(MathLib.fromUInt(10**10));
+        bytes16 scale = MathLib.fromUInt(1).div(MathLib.fromUInt(10 ** 10));
         return x.mul(scale);
     }
 
@@ -143,7 +143,7 @@ contract IntegrationHarness {
      * @return v Scaled quad-precision result.
      */
     function f_huge(bytes16 x) external pure returns (bytes16 v) {
-        bytes16 scale = MathLib.fromUInt(10**30);
+        bytes16 scale = MathLib.fromUInt(10 ** 30);
         return x.mul(scale);
     }
 
@@ -153,7 +153,7 @@ contract IntegrationHarness {
      * @return v Scaled quad-precision result.
      */
     function f_large(bytes16 x) external pure returns (bytes16) {
-        bytes16 scale = MathLib.fromUInt(10**20);
+        bytes16 scale = MathLib.fromUInt(10 ** 20);
         return x.mul(scale);
     }
 
@@ -199,7 +199,7 @@ contract IntegrationHarness {
      * @param n Number of subintervals (must be > 0).
      * @return I Quad-precision integral approximation.
      */
-    function trapezoidal (
+    function trapezoidal(
         address target,
         bytes4 sel,
         bytes16 a,
@@ -255,6 +255,22 @@ contract IntegrationHarness {
         return MathLib.add(a, b);
     }
 
+    function qSub(bytes16 a, bytes16 b) external pure returns (bytes16) {
+        return MathLib.sub(a, b);
+    }
+
+    function qMul(bytes16 a, bytes16 b) external pure returns (bytes16) {
+        return MathLib.mul(a, b);
+    }
+
+    function qDiv(bytes16 a, bytes16 b) external pure returns (bytes16) {
+        return MathLib.div(a, b);
+    }
+
+    function qNeg(bytes16 a) external pure returns (bytes16) {
+        return MathLib.sub(MathLib.fromInt(0), a);
+    }
+
     /**
      * @notice Converts a signed integer to IEEE-754 quadruple precision.
      * @param  n Signed integer.
@@ -271,7 +287,10 @@ contract IntegrationHarness {
      * @param den Signed denominator (must be non-zero).
      * @return q  Quadruple-precision value representing num/den.
      */
-    function qFromFrac(int256 num, int256 den) external pure returns (bytes16 q) {
+    function qFromFrac(
+        int256 num,
+        int256 den
+    ) external pure returns (bytes16 q) {
         require(den != 0, "den=0");
         bytes16 qNum = MathLib.fromInt(num);
         bytes16 qDen = MathLib.fromInt(den);
