@@ -15,7 +15,7 @@ contract RootFindingHarness {
     using MathLib for bytes16;
 
     /// Scaling factor used for JS-style fixed-decimal conversions.
-    uint256 public constant SCALE = 1e12;
+    uint256 public constant SCALE = 1e18;
 
     // ------------------------------------------------------------------------
     // Test functions f(x) and df(x) for root-finding
