@@ -64,7 +64,7 @@ contract TrigonometryHarness {
     // ------------------------------------------------------------
 
     /// @notice Scaling factor used for JS-style fixed-decimal conversions.
-    uint256 public constant SCALE = 1e12;
+    uint256 public constant SCALE = 1e18;
 
     /**
      * @notice Converts a scaled integer (scaled by SCALE) into quadruple precision.
