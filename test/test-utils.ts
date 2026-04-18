@@ -1,5 +1,5 @@
-import { Contract, Signer } from "ethers";
-import { ethers } from "hardhat";
+import {Contract, Signer} from "ethers";
+import {ethers} from "hardhat";
 
 /**
  * A generalized interface for the contract harness, ensuring it has required Ethers methods.
@@ -7,7 +7,7 @@ import { ethers } from "hardhat";
  */
 export interface Harness extends Contract {
     // Allows dynamic access to method names for estimateGas fallback check
-    [key: string]: any; 
+    [key: string]: any;
 }
 
 // ------------------------------------------------------------
@@ -29,12 +29,12 @@ export async function touchGas(harness: Harness, method: string, args: any[]): P
 
         // Send a transaction with minimal configuration
         const tx = await signer.sendTransaction({to, data});
-        
+
         // Wait for the transaction to be mined for a reliable touch
         await tx.wait();
     } catch (error) {
         // Log the error for debugging
-        console.warn(`touchGas failed for ${method}:`, error instanceof Error ? error.message : error);        
+        console.warn(`touchGas failed for ${method}:`, error instanceof Error ? error.message : error);
     }
 }
 
@@ -59,8 +59,8 @@ export async function estimateGas(harness: Harness, method: string, args: any[])
         const data: string = harness.interface.encodeFunctionData(method, args);
         const [signer]: Signer[] = await ethers.getSigners();
         const to: string = await harness.getAddress();
-        
-        const gasBigInt: bigint = await signer.estimateGas({ to, data });
+
+        const gasBigInt: bigint = await signer.estimateGas({to, data});
         return gasBigInt.toString();
 
     } catch (error) {
@@ -78,11 +78,23 @@ interface PrintBlockMatrixData {
     t: number | string;
     method: string;
     explanation: string;
-    gas: string;
+    gas: string | bigint | number;
     shapeIn?: string;
     shapeOut?: string;
     inHex?: string;
     outHex?: string;
+    expectedDec?: string;
+    outDec?: string;
+    maxAbsError?: string;
+    avgAbsError?: string;
+    maxRelError?: string;
+    avgRelError?: string;
+    residual?: string;
+    normalizedResidual?: string;
+    tolerance?: string;
+    withinTol?: string;
+    exceededTol?: string;
+    worstCase?: string;
 }
 
 /**
@@ -90,10 +102,31 @@ interface PrintBlockMatrixData {
  *             Uses object destructuring and template literals for clean output generation.
  * @param data The structured data to print.
  */
-export function printBlockMatrix({t, method, explanation, gas, shapeIn = "-", shapeOut = "-", inHex = "-", outHex = "-"}: PrintBlockMatrixData): void {
-    
-    const sep: string = "-".repeat(60); // Separator
-    
+export function printBlockMatrix({
+                                     t,
+                                     method,
+                                     explanation,
+                                     gas,
+                                     shapeIn = "-",
+                                     shapeOut = "-",
+                                     inHex = "-",
+                                     outHex = "-",
+                                     expectedDec = "-",
+                                     outDec = "-",
+                                     maxAbsError = "-",
+                                     avgAbsError = "-",
+                                     maxRelError = "-",
+                                     avgRelError = "-",
+                                     residual = "-",
+                                     normalizedResidual = "-",
+                                     tolerance = "-",
+                                     withinTol = "-",
+                                     exceededTol = "-",
+                                     worstCase = "-",
+                                 }: PrintBlockMatrixData): void {
+
+    const sep: string = "-".repeat(60);
+
     const logLines: string[] = [
         sep,
         `Test: ${t}`,
@@ -104,6 +137,18 @@ export function printBlockMatrix({t, method, explanation, gas, shapeIn = "-", sh
         `Shape Out: ${shapeOut}`,
         `Input (Hex): ${inHex}`,
         `Output (Hex): ${outHex}`,
+        `Expected Output (Dec): ${expectedDec}`,
+        `Output (Dec): ${outDec}`,
+        `Max Abs. Error: ${maxAbsError}`,
+        `Avg Abs. Error: ${avgAbsError}`,
+        `Max Rel. Error: ${maxRelError}`,
+        `Avg Rel. Error: ${avgRelError}`,
+        `Residual: ${residual}`,
+        `Normalized Residual: ${normalizedResidual}`,
+        `Tolerance: ${tolerance}`,
+        `Within Tol: ${withinTol}`,
+        `Exceeded Tol: ${exceededTol}`,
+        `Worst Case: ${worstCase}`,
         sep,
     ];
 
@@ -114,12 +159,20 @@ interface PrintBlockRegularData {
     t: number | string;
     method: string;
     explanation: string;
-    gas: string;
+    gas: string | bigint | number;
     inHex?: string;
     expectedHex?: string;
     outHex?: string;
     expectedDec?: string;
     outDec?: string;
+    maxAbsError?: string;
+    avgAbsError?: string;
+    residual?: string;
+    normalizedResidual?: string;
+    withinTol?: string;
+    exceededTol?: string;
+    tolerance?: string;
+    worstCase?: string;
 }
 
 /**
@@ -127,10 +180,28 @@ interface PrintBlockRegularData {
  *             Uses object destructuring and template literals for clean output generation.
  * @param data The structured data to print.
  */
-export function printBlockRegular({t, method, explanation, gas, inHex = "-", expectedHex = "-", outHex = "-", expectedDec = "-", outDec = "-"}: PrintBlockRegularData): void {
-    
-    const sep: string = "-".repeat(60); // Separator
-    
+export function printBlockRegular({
+                                      t,
+                                      method,
+                                      explanation,
+                                      gas,
+                                      inHex = "-",
+                                      expectedHex = "-",
+                                      outHex = "-",
+                                      expectedDec = "-",
+                                      outDec = "-",
+                                      maxAbsError = "-",
+                                      avgAbsError = "-",
+                                      residual = "-",
+                                      normalizedResidual = "-",
+                                      tolerance = "-",
+                                      withinTol = "-",
+                                      exceededTol = "-",
+                                      worstCase = "-",
+                                  }: PrintBlockRegularData): void {
+
+    const sep: string = "-".repeat(60);
+
     const logLines: string[] = [
         sep,
         `Test: ${t}`,
@@ -142,27 +213,61 @@ export function printBlockRegular({t, method, explanation, gas, inHex = "-", exp
         `Output (hex): ${outHex}`,
         `Expected Output (dec): ${expectedDec}`,
         `Output (dec): ${outDec}`,
+        `Max Abs. Error: ${maxAbsError}`,
+        `Avg Abs. Error: ${avgAbsError}`,
+        `Residual: ${residual}`,
+        `Normalized Residual: ${normalizedResidual}`,
+        `Tolerance: ${tolerance}`,
+        `Within Tol: ${withinTol}`,
+        `Exceeded Tol: ${exceededTol}`,
+        `Worst Case: ${worstCase}`,
         sep,
     ];
 
     console.log(logLines.join("\n"));
 }
 
-interface printBlockOptimizationData {
-    outDec?: string;
-    t: string; 
-    method: string; 
-    explanation: string; 
-    gas: bigint | number | string; 
+interface PrintBlockOptimizationData {
+    t: string;
+    method: string;
+    explanation: string;
+    gas: bigint | number | string;
     x0?: string;
     xFinal?: string;
     gx?: string;
     status?: string;
     iters?: string;
+    gradNorm?: string;
+    xError?: string;
+    fError?: string;
+    alpha?: string;
     extra?: string;
+    withinTol?: string;
+    exceededTol?: string;
+    tolerance?: string;
+    worstCase?: string;
 }
 
-export function printBlockOptimization({t, method, explanation, gas, x0 = "-", xFinal = "-", gx = "-", status = "-", iters = "-", extra = "-"}: printBlockOptimizationData): void {
+export function printBlockOptimization({
+                                           t,
+                                           method,
+                                           explanation,
+                                           gas,
+                                           x0 = "-",
+                                           xFinal = "-",
+                                           gx = "-",
+                                           status = "-",
+                                           iters = "-",
+                                           gradNorm = "-",
+                                           xError = "-",
+                                           fError = "-",
+                                           alpha = "-",
+                                           extra = "-",
+                                           withinTol = "-",
+                                           exceededTol = "-",
+                                           tolerance = "-",
+                                           worstCase = "-",
+                                       }: PrintBlockOptimizationData): void {
     const sep = "-".repeat(60);
     const logLines = [
         sep,
@@ -175,7 +280,15 @@ export function printBlockOptimization({t, method, explanation, gas, x0 = "-", x
         `g(x_final): ${gx}`,
         `Status: ${status}`,
         `Iterations: ${iters}`,
+        `Gradient Norm: ${gradNorm}`,
+        `Solution Error: ${xError}`,
+        `Objective Error: ${fError}`,
+        `Final Step Size: ${alpha}`,
         `Extra: ${extra}`,
+        `Tolerance: ${tolerance}`,
+        `Within Tol: ${withinTol}`,
+        `Exceeded Tol: ${exceededTol}`,
+        `Worst Case: ${worstCase}`,
         sep,
     ];
     console.log(logLines.join("\n"));
@@ -183,9 +296,9 @@ export function printBlockOptimization({t, method, explanation, gas, x0 = "-", x
 
 /**
  * @notice Formats a fixed-point BigInt into a human-readable decimal string.
- * @dev    Splits the value into integer and fractional parts. If the scale input is 0, 
+ * @dev    Splits the value into integer and fractional parts. If the scale input is 0,
  *         it defaults to 10^12. Uses padStart to preserve leading zeros in decimals.
- *         Example: 
+ *         Example:
  *          Input: 1050000000000n (with SCALE = 10**12)
  *          Output: "1.050000000000"
  * @param  v The BigInt value to be formatted (supports positive and negative).
