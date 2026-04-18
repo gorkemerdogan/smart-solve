@@ -206,14 +206,26 @@ contract PolynomialHarness {
     uint256 public constant SCALE = 1e12;
 
     /**
-     * @notice Converts a quadruple-precision number into a scaled integer (scaled by SCALE).
+     * @notice Converts a quadruple-precision number into a scaled integer safely.
      * @param x Quadruple-precision value.
-     * @return Integer representing x * SCALE.
+     * @return ok True if the scaled value fits into int256, false otherwise.
+     * @return value Integer representing x * SCALE when ok is true, otherwise 0.
      */
-    function toFloat(bytes16 x) external pure returns (int256) {
+    function toFloat(bytes16 x) external pure returns (bool ok, int256 value) {
         bytes16 qScale = MathLib.fromUInt(SCALE);
         bytes16 scaled = MathLib.mul(x, qScale);
-        return MathLib.toInt(scaled);
+
+        bytes16 qMax = MathLib.fromInt(type(int256).max);
+        bytes16 qMin = MathLib.fromInt(type(int256).min);
+
+        int256 cmpMax = MathLib.cmp(scaled, qMax);
+        int256 cmpMin = MathLib.cmp(scaled, qMin);
+
+        if (cmpMax > 0 || cmpMin < 0) {
+            return (false, 0);
+        }
+
+        return (true, MathLib.toInt(scaled));
     }
 
     /**
