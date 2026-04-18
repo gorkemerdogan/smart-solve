@@ -203,7 +203,7 @@ contract PolynomialHarness {
     }
 
     /// Scaling factor used for JS-style fixed-decimal conversions.
-    uint256 public constant SCALE = 1e12;
+    uint256 public constant SCALE = 1e18;
 
     /**
      * @notice Converts a quadruple-precision number into a scaled integer safely.
