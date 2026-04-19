@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-import { ethers } from "hardhat";
-import type { Contract } from "ethers";
-import { touchGas, estimateGas, printBlockRegular } from "../test-utils";
+import {ethers} from "hardhat";
+import type {Contract} from "ethers";
+import {touchGas, estimateGas, printBlockRegular} from "./test-utils";
 
 // ------------------------------------------------------------
-//  Types
+// Types
 // ------------------------------------------------------------
 
 type TrigHarness = Contract & {
@@ -28,10 +28,11 @@ type TrigHarness = Contract & {
 };
 
 // ------------------------------------------------------------
-//  Constants & Helpers
+// Constants & Helpers
 // ------------------------------------------------------------
 
 const SCALE = 1e12;
+const REPEAT_COUNT = 10;
 
 async function toQuad(h: TrigHarness, x: number): Promise<string> {
     return h.fromFloat(BigInt(Math.round(x * SCALE)));
@@ -46,6 +47,30 @@ function fmt(x: number): string {
     if (Number.isNaN(x)) return "NaN";
     if (!Number.isFinite(x)) return String(x);
     return x.toFixed(12);
+}
+
+function avgBigInt(values: bigint[]): bigint {
+    if (values.length === 0) return 0n;
+    return values.reduce((a, b) => a + b, 0n) / BigInt(values.length);
+}
+
+function minBigInt(values: bigint[]): bigint {
+    if (values.length === 0) return 0n;
+    return values.reduce((a, b) => (a < b ? a : b));
+}
+
+function maxBigInt(values: bigint[]): bigint {
+    if (values.length === 0) return 0n;
+    return values.reduce((a, b) => (a > b ? a : b));
+}
+
+async function qHalfPiMinusEpsilon(
+    h: TrigHarness,
+    qhalfPi: string,
+    epsilonRad: number
+): Promise<string> {
+    const qNegEps = await h.fromFloat(BigInt(Math.round(-epsilonRad * SCALE)));
+    return await h.add(qhalfPi, qNegEps);
 }
 
 /**
@@ -64,12 +89,12 @@ async function degreeToQuadWithExactCriticalAngles(
     if (deg === 270) return await h.add(qpi, qhalfPi);
     if (deg === 360) return await h.add(qpi, qpi);
 
-    const rad = deg * Math.PI / 180;
+    const rad = (deg * Math.PI) / 180;
     return await toQuad(h, rad);
 }
 
 // ------------------------------------------------------------
-//  Test Suite
+// Test Suite
 // ------------------------------------------------------------
 
 describe("Trigonometry - Gas Growth Tests", function () {
@@ -97,26 +122,64 @@ describe("Trigonometry - Gas Growth Tests", function () {
     });
 
     // ------------------------------------------------------------
-    //  Section 1: Gas Sensitivity to Input Magnitude
+    // Section 1: Gas Sensitivity to Input Magnitude
     // ------------------------------------------------------------
 
     describe("Section 1: Gas Sensitivity to Input Magnitude", function () {
         let testNo = 0;
 
-        const DIRECT_CASES = [-1000, -1, 0, 1, 1000];
-        const INV_CASES = [-1, -0.5, 0, 0.5, 1];
-        const ATAN_CASES = [-1000, -1, 0, 1, 1000];
+        const INV_CASES: number[] = Array.from({ length: 2001 }, (_, i) =>
+            Number((-1 + i * 0.001).toFixed(3))
+        );
+
+        function buildPiecewiseRange(
+            start: number,
+            end: number,
+            step: number
+        ): number[] {
+            const values: number[] = [];
+            for (let x = start; x <= end + 1e-12; x += step) {
+                values.push(Number(x.toFixed(6)));
+            }
+            return values;
+        }
+
+        function uniqueSorted(values: number[]): number[] {
+            return Array.from(new Set(values.map(v => Number(v.toFixed(6))))).sort((a, b) => a - b);
+        }
+
+        const DIRECT_CASES: number[] = uniqueSorted([
+            ...buildPiecewiseRange(-1000, -100, 10),
+            ...buildPiecewiseRange(-99, -10, 1),
+            ...buildPiecewiseRange(-9.9, -1, 0.1),
+            ...buildPiecewiseRange(-0.99, 1, 0.01),
+            ...buildPiecewiseRange(1.01, 10, 0.1),
+            ...buildPiecewiseRange(11, 100, 1),
+            ...buildPiecewiseRange(110, 1000, 10),
+            0
+        ]);
+
+        const ATAN_CASES: number[] = uniqueSorted([
+            ...buildPiecewiseRange(-1000, -100, 10),
+            ...buildPiecewiseRange(-99, -10, 1),
+            ...buildPiecewiseRange(-9.9, -1, 0.1),
+            ...buildPiecewiseRange(-0.99, 1, 0.01),
+            ...buildPiecewiseRange(1.01, 10, 0.1),
+            ...buildPiecewiseRange(11, 100, 1),
+            ...buildPiecewiseRange(110, 1000, 10),
+            0
+        ]);
 
         const DIRECT_METHODS: Array<{ method: "sin" | "cos" | "tan" | "cot"; label: string }> = [
-            { method: "sin", label: "sin" },
-            { method: "cos", label: "cos" },
-            { method: "tan", label: "tan" },
-            { method: "cot", label: "cot" },
+            {method: "sin", label: "sin"},
+            {method: "cos", label: "cos"},
+            {method: "tan", label: "tan"},
+            {method: "cot", label: "cot"},
         ];
 
         const INV_METHODS: Array<{ method: "asin" | "acos"; label: string }> = [
-            { method: "asin", label: "asin" },
-            { method: "acos", label: "acos" },
+            {method: "asin", label: "asin"},
+            {method: "acos", label: "acos"},
         ];
 
         for (const m of DIRECT_METHODS) {
@@ -131,9 +194,9 @@ describe("Trigonometry - Gas Growth Tests", function () {
 
                     const out =
                         m.method === "sin" ? await harness.sin(qx) :
-                        m.method === "cos" ? await harness.cos(qx) :
-                        m.method === "tan" ? await harness.tan(qx) :
-                        await harness.cot(qx);
+                            m.method === "cos" ? await harness.cos(qx) :
+                                m.method === "tan" ? await harness.tan(qx) :
+                                    await harness.cot(qx);
 
                     const isNan = await harness.isNaN(out);
 
@@ -212,13 +275,73 @@ describe("Trigonometry - Gas Growth Tests", function () {
     });
 
     // ------------------------------------------------------------
-    //  Section 3: Gas Consumption over Full Domain (1° resolution)
+    // Section 2: Gas Sensitivity to Critical Region for Tangent
     // ------------------------------------------------------------
+
+    describe("Section 2: Gas Sensitivity to Critical Region for Tangent", function () {
+        let testNo = 0;
+
+        const EPSILON = 1e-6;
+
+        const TAN_CRITICAL_CASES: Array<{
+            label: string;
+            buildInput: () => Promise<string>;
+        }> = [
+            {
+                label: "0",
+                buildInput: async () => await toQuad(harness, 0),
+            },
+            {
+                label: "π/4",
+                buildInput: async () => await toQuad(harness, Math.PI / 4),
+            },
+            {
+                label: "π/3",
+                buildInput: async () => await toQuad(harness, Math.PI / 3),
+            },
+            {
+                label: "π/2-ε",
+                buildInput: async () => await qHalfPiMinusEpsilon(harness, QHALF_PI, EPSILON),
+            },
+        ];
+
+        for (const c of TAN_CRITICAL_CASES) {
+            const t = `2.${++testNo}`;
+
+            it(`Test ${t}: tan gas sensitivity at critical region ${c.label}`, async function () {
+                const qx = await c.buildInput();
+
+                await touchGas(harness, "tan", [qx]);
+                const gas = await estimateGas(harness, "tan", [qx]);
+
+                const out = await harness.tan(qx);
+                const isNan = await harness.isNaN(out);
+
+                printBlockRegular({
+                    t,
+                    method: "tan",
+                    explanation: `Gas sensitivity to critical region using x=${c.label}.`,
+                    gas,
+                    inHex: `x=${c.label}`,
+                    expectedHex: "N/A",
+                    outHex: out,
+                    expectedDec: "N/A",
+                    outDec: isNan ? "NaN" : fmt(await fromQuad(harness, out)),
+                });
+            });
+        }
+    });
+
+    // ------------------------------------------------------------
+// Section 3: Gas Consumption over Full Domain (1° resolution, repeated)
+// ------------------------------------------------------------
 
     describe("Section 3: Gas Consumption over Full Domain", function () {
         let testNo = 0;
 
-        it("Test 3.1: sin & cos gas over [0°, 360°] with 1° resolution", async function () {
+        const FULL_DOMAIN_REPEAT_COUNT = 5;
+
+        it("Test 3.1: sin & cos gas over [0°, 360°] with 1° resolution and repeated measurements", async function () {
             const startDeg = 0;
             const endDeg = 360;
 
@@ -234,56 +357,72 @@ describe("Trigonometry - Gas Growth Tests", function () {
             for (let deg = startDeg; deg <= endDeg; deg++) {
                 const qx = await degreeToQuadWithExactCriticalAngles(harness, deg, QPI, QHALF_PI);
 
-                // ---- sin ----
-                await touchGas(harness, "sin", [qx]);
-                const sinGas = await estimateGas(harness, "sin", [qx]);
+                const sinGasRuns: bigint[] = [];
+                const cosGasRuns: bigint[] = [];
 
-                const sinOut = await harness.sin(qx);
-                const sinVal = await fromQuad(harness, sinOut);
+                let lastSinOut = "";
+                let lastCosOut = "";
+                let lastSinVal = 0;
+                let lastCosVal = 0;
 
-                // ---- cos ----
-                await touchGas(harness, "cos", [qx]);
-                const cosGas = await estimateGas(harness, "cos", [qx]);
+                for (let run = 1; run <= FULL_DOMAIN_REPEAT_COUNT; run++) {
+                    // ---- sin ----
+                    await touchGas(harness, "sin", [qx]);
+                    const sinGas = await estimateGas(harness, "sin", [qx]);
+                    const sinOut = await harness.sin(qx);
+                    const sinVal = await fromQuad(harness, sinOut);
 
-                const cosOut = await harness.cos(qx);
-                const cosVal = await fromQuad(harness, cosOut);
+                    sinGasRuns.push(BigInt(sinGas.toString()));
+                    lastSinOut = sinOut;
+                    lastSinVal = sinVal;
 
-                const sinGasBig = BigInt(sinGas.toString());
-                const cosGasBig = BigInt(cosGas.toString());
+                    // ---- cos ----
+                    await touchGas(harness, "cos", [qx]);
+                    const cosGas = await estimateGas(harness, "cos", [qx]);
+                    const cosOut = await harness.cos(qx);
+                    const cosVal = await fromQuad(harness, cosOut);
 
-                totalSin += sinGasBig;
-                totalCos += cosGasBig;
+                    cosGasRuns.push(BigInt(cosGas.toString()));
+                    lastCosOut = cosOut;
+                    lastCosVal = cosVal;
+                }
 
-                if (sinGasBig < minSin) minSin = sinGasBig;
-                if (sinGasBig > maxSin) maxSin = sinGasBig;
+                const sinAvgGas = avgBigInt(sinGasRuns);
+                const cosAvgGas = avgBigInt(cosGasRuns);
 
-                if (cosGasBig < minCos) minCos = cosGasBig;
-                if (cosGasBig > maxCos) maxCos = cosGasBig;
+                totalSin += sinAvgGas;
+                totalCos += cosAvgGas;
+
+                if (sinAvgGas < minSin) minSin = sinAvgGas;
+                if (sinAvgGas > maxSin) maxSin = sinAvgGas;
+
+                if (cosAvgGas < minCos) minCos = cosAvgGas;
+                if (cosAvgGas > maxCos) maxCos = cosAvgGas;
 
                 const t = `3.${++testNo}`;
 
                 printBlockRegular({
                     t,
                     method: "sin",
-                    explanation: `Gas measurement at ${deg}° (full-domain sweep; exact critical angles injected).`,
-                    gas: `${sinGasBig}`,
+                    explanation: `Average gas measurement at ${deg}° over ${FULL_DOMAIN_REPEAT_COUNT} repeated runs (full-domain sweep; exact critical angles injected).`,
+                    gas: `${sinAvgGas}`,
                     inHex: `deg=${deg}`,
                     expectedHex: "N/A",
-                    outHex: sinOut,
+                    outHex: lastSinOut,
                     expectedDec: "N/A",
-                    outDec: fmt(sinVal),
+                    outDec: fmt(lastSinVal),
                 });
 
                 printBlockRegular({
                     t: `${t}-cos`,
                     method: "cos",
-                    explanation: `Gas measurement at ${deg}° (full-domain sweep; exact critical angles injected).`,
-                    gas: `${cosGasBig}`,
+                    explanation: `Average gas measurement at ${deg}° over ${FULL_DOMAIN_REPEAT_COUNT} repeated runs (full-domain sweep; exact critical angles injected).`,
+                    gas: `${cosAvgGas}`,
                     inHex: `deg=${deg}`,
                     expectedHex: "N/A",
-                    outHex: cosOut,
+                    outHex: lastCosOut,
                     expectedDec: "N/A",
-                    outDec: fmt(cosVal),
+                    outDec: fmt(lastCosVal),
                 });
             }
 
@@ -294,7 +433,9 @@ describe("Trigonometry - Gas Growth Tests", function () {
             console.log("------------------------------------------------------------");
             console.log("FULL DOMAIN SUMMARY");
             console.log("------------------------------------------------------------");
-            console.log("Input generation: Math.PI for general angles, exact quad constants for 0°, 90°, 180°, 270°, 360°.");
+            console.log(
+                `Input generation: Math.PI for general angles, exact quad constants for 0°, 90°, 180°, 270°, 360°. Each angle was evaluated ${FULL_DOMAIN_REPEAT_COUNT} times and average gas is reported.`
+            );
             console.log(`sin -> avg: ${avgSin} | min: ${minSin} | max: ${maxSin}`);
             console.log(`cos -> avg: ${avgCos} | min: ${minCos} | max: ${maxCos}`);
         });

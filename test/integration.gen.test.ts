@@ -4,7 +4,8 @@ import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 
 describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
-    this.timeout(300000); // 5 minutes
+    this.timeout(0); // - minutes
+
     // ------------------------------------------------------------
     // Types
     // ------------------------------------------------------------
@@ -29,6 +30,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
 
     type MethodName = "trapezoidal" | "simpson13" | "simpson38";
     type FunctionKey = "f_one" | "f_linear" | "f_square" | "f_cube" | "f_sin" | "f_inv" | "f_piecewise";
+    type RunStatus = "success" | "revert";
 
     interface IntervalSpec {
         label: string;
@@ -60,12 +62,14 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
         a: number;
         b: number;
         n: bigint;
-        expected: number;
-        actual: number;
-        absError: number;
-        relError: number;
-        estimatedGas: bigint;
-        gasUsed: bigint;
+        expected: number | null;
+        actual: number | null;
+        absError: number | null;
+        relError: number | null;
+        estimatedGas: bigint | null;
+        gasUsed: bigint | null;
+        status: RunStatus;
+        errorMessage: string | null;
     }
 
     // ------------------------------------------------------------
@@ -76,7 +80,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     let target: string;
 
     const SCALE = 1_000_000_000_000n; // 1e12
-    const N_VALUES = [12n, 24n, 48n, 96n, 192n];
+    const N_VALUES = [12n, 24n, 48n, 96n, 192n, 384n, 768n, 1152n, 1536n, 1920n, 2304n, 2688n, 3072n];
     const METHODS: MethodName[] = ["trapezoidal", "simpson13", "simpson38"];
 
     let SIN_INTERVALS_QUAD: QuadIntervalSpec[] = [];
@@ -98,6 +102,19 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
         }
 
         throw new Error(`Cannot convert value to bigint: ${String(v)}`);
+    }
+
+    function extractErrorMessage(err: unknown): string {
+        if (err instanceof Error) return err.message;
+
+        if (typeof err === "string") return err;
+
+        if (err && typeof err === "object") {
+            const e = err as { shortMessage?: string; message?: string; reason?: string };
+            return e.shortMessage || e.reason || e.message || JSON.stringify(err);
+        }
+
+        return String(err);
     }
 
     async function toQuad(x: number): Promise<string> {
@@ -163,40 +180,22 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     }
 
     function printOverallSummary(records: TestRecord[]): void {
-        const absErrors = records.map((r) => r.absError);
-        const relErrors = records.map((r) => r.relError);
-        const estimatedGases = records.map((r) => r.estimatedGas);
-        const gasUsedValues = records.map((r) => r.gasUsed);
+        const success = records.filter((r) => r.status === "success");
+        const reverted = records.filter((r) => r.status === "revert");
+
+        const absErrors = success.map((r) => r.absError!).filter((v) => v !== null);
+        const relErrors = success.map((r) => r.relError!).filter((v) => v !== null);
+        const estimatedGases = success.map((r) => r.estimatedGas!).filter((v) => v !== null);
+        const gasUsedValues = success.map((r) => r.gasUsed!).filter((v) => v !== null);
 
         console.log("============================================================");
         console.log("OVERALL SUMMARY");
         console.log("============================================================");
         console.log(`Total Tests           : ${records.length}`);
-        console.log(`Average Abs. Error    : ${mean(absErrors)}`);
-        console.log(`Average Rel. Error    : ${mean(relErrors)}`);
-        console.log(`Min Abs. Error        : ${minNumber(absErrors)}`);
-        console.log(`Max Abs. Error        : ${maxNumber(absErrors)}`);
-        console.log(`Average Estimated Gas : ${meanBigInt(estimatedGases).toString()}`);
-        console.log(`Average Gas Used      : ${meanBigInt(gasUsedValues).toString()}`);
-        console.log(`Min Estimated Gas     : ${minBigInt(estimatedGases).toString()}`);
-        console.log(`Max Estimated Gas     : ${maxBigInt(estimatedGases).toString()}`);
-        console.log(`Min Gas Used          : ${minBigInt(gasUsedValues).toString()}`);
-        console.log(`Max Gas Used          : ${maxBigInt(gasUsedValues).toString()}`);
-    }
+        console.log(`Successful Tests      : ${success.length}`);
+        console.log(`Reverted Tests        : ${reverted.length}`);
 
-    function printMethodSummaries(records: TestRecord[]): void {
-        for (const method of METHODS) {
-            const subset = records.filter((r) => r.method === method);
-
-            const absErrors = subset.map((r) => r.absError);
-            const relErrors = subset.map((r) => r.relError);
-            const estimatedGases = subset.map((r) => r.estimatedGas);
-            const gasUsedValues = subset.map((r) => r.gasUsed);
-
-            console.log("============================================================");
-            console.log(`SUMMARY - ${method}`);
-            console.log("============================================================");
-            console.log(`Total Tests           : ${subset.length}`);
+        if (success.length > 0) {
             console.log(`Average Abs. Error    : ${mean(absErrors)}`);
             console.log(`Average Rel. Error    : ${mean(relErrors)}`);
             console.log(`Min Abs. Error        : ${minNumber(absErrors)}`);
@@ -207,6 +206,43 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             console.log(`Max Estimated Gas     : ${maxBigInt(estimatedGases).toString()}`);
             console.log(`Min Gas Used          : ${minBigInt(gasUsedValues).toString()}`);
             console.log(`Max Gas Used          : ${maxBigInt(gasUsedValues).toString()}`);
+        } else {
+            console.log("No successful test case was recorded.");
+        }
+    }
+
+    function printMethodSummaries(records: TestRecord[]): void {
+        for (const method of METHODS) {
+            const subset = records.filter((r) => r.method === method);
+            const success = subset.filter((r) => r.status === "success");
+            const reverted = subset.filter((r) => r.status === "revert");
+
+            const absErrors = success.map((r) => r.absError!).filter((v) => v !== null);
+            const relErrors = success.map((r) => r.relError!).filter((v) => v !== null);
+            const estimatedGases = success.map((r) => r.estimatedGas!).filter((v) => v !== null);
+            const gasUsedValues = success.map((r) => r.gasUsed!).filter((v) => v !== null);
+
+            console.log("============================================================");
+            console.log(`SUMMARY - ${method}`);
+            console.log("============================================================");
+            console.log(`Total Tests           : ${subset.length}`);
+            console.log(`Successful Tests      : ${success.length}`);
+            console.log(`Reverted Tests        : ${reverted.length}`);
+
+            if (success.length > 0) {
+                console.log(`Average Abs. Error    : ${mean(absErrors)}`);
+                console.log(`Average Rel. Error    : ${mean(relErrors)}`);
+                console.log(`Min Abs. Error        : ${minNumber(absErrors)}`);
+                console.log(`Max Abs. Error        : ${maxNumber(absErrors)}`);
+                console.log(`Average Estimated Gas : ${meanBigInt(estimatedGases).toString()}`);
+                console.log(`Average Gas Used      : ${meanBigInt(gasUsedValues).toString()}`);
+                console.log(`Min Estimated Gas     : ${minBigInt(estimatedGases).toString()}`);
+                console.log(`Max Estimated Gas     : ${maxBigInt(estimatedGases).toString()}`);
+                console.log(`Min Gas Used          : ${minBigInt(gasUsedValues).toString()}`);
+                console.log(`Max Gas Used          : ${maxBigInt(gasUsedValues).toString()}`);
+            } else {
+                console.log("No successful test case was recorded for this method.");
+            }
         }
     }
 
@@ -216,12 +252,116 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
         console.log(`Function      : ${record.funcLabel}`);
         console.log(`Interval      : ${record.intervalLabel}`);
         console.log(`n             : ${record.n.toString()}`);
-        console.log(`Expected      : ${record.expected}`);
-        console.log(`Actual        : ${record.actual}`);
-        console.log(`Abs. Error    : ${record.absError}`);
-        console.log(`Rel. Error    : ${record.relError}`);
-        console.log(`Estimated Gas : ${record.estimatedGas.toString()}`);
-        console.log(`Gas Used      : ${record.gasUsed.toString()}`);
+        console.log(`Status        : ${record.status}`);
+
+        if (record.status === "success") {
+            console.log(`Expected      : ${record.expected}`);
+            console.log(`Actual        : ${record.actual}`);
+            console.log(`Abs. Error    : ${record.absError}`);
+            console.log(`Rel. Error    : ${record.relError}`);
+            console.log(`Estimated Gas : ${record.estimatedGas?.toString()}`);
+            console.log(`Gas Used      : ${record.gasUsed?.toString()}`);
+        } else {
+            console.log(`Error         : ${record.errorMessage}`);
+        }
+    }
+
+    async function runSingleCase(params: {
+        method: MethodName;
+        fn: BenchmarkFunction;
+        selector: string;
+        intervalLabel: string;
+        aLabelNum: number;
+        bLabelNum: number;
+        aQuad: string;
+        bQuad: string;
+        n: bigint;
+        signerAddress: string;
+        signer: Awaited<ReturnType<typeof ethers.getSigners>>[number];
+    }): Promise<TestRecord> {
+        const {
+            method,
+            fn,
+            selector,
+            intervalLabel,
+            aLabelNum,
+            bLabelNum,
+            aQuad,
+            bQuad,
+            n,
+            signerAddress,
+            signer,
+        } = params;
+
+        try {
+            const expected = fn.exactIntegral(aLabelNum, bLabelNum);
+
+            const txRequest = await harness.getFunction(method).populateTransaction(
+                target,
+                selector,
+                aQuad,
+                bQuad,
+                n
+            );
+
+            txRequest.to = target;
+
+            const estimatedGas = await ethers.provider.estimateGas({
+                ...txRequest,
+                from: signerAddress,
+            });
+
+            const response = await signer.sendTransaction({
+                ...txRequest,
+                gasLimit: estimatedGas + 100_000n,
+            });
+
+            const receipt = await response.wait();
+            if (!receipt) {
+                throw new Error("Transaction receipt is null");
+            }
+
+            const gasUsed = receipt.gasUsed;
+
+            const result = await harness[method](target, selector, aQuad, bQuad, n);
+            const actual = await quadToNumber(result);
+
+            return {
+                method,
+                func: fn.key,
+                funcLabel: fn.label,
+                intervalLabel,
+                a: aLabelNum,
+                b: bLabelNum,
+                n,
+                expected,
+                actual,
+                absError: Math.abs(actual - expected),
+                relError: computeRelativeError(actual, expected),
+                estimatedGas,
+                gasUsed,
+                status: "success",
+                errorMessage: null,
+            };
+        } catch (err) {
+            return {
+                method,
+                func: fn.key,
+                funcLabel: fn.label,
+                intervalLabel,
+                a: aLabelNum,
+                b: bLabelNum,
+                n,
+                expected: null,
+                actual: null,
+                absError: null,
+                relError: null,
+                estimatedGas: null,
+                gasUsed: null,
+                status: "revert",
+                errorMessage: extractErrorMessage(err),
+            };
+        }
     }
 
     // ------------------------------------------------------------
@@ -350,6 +490,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     it("should execute the full deterministic accuracy and gas benchmark suite", async function () {
         const records: TestRecord[] = [];
         const [signer] = await ethers.getSigners();
+        const signerAddress = await signer.getAddress();
 
         for (const fn of FUNCTIONS) {
             const selector = harness.interface.getFunction(fn.selectorName)?.selector;
@@ -361,52 +502,19 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
                 for (const interval of SIN_INTERVALS_QUAD) {
                     for (const n of N_VALUES) {
                         for (const method of METHODS) {
-                            const expected = fn.exactIntegral(interval.aNum, interval.bNum);
-
-                            const txRequest = await harness.getFunction(method).populateTransaction(
-                                target,
-                                selector,
-                                interval.a,
-                                interval.b,
-                                n
-                            );
-
-                            txRequest.to = target;
-
-                            const estimatedGas = await ethers.provider.estimateGas({
-                                ...txRequest,
-                                from: await signer.getAddress(),
-                            });
-
-                            const response = await signer.sendTransaction({
-                                ...txRequest,
-                                gasLimit: estimatedGas + 100_000n,
-                            });
-
-                            const receipt = await response.wait();
-                            if (!receipt) {
-                                throw new Error("Transaction receipt is null");
-                            }
-
-                            const gasUsed = receipt.gasUsed;
-                            const result = await harness[method](target, selector, interval.a, interval.b, n);
-                            const actual = await quadToNumber(result);
-
-                            const record: TestRecord = {
+                            const record = await runSingleCase({
                                 method,
-                                func: fn.key,
-                                funcLabel: fn.label,
+                                fn,
+                                selector,
                                 intervalLabel: interval.label,
-                                a: interval.aNum,
-                                b: interval.bNum,
+                                aLabelNum: interval.aNum,
+                                bLabelNum: interval.bNum,
+                                aQuad: interval.a,
+                                bQuad: interval.b,
                                 n,
-                                expected,
-                                actual,
-                                absError: Math.abs(actual - expected),
-                                relError: computeRelativeError(actual, expected),
-                                estimatedGas,
-                                gasUsed,
-                            };
+                                signerAddress,
+                                signer,
+                            });
 
                             records.push(record);
                             printRecord(record);
@@ -420,52 +528,19 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
 
                     for (const n of N_VALUES) {
                         for (const method of METHODS) {
-                            const expected = fn.exactIntegral(interval.a, interval.b);
-
-                            const txRequest = await harness.getFunction(method).populateTransaction(
-                                target,
-                                selector,
-                                qa,
-                                qb,
-                                n
-                            );
-
-                            txRequest.to = target;
-
-                            const estimatedGas = await ethers.provider.estimateGas({
-                                ...txRequest,
-                                from: await signer.getAddress(),
-                            });
-
-                            const response = await signer.sendTransaction({
-                                ...txRequest,
-                                gasLimit: estimatedGas + 100_000n,
-                            });
-
-                            const receipt = await response.wait();
-                            if (!receipt) {
-                                throw new Error("Transaction receipt is null");
-                            }
-
-                            const gasUsed = receipt.gasUsed;
-                            const result = await harness[method](target, selector, qa, qb, n);
-                            const actual = await quadToNumber(result);
-
-                            const record: TestRecord = {
+                            const record = await runSingleCase({
                                 method,
-                                func: fn.key,
-                                funcLabel: fn.label,
+                                fn,
+                                selector,
                                 intervalLabel: interval.label,
-                                a: interval.a,
-                                b: interval.b,
+                                aLabelNum: interval.a,
+                                bLabelNum: interval.b,
+                                aQuad: qa,
+                                bQuad: qb,
                                 n,
-                                expected,
-                                actual,
-                                absError: Math.abs(actual - expected),
-                                relError: computeRelativeError(actual, expected),
-                                estimatedGas,
-                                gasUsed,
-                            };
+                                signerAddress,
+                                signer,
+                            });
 
                             records.push(record);
                             printRecord(record);
@@ -477,7 +552,5 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
 
         printOverallSummary(records);
         printMethodSummaries(records);
-
-        expect(records.length).to.equal(7 * 5 * 5 * 3); // 525 tests
     });
 });

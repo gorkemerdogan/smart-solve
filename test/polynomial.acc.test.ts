@@ -11,7 +11,7 @@ type PolynomialHarness = Contract & {
     qFromInt(x: number | bigint): Promise<string>;
     qFromUInt(x: number | bigint): Promise<string>;
     qFromFrac(num: number | bigint, den: number | bigint): Promise<string>;
-    toFloat(q: string): Promise<unknown>;
+    toFloat(q: string): Promise<[boolean, bigint]>;
     fromFloat(n: bigint): Promise<string>;
 
     evaluateHorners(coeffs: string[], x: string): Promise<string>;
@@ -84,11 +84,23 @@ function formatScaledInt(v: bigint): string {
 }
 
 async function outScaled(harness: PolynomialHarness, q: string): Promise<bigint> {
-    return asBigInt(await harness.toFloat(q));
+    const [ok, raw] = await harness.toFloat(q);
+    if (!ok) {
+        throw new Error("toFloat overflow during scaled conversion");
+    }
+    return asBigInt(raw);
 }
 
 async function scaledVec(harness: PolynomialHarness, values: string[]): Promise<bigint[]> {
-    return Promise.all(values.map(async v => asBigInt(await harness.toFloat(v))));
+    return Promise.all(
+        values.map(async v => {
+            const [ok, raw] = await harness.toFloat(v);
+            if (!ok) {
+                throw new Error("toFloat overflow during scaled conversion");
+            }
+            return asBigInt(raw);
+        })
+    );
 }
 
 function scaledAbsError(actual: bigint, expected: bigint): bigint {
@@ -508,7 +520,12 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
 
         harness = (await HF.deploy()) as unknown as PolynomialHarness;
 
-        const oneScaled = asBigInt(await harness.toFloat(await harness.qFromInt(1n)));
+        const [ok, oneScaledRaw] = await harness.toFloat(await harness.qFromInt(1n));
+        if (!ok) {
+            throw new Error("Failed to convert qFromInt(1) in harness.toFloat");
+        }
+
+        const oneScaled = asBigInt(oneScaledRaw);
         SCALE = oneScaled;
         SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });

@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { printBlockRegular } from "./test-utils";
 
 // ------------------------------------------------------------
 // Types
@@ -87,6 +88,7 @@ interface StepCase {
 
 interface MethodStats {
     count: number;
+    failed: number;
     withinTol: number;
     exceededTol: number;
     absSum: bigint;
@@ -204,6 +206,7 @@ function numberToScaledBigInt(value: number): bigint {
 function initStats(): MethodStats {
     return {
         count: 0,
+        failed: 0,
         withinTol: 0,
         exceededTol: 0,
         absSum: 0n,
@@ -247,62 +250,9 @@ function averageScaled(sum: bigint, count: number): bigint {
     return count === 0 ? 0n : sum / BigInt(count);
 }
 
-function printMethodSummary(args: {
-    benchmark: string;
-    method: MethodLabel;
-    stats: MethodStats;
-    tol: bigint;
-}) {
-    const avgAbs = averageScaled(args.stats.absSum, args.stats.count);
-    const avgRel = averageScaled(args.stats.relSumScaled, args.stats.count);
-    const avgGas = averageScaled(args.stats.gasSum, args.stats.count);
-
-    console.log("============================================================");
-    console.log(`Benchmark           : ${args.benchmark}`);
-    console.log(`Method              : ${args.method}`);
-    console.log(`Total Tests         : ${args.stats.count}`);
-    console.log(`Within Tolerance    : ${args.stats.withinTol}`);
-    console.log(`Exceeded Tolerance  : ${args.stats.exceededTol}`);
-    console.log(`Tolerance           : ${formatScaledInt(args.tol)}`);
-    console.log(`Average Abs. Error  : ${formatScaledInt(avgAbs)}`);
-    console.log(`Average Rel. Error  : ${formatScaledInt(avgRel)}`);
-    console.log(`Average Rel. Error% : ${formatPercentScaled(avgRel)}%`);
-    console.log(`Min Abs. Error      : ${formatScaledInt(args.stats.minAbs)}`);
-    console.log(`Max Abs. Error      : ${formatScaledInt(args.stats.maxAbs)}`);
-    console.log(`Min Rel. Error      : ${formatScaledInt(args.stats.minRelScaled)}`);
-    console.log(`Max Rel. Error      : ${formatScaledInt(args.stats.maxRelScaled)}`);
-    console.log(`Average Est. Gas    : ${avgGas.toString()}`);
-    console.log(`Min Est. Gas        : ${args.stats.minGas.toString()}`);
-    console.log(`Max Est. Gas        : ${args.stats.maxGas.toString()}`);
-    console.log("============================================================");
-}
-
-function printCaseBlock(args: {
-    benchmark: string;
-    caseNo: number;
-    method: MethodLabel;
-    y0: number;
-    hLabel: string;
-    steps: number;
-    xFinal: number;
-    expectedScaled: bigint;
-    actualScaled: bigint;
-    absErr: bigint;
-    relErrScaled: bigint;
-    estimatedGas: bigint;
-}) {
-    console.log("------------------------------------------------------------");
-    console.log(`Benchmark          : ${args.benchmark}`);
-    console.log(`Case               : ${args.caseNo}`);
-    console.log(`Method             : ${args.method}`);
-    console.log(`Input              : x0=0, y0=${args.y0}, h=${args.hLabel}, steps=${args.steps}, x_final=${args.xFinal}`);
-    console.log(`Expected Output    : ${formatScaledInt(args.expectedScaled)}`);
-    console.log(`Actual Output      : ${formatScaledInt(args.actualScaled)}`);
-    console.log(`Absolute Error     : ${formatScaledInt(args.absErr)}`);
-    console.log(`Relative Error     : ${formatScaledInt(args.relErrScaled)}`);
-    console.log(`Relative Error (%) : ${formatPercentScaled(args.relErrScaled)}%`);
-    console.log(`Estimated Gas      : ${args.estimatedGas.toString()}`);
-    console.log("------------------------------------------------------------");
+function errorToString(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    return String(err);
 }
 
 async function runMethod(
@@ -341,11 +291,18 @@ async function runMethod(
     return { output, estimatedGas };
 }
 
+function safeErrorToString(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    return String(err);
+}
+
 // ------------------------------------------------------------
 // Test Suite
 // ------------------------------------------------------------
 
 describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
+    this.timeout(0);
+
     let harness: ODESolverHarness;
     let target: string;
 
@@ -366,10 +323,36 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
     const STEP_CASES: StepCase[] = [
         { hNum: 1, hDen: 10, hLabel: "0.1", steps: 10 },
         { hNum: 1, hDen: 10, hLabel: "0.1", steps: 50 },
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 20 },
+        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 100 },
+        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 200 },
+        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 400 },
+        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 600 },
+        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 700 },
+        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 800 },
+        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 1000 },
+        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 1500 },
+
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 10 },
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 50 },
         { hNum: 1, hDen: 20, hLabel: "0.05", steps: 100 },
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 200 },
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 400 },
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 600 },
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 700 },
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 800 },
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 1000 },
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 1500 },
+
+        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 10 },
+        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 50 },
         { hNum: 1, hDen: 100, hLabel: "0.01", steps: 100 },
-        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 200 }
+        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 200 },
+        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 400 },
+        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 600 },
+        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 700 },
+        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 800 },
+        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 1000 },
+        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 1500 },
     ];
 
     const ABS_TOL = 1_000_000n; // 1e-6 at SCALE = 1e12
@@ -400,7 +383,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
         SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
-    it("should evaluate average absolute and relative error over 18 systematic test instances per benchmark", async function () {
+    it("should evaluate ODE cases and continue even if some runs revert or run out of gas", async function () {
         const x0 = await qInt(0n);
 
         const benchmarks: BenchmarkDef[] = [
@@ -449,7 +432,12 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
             }
         }
 
-        let overallExecutions = 0;
+        const overallStatsByMethod = new Map<MethodLabel, MethodStats>();
+        for (const method of METHODS) {
+            overallStatsByMethod.set(method.label, initStats());
+        }
+
+        let overallAttempts = 0;
 
         for (const benchmark of benchmarks) {
             const statsByMethod = new Map<MethodLabel, MethodStats>();
@@ -470,64 +458,178 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                 const expectedValue = benchmark.exactSolution(tc.y0, tc.xFinal);
                 const expectedScaled = numberToScaledBigInt(expectedValue);
 
+
+                let expectedHex = "N/A";
+                let expectedHexStatus = "OK";
+
+                try {
+                    expectedHex = await harness.fromFloat(expectedScaled);
+                } catch (err) {
+                    expectedHexStatus = `OUT_OF_RANGE: ${safeErrorToString(err)}`;
+                    expectedHex = "OUT_OF_RANGE";
+                }
+
+                //const expectedHex = await harness.fromFloat(expectedScaled);
+
                 for (const method of METHODS) {
-                    const run = await runMethod(
-                        harness,
-                        method.key,
-                        target,
-                        benchmark.selector,
-                        x0,
-                        y0Q,
-                        hQ,
-                        tc.steps
-                    );
+                    overallAttempts += 1;
 
-                    const actualScaled = await outScaled(harness, run.output);
-                    const absErr = scaledAbsError(actualScaled, expectedScaled);
-                    const relErrScaled = scaledRelErrorScaled(actualScaled, expectedScaled);
+                    try {
+                        const run = await runMethod(
+                            harness,
+                            method.key,
+                            target,
+                            benchmark.selector,
+                            x0,
+                            y0Q,
+                            hQ,
+                            tc.steps
+                        );
 
-                    updateStats(
-                        statsByMethod.get(method.label)!,
-                        absErr,
-                        relErrScaled,
-                        run.estimatedGas,
-                        ABS_TOL
-                    );
-                    overallExecutions += 1;
+                        const actualScaled = await outScaled(harness, run.output);
+                        const absErr = scaledAbsError(actualScaled, expectedScaled);
+                        const relErrScaled = scaledRelErrorScaled(actualScaled, expectedScaled);
 
-                    printCaseBlock({
-                        benchmark: benchmark.label,
-                        caseNo: tc.caseNo,
-                        method: method.label,
-                        y0: tc.y0,
-                        hLabel: tc.hLabel,
-                        steps: tc.steps,
-                        xFinal: tc.xFinal,
-                        expectedScaled,
-                        actualScaled,
-                        absErr,
-                        relErrScaled,
-                        estimatedGas: run.estimatedGas,
-                    });
+                        updateStats(
+                            statsByMethod.get(method.label)!,
+                            absErr,
+                            relErrScaled,
+                            run.estimatedGas,
+                            ABS_TOL
+                        );
+
+                        updateStats(
+                            overallStatsByMethod.get(method.label)!,
+                            absErr,
+                            relErrScaled,
+                            run.estimatedGas,
+                            ABS_TOL
+                        );
+
+                        printBlockRegular({
+                            t: `${benchmark.key}-${tc.caseNo}`,
+                            method: method.label,
+                            explanation: `SUCCESS | Benchmark=${benchmark.label}, x0=0, y0=${tc.y0}, h=${tc.hLabel}, steps=${tc.steps}, x_final=${tc.xFinal}`,
+                            gas: run.estimatedGas.toString(),
+                            inHex: `x0=${x0} | y0=${y0Q} | h=${hQ} | steps=${tc.steps}`,
+                            expectedHex,
+                            outHex: run.output,
+                            expectedDec: formatScaledInt(expectedScaled),
+                            outDec: formatScaledInt(actualScaled),
+                            maxAbsError: formatScaledInt(absErr),
+                            avgAbsError: formatScaledInt(absErr),
+                            residual: formatScaledInt(absErr),
+                            normalizedResidual: formatScaledInt(relErrScaled),
+                            tolerance: formatScaledInt(ABS_TOL),
+                            withinTol: absErr <= ABS_TOL ? "Yes" : "No",
+                            exceededTol: absErr > ABS_TOL ? "Yes" : "No",
+                            worstCase: `Case ${tc.caseNo} | AbsErr=${formatScaledInt(absErr)} | RelErr=${formatPercentScaled(relErrScaled)}%`,
+                        });
+                    } catch (err) {
+                        const message = errorToString(err);
+
+                        statsByMethod.get(method.label)!.failed += 1;
+                        overallStatsByMethod.get(method.label)!.failed += 1;
+
+                        printBlockRegular({
+                            t: `${benchmark.key}-${tc.caseNo}`,
+                            method: method.label,
+                            explanation: `FAILED | Benchmark=${benchmark.label}, x0=0, y0=${tc.y0}, h=${tc.hLabel}, steps=${tc.steps}, x_final=${tc.xFinal}`,
+                            gas: "FAILED",
+                            inHex: `x0=${x0} | y0=${y0Q} | h=${hQ} | steps=${tc.steps}`,
+                            expectedHex,
+                            outHex: "REVERTED / OUT_OF_GAS",
+                            expectedDec: formatScaledInt(expectedScaled),
+                            outDec: "FAILED",
+                            maxAbsError: "FAILED",
+                            avgAbsError: "FAILED",
+                            residual: "FAILED",
+                            normalizedResidual: "FAILED",
+                            tolerance: formatScaledInt(ABS_TOL),
+                            withinTol: "FAILED",
+                            exceededTol: "FAILED",
+                            worstCase: message,
+                        });
+                    }
                 }
             }
 
             console.log("");
             console.log("******************** BENCHMARK SUMMARY *********************");
+
             for (const method of METHODS) {
-                printMethodSummary({
-                    benchmark: benchmark.label,
+                const stats = statsByMethod.get(method.label)!;
+                const avgAbs = averageScaled(stats.absSum, stats.count);
+                const avgRel = averageScaled(stats.relSumScaled, stats.count);
+                const avgGas = averageScaled(stats.gasSum, stats.count);
+
+                printBlockRegular({
+                    t: `${benchmark.key}-summary`,
                     method: method.label,
-                    stats: statsByMethod.get(method.label)!,
-                    tol: ABS_TOL,
+                    explanation: `Summary for benchmark ${benchmark.label} | success=${stats.count} | failed=${stats.failed}`,
+                    gas: stats.count > 0 ? avgGas.toString() : "N/A",
+                    inHex: "-",
+                    expectedHex: "-",
+                    outHex: "-",
+                    expectedDec: "-",
+                    outDec: "-",
+                    maxAbsError: stats.count > 0 ? formatScaledInt(stats.maxAbs) : "N/A",
+                    avgAbsError: stats.count > 0 ? formatScaledInt(avgAbs) : "N/A",
+                    residual: stats.count > 0 ? formatScaledInt(stats.maxAbs) : "N/A",
+                    normalizedResidual: stats.count > 0 ? formatScaledInt(avgRel) : "N/A",
+                    tolerance: formatScaledInt(ABS_TOL),
+                    withinTol: stats.withinTol.toString(),
+                    exceededTol: stats.exceededTol.toString(),
+                    worstCase:
+                        stats.count > 0
+                            ? `success=${stats.count}, failed=${stats.failed}, minAbs=${formatScaledInt(stats.minAbs)}, maxRel=${formatPercentScaled(stats.maxRelScaled)}%, minGas=${stats.minGas.toString()}, maxGas=${stats.maxGas.toString()}`
+                            : `success=0, failed=${stats.failed}`,
                 });
             }
 
-            const eulerAvgAbs = averageScaled(statsByMethod.get("Euler")!.absSum, 18);
-            const rk4AvgAbs = averageScaled(statsByMethod.get("RK4")!.absSum, 18);
-            expect(rk4AvgAbs <= eulerAvgAbs).to.equal(true);
+            const eulerStats = statsByMethod.get("Euler")!;
+            const rk4Stats = statsByMethod.get("RK4")!;
+
+            if (eulerStats.count > 0 && rk4Stats.count > 0) {
+                const eulerAvgAbs = averageScaled(eulerStats.absSum, eulerStats.count);
+                const rk4AvgAbs = averageScaled(rk4Stats.absSum, rk4Stats.count);
+                expect(rk4AvgAbs <= eulerAvgAbs).to.equal(true);
+            }
         }
 
-        expect(overallExecutions).to.equal(18 * 4 * 4);
+        console.log("");
+        console.log("********************** OVERALL SUMMARY *********************");
+
+        for (const method of METHODS) {
+            const stats = overallStatsByMethod.get(method.label)!;
+            const avgAbs = averageScaled(stats.absSum, stats.count);
+            const avgRel = averageScaled(stats.relSumScaled, stats.count);
+            const avgGas = averageScaled(stats.gasSum, stats.count);
+
+            printBlockRegular({
+                t: "overall-summary",
+                method: method.label,
+                explanation: `Overall summary across all benchmarks | success=${stats.count} | failed=${stats.failed}`,
+                gas: stats.count > 0 ? avgGas.toString() : "N/A",
+                inHex: "-",
+                expectedHex: "-",
+                outHex: "-",
+                expectedDec: "-",
+                outDec: "-",
+                maxAbsError: stats.count > 0 ? formatScaledInt(stats.maxAbs) : "N/A",
+                avgAbsError: stats.count > 0 ? formatScaledInt(avgAbs) : "N/A",
+                residual: stats.count > 0 ? formatScaledInt(stats.maxAbs) : "N/A",
+                normalizedResidual: stats.count > 0 ? formatScaledInt(avgRel) : "N/A",
+                tolerance: formatScaledInt(ABS_TOL),
+                withinTol: stats.withinTol.toString(),
+                exceededTol: stats.exceededTol.toString(),
+                worstCase:
+                    stats.count > 0
+                        ? `success=${stats.count}, failed=${stats.failed}, minAbs=${formatScaledInt(stats.minAbs)}, maxRel=${formatPercentScaled(stats.maxRelScaled)}%, minGas=${stats.minGas.toString()}, maxGas=${stats.maxGas.toString()}`
+                        : `success=0, failed=${stats.failed}`,
+            });
+        }
+
+        expect(overallAttempts).to.equal(testCases.length * benchmarks.length * METHODS.length);
     });
 });

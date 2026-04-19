@@ -43,11 +43,11 @@ type RootFindingHarness = Contract & {
 // Global numeric helpers
 // ------------------------------------------------------------
 
-let SCALE_DECIMALS = 12n;
+let SCALE_DECIMALS = 18n;
 let SCALE = 10n ** SCALE_DECIMALS;
 
 const FIXED_SEED = 37n;
-const NUMBER_OF_TESTS = 30;
+const NUMBER_OF_TESTS = 90;
 
 function asBigInt(v: unknown): bigint {
     if (typeof v === "bigint") return v;
@@ -195,14 +195,56 @@ function printMethodSummary(
 }
 
 // ------------------------------------------------------------
+// Per-case logging helpers
+// ------------------------------------------------------------
+
+function printCaseHeader(benchmarkName: string, caseNo: number) {
+    console.log("------------------------------------------------------------");
+    console.log(`Benchmark            : ${benchmarkName}`);
+    console.log(`Case                 : ${caseNo}`);
+    console.log("------------------------------------------------------------");
+}
+
+function printCaseResult(args: {
+    benchmarkName: string;
+    caseNo: number;
+    method: MethodName;
+    initText: string;
+    converged: boolean;
+    iterations: bigint;
+    gas: bigint;
+    rootScaled: bigint;
+    expectedRootScaled: bigint;
+    residualScaled: bigint;
+}) {
+    const absErr = scaledAbsError(args.rootScaled, args.expectedRootScaled);
+    const relErr = scaledRelError(args.rootScaled, args.expectedRootScaled);
+
+    console.log(`Benchmark            : ${args.benchmarkName}`);
+    console.log(`Case                 : ${args.caseNo}`);
+    console.log(`Method               : ${args.method}`);
+    console.log(`Initialization       : ${args.initText}`);
+    console.log(`Converged            : ${args.converged ? "Yes" : "No"}`);
+    console.log(`Iterations           : ${args.iterations.toString()}`);
+    console.log(`Estimated Gas        : ${args.gas.toString()}`);
+    console.log(`Expected Root        : ${formatScaledInt(args.expectedRootScaled)}`);
+    console.log(`Computed Root        : ${formatScaledInt(args.rootScaled)}`);
+    console.log(`Absolute Error       : ${formatScaledInt(absErr)}`);
+    console.log(`Relative Error       : ${formatScaledInt(relErr)}`);
+    console.log(`Residual             : ${formatScaledInt(args.residualScaled)}`);
+    console.log("------------------------------------------------------------");
+}
+
+// ------------------------------------------------------------
 // Test suite
 // ------------------------------------------------------------
 
 describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function () {
+    this.timeout(0); // - minutes
     let harness: RootFindingHarness;
     let target: string;
 
-    let TOL_1E_15: string;
+    let TOL_1E_30: string;
 
     let selX2Minus4: string;
     let selDf2x: string;
@@ -247,7 +289,7 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
         selQuartic = harness.interface.getFunction("f_quartic")!.selector;
         selDfQuartic = harness.interface.getFunction("df_quartic")!.selector;
 
-        TOL_1E_15 = await qFrac(1n, 1_000_000_000_000_000n);
+        TOL_1E_30 = await qFrac(1n, 1_000_000_000_000_000_000_000_000n);
 
         const oneScaled = asBigInt(await harness.toFloat(await qInt(1n)));
         SCALE = oneScaled;
@@ -264,6 +306,8 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
         for (let i = 1; i <= NUMBER_OF_TESTS; i++) {
             const tag = `${cfg.name}-case-${i}`;
 
+            printCaseHeader(cfg.name, i);
+
             // --------------------------------------------------------
             // Bisection
             // --------------------------------------------------------
@@ -275,7 +319,7 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
 
                 const gas = await harness
                     .getFunction("rootFindingBisection")
-                    .estimateGas(target, cfg.fSelector, a, b, TOL_1E_15, cfg.maxIterBisection);
+                    .estimateGas(target, cfg.fSelector, a, b, TOL_1E_30, cfg.maxIterBisection);
 
                 const [root, iterations, converged, fAtRoot] =
                     await harness.rootFindingBisection(
@@ -283,7 +327,7 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
                         cfg.fSelector,
                         a,
                         b,
-                        TOL_1E_15,
+                        TOL_1E_30,
                         cfg.maxIterBisection
                     );
 
@@ -303,6 +347,19 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
                     );
                     summaries.Bisection.residualsConv.push(residualScaled);
                 }
+
+                printCaseResult({
+                    benchmarkName: cfg.name,
+                    caseNo: i,
+                    method: "Bisection",
+                    initText: `a=${formatScaledInt(aScaled)}, b=${formatScaledInt(bScaled)}`,
+                    converged,
+                    iterations,
+                    gas: asBigInt(gas),
+                    rootScaled,
+                    expectedRootScaled: cfg.expectedRootScaled,
+                    residualScaled,
+                });
             }
 
             // --------------------------------------------------------
@@ -321,7 +378,7 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
                         target,
                         cfg.dfSelector,
                         x0,
-                        TOL_1E_15,
+                        TOL_1E_30,
                         cfg.maxIterNewton
                     );
 
@@ -332,7 +389,7 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
                         target,
                         cfg.dfSelector,
                         x0,
-                        TOL_1E_15,
+                        TOL_1E_30,
                         cfg.maxIterNewton
                     );
 
@@ -352,6 +409,19 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
                     );
                     summaries.Newton.residualsConv.push(residualScaled);
                 }
+
+                printCaseResult({
+                    benchmarkName: cfg.name,
+                    caseNo: i,
+                    method: "Newton",
+                    initText: `x0=${formatScaledInt(x0Scaled)}`,
+                    converged,
+                    iterations,
+                    gas: asBigInt(gas),
+                    rootScaled,
+                    expectedRootScaled: cfg.expectedRootScaled,
+                    residualScaled,
+                });
             }
 
             // --------------------------------------------------------
@@ -365,7 +435,7 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
 
                 const gas = await harness
                     .getFunction("rootFindingSecant")
-                    .estimateGas(target, cfg.fSelector, x0, x1, TOL_1E_15, cfg.maxIterSecant);
+                    .estimateGas(target, cfg.fSelector, x0, x1, TOL_1E_30, cfg.maxIterSecant);
 
                 const [root, iterations, converged, fAtRoot] =
                     await harness.rootFindingSecant(
@@ -373,7 +443,7 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
                         cfg.fSelector,
                         x0,
                         x1,
-                        TOL_1E_15,
+                        TOL_1E_30,
                         cfg.maxIterSecant
                     );
 
@@ -393,6 +463,19 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
                     );
                     summaries.Secant.residualsConv.push(residualScaled);
                 }
+
+                printCaseResult({
+                    benchmarkName: cfg.name,
+                    caseNo: i,
+                    method: "Secant",
+                    initText: `x0=${formatScaledInt(x0Scaled)}, x1=${formatScaledInt(x1Scaled)}`,
+                    converged,
+                    iterations,
+                    gas: asBigInt(gas),
+                    rootScaled,
+                    expectedRootScaled: cfg.expectedRootScaled,
+                    residualScaled,
+                });
             }
         }
 
@@ -411,11 +494,10 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
             fSelector: selX2Minus4,
             dfSelector: selDf2x,
             expectedRootScaled: root,
-            maxIterBisection: 100n,
-            maxIterNewton: 50n,
-            maxIterSecant: 50n,
+            maxIterBisection: 1130n,
+            maxIterNewton: 1130n,
+            maxIterSecant: 1130n,
 
-            // Keep the interval on the positive-root side only.
             makeBisectionBracket: (_tag: string) => {
                 return {
                     aScaled: 1n * SCALE,
@@ -423,17 +505,15 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
                 };
             },
 
-            // Start close enough to the positive root to avoid drifting.
             makeNewtonInitialGuess: (tag: string) => {
                 const side = randomWord(`${tag}-newton-side`) % 2n;
-                const offset = randomScaledBetween(`${tag}-newton-offset`, SCALE / 20n, SCALE / 2n); // 0.05 .. 0.5
+                const offset = randomScaledBetween(`${tag}-newton-offset`, SCALE / 20n, SCALE / 2n);
                 return side === 0n ? root - offset : root + offset;
             },
 
-            // Force secant points to stay around the positive root.
             makeSecantInitialGuesses: (tag: string) => {
-                const leftOffset = randomScaledBetween(`${tag}-sec-left`, SCALE / 20n, 4n * SCALE / 10n);   // 0.05 .. 0.4
-                const rightOffset = randomScaledBetween(`${tag}-sec-right`, SCALE / 20n, 4n * SCALE / 10n); // 0.05 .. 0.4
+                const leftOffset = randomScaledBetween(`${tag}-sec-left`, SCALE / 20n, 4n * SCALE / 10n);
+                const rightOffset = randomScaledBetween(`${tag}-sec-right`, SCALE / 20n, 4n * SCALE / 10n);
                 return {
                     x0Scaled: root - leftOffset,
                     x1Scaled: root + rightOffset,
@@ -455,9 +535,9 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
             fSelector: selCubic,
             dfSelector: selDfCubic,
             expectedRootScaled: root,
-            maxIterBisection: 100n,
-            maxIterNewton: 50n,
-            maxIterSecant: 50n,
+            maxIterBisection: 1130n,
+            maxIterNewton: 1130n,
+            maxIterSecant: 1130n,
 
             makeBisectionBracket: (_tag: string) => {
                 return {
@@ -468,13 +548,13 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
 
             makeNewtonInitialGuess: (tag: string) => {
                 const side = randomWord(`${tag}-newton-side`) % 2n;
-                const offset = randomScaledBetween(`${tag}-newton-offset`, SCALE / 20n, 6n * SCALE / 10n); // 0.05 .. 0.6
+                const offset = randomScaledBetween(`${tag}-newton-offset`, SCALE / 20n, 6n * SCALE / 10n);
                 return side === 0n ? root - offset : root + offset;
             },
 
             makeSecantInitialGuesses: (tag: string) => {
-                const leftOffset = randomScaledBetween(`${tag}-sec-left`, SCALE / 20n, 3n * SCALE / 10n);   // 0.05 .. 0.3
-                const rightOffset = randomScaledBetween(`${tag}-sec-right`, SCALE / 20n, 3n * SCALE / 10n); // 0.05 .. 0.3
+                const leftOffset = randomScaledBetween(`${tag}-sec-left`, SCALE / 20n, 3n * SCALE / 10n);
+                const rightOffset = randomScaledBetween(`${tag}-sec-right`, SCALE / 20n, 3n * SCALE / 10n);
                 return {
                     x0Scaled: root - leftOffset,
                     x1Scaled: root + rightOffset,
@@ -496,9 +576,9 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
             fSelector: selQuartic,
             dfSelector: selDfQuartic,
             expectedRootScaled: root,
-            maxIterBisection: 100n,
-            maxIterNewton: 50n,
-            maxIterSecant: 50n,
+            maxIterBisection: 1130n,
+            maxIterNewton: 1130n,
+            maxIterSecant: 1130n,
 
             makeBisectionBracket: (_tag: string) => {
                 return {
@@ -509,13 +589,13 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
 
             makeNewtonInitialGuess: (tag: string) => {
                 const side = randomWord(`${tag}-newton-side`) % 2n;
-                const offset = randomScaledBetween(`${tag}-newton-offset`, SCALE / 20n, 5n * SCALE / 10n); // 0.05 .. 0.5
+                const offset = randomScaledBetween(`${tag}-newton-offset`, SCALE / 20n, 5n * SCALE / 10n);
                 return side === 0n ? root - offset : root + offset;
             },
 
             makeSecantInitialGuesses: (tag: string) => {
-                const leftOffset = randomScaledBetween(`${tag}-sec-left`, SCALE / 20n, 2n * SCALE / 10n);   // 0.05 .. 0.2
-                const rightOffset = randomScaledBetween(`${tag}-sec-right`, SCALE / 20n, 2n * SCALE / 10n); // 0.05 .. 0.2
+                const leftOffset = randomScaledBetween(`${tag}-sec-left`, SCALE / 20n, 2n * SCALE / 10n);
+                const rightOffset = randomScaledBetween(`${tag}-sec-right`, SCALE / 20n, 2n * SCALE / 10n);
                 return {
                     x0Scaled: root - leftOffset,
                     x1Scaled: root + rightOffset,
