@@ -138,11 +138,27 @@ library QuadConstants {
     }
 
     /**
+     * @notice Returns 1e-24 as a quadruple-precision constant. Very small epsilon.
+     * @return bytes16 1 x 10^-24
+     */
+    function EPS_1e24() internal pure returns (bytes16) {
+        return fromFrac(1, 1_000_000_000_000_000_000_000_000);
+    }
+
+    /**
      * @notice Returns 1e-30 as a quadruple-precision constant. Very small epsilon.
      * @return bytes16 1 x 10^-30
      */
     function EPS_1e30() internal pure returns (bytes16) {
-        return 0x3cd203af9ee756159b00000000000000;
+        return fromFrac(1, 1_000_000_000_000_000_000_000_000_000_000);
+    }
+
+    /**
+ * @notice Returns 1e-33 as a quadruple-precision constant. Very small epsilon.
+     * @return bytes16 1 x 10^-33
+     */
+    function EPS_1e36() internal pure returns (bytes16) {
+        return fromFrac(1, 1_000_000_000_000_000_000_000_000_000_000_000_000);
     }
 
     // -------------------------------------------------------------

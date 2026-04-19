@@ -119,7 +119,7 @@ library RootFinding {
         // Load minimum tolerance from storage or fallback default
         bytes16 minTol = cfg.minTol;
         if (minTol == bytes16(0)) {
-            minTol = QuadConstants.DEFAULT_MIN_TOL();
+            minTol = QuadConstants.EPS_1e36();
         }
 
         // Case 1: Caller provided a specific, non-zero requestedTol
