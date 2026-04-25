@@ -63,11 +63,6 @@
   * Newton method guards against zero derivatives.  
   * Secant method guards against zero slope between iterates.
 * **Convergence Control:** User-specified tolerance with global configuration fallback and enforced minimum tolerance.
-
-### 8. Trigonometry Stack (`Trigonometry.sol`)
-* **Methods:** sin, cos, tan, cot, arcsin, arccos, and arctan, internally routed through dedicated sine/cosine, tangent/cotangent, and inverse-trigonometry modules.
-* **Design Scope:** Deterministic, pure-function trigonometric primitives intended for on-chain numerical analysis, optimization, differential equations, and geometric algorithms.
-
 ---
 
 ## System Architecture
@@ -106,8 +101,7 @@ contracts/
 │   │   ├── NumericConfigFacet.sol
 │   │   ├── ODESolverFacet.sol
 │   │   ├── PolynomialFacet.sol
-│   │   ├── RootFindingFacet.sol
-│   │   └── TrigonometryFacet.sol
+│   │   └── RootFindingFacet.sol
 │
 ├── interfaces/
 │   │   ...                # EIP-2535 and Custom Interfaces
@@ -120,12 +114,6 @@ contracts/
 │   │   ├── ODESolver.sol
 │   │   ├── Polynomial.sol
 │   │   └── RootFinding.sol
-│   │
-│   ├── trigonometry/
-│   │   ├── Trigonometry.sol
-│   │   ├── TrigonometryArc.sol
-│   │   ├── TrigonometrySinCos.sol
-│   │   └── TrigonometryTanCot.sol
 │   │
 │   ├── LibSmartSolve.sol
 │   ├── MathLib.sol        # Math library depends on ABDKMathQuad
