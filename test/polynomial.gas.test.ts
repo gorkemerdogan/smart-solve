@@ -139,7 +139,9 @@ describe("PolynomialHarness - Horner Gas Growth Tests", function () {
     let X_1000: string;
 
     before(async () => {
-        const MathLibFactory = await ethers.getContractFactory("MathLib");
+        const MathLibFactory = await ethers.getContractFactory(
+            "contracts/libraries/MathLib.sol:MathLib"
+        );
         const math = await MathLibFactory.deploy();
         await math.waitForDeployment();
 

@@ -296,7 +296,9 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
     const qFrac = async (num: number | bigint, den: number | bigint) => await harness.qFromFrac(num, den);
 
     before(async () => {
-        const MathLibFactory = await ethers.getContractFactory("MathLib");
+        const MathLibFactory = await ethers.getContractFactory(
+            "contracts/libraries/MathLib.sol:MathLib"
+        );
         const mathlib = await MathLibFactory.deploy();
         await mathlib.waitForDeployment();
 

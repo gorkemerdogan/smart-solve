@@ -283,7 +283,9 @@ describe("SteepestDescent Library - Accuracy & Gas Summary Benchmarks", function
     let TOL_1E_9: string;
 
     before(async () => {
-        const MathLibFactory = await ethers.getContractFactory("MathLib");
+        const MathLibFactory = await ethers.getContractFactory(
+            "contracts/libraries/MathLib.sol:MathLib"
+        );
         const mathlib = await MathLibFactory.deploy();
         await mathlib.waitForDeployment();
 

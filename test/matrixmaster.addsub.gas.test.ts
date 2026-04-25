@@ -350,7 +350,9 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Add/Sub)", function () {
     let t = 0;
 
     before(async function () {
-        const MathLibFactory = await ethers.getContractFactory("MathLib");
+        const MathLibFactory = await ethers.getContractFactory(
+            "contracts/libraries/MathLib.sol:MathLib"
+        );
         const mathlib = await MathLibFactory.deploy();
         await mathlib.waitForDeployment();
 

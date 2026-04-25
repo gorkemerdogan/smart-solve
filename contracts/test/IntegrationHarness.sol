@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Trigonometry} from "../libraries/Trigonometry/Trigonometry.sol";
+import {Trigonometry} from "@gorkemerdogan/trigonometry-master/contracts/libraries/Trigonometry.sol";
 import {QuadConstants as QC} from "../libraries/QuadConstants.sol";
 import {MathLib} from "../libraries/MathLib.sol";
 import {Integration} from "../libraries/numeric/Integration.sol";

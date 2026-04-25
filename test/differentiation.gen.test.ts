@@ -86,7 +86,9 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
     const allResults: TestResult[] = [];
 
     before(async function () {
-        const MathLibFactory = await ethers.getContractFactory("MathLib");
+        const MathLibFactory = await ethers.getContractFactory(
+            "contracts/libraries/MathLib.sol:MathLib"
+        );
         mathLib = await MathLibFactory.deploy();
         await mathLib.waitForDeployment();
 

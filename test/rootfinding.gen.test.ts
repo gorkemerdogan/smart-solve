@@ -268,7 +268,9 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
     }
 
     before(async () => {
-        const MathLibFactory = await ethers.getContractFactory("MathLib");
+        const MathLibFactory = await ethers.getContractFactory(
+            "contracts/libraries/MathLib.sol:MathLib"
+        );
         const mathlib = await MathLibFactory.deploy();
         await mathlib.waitForDeployment();
 

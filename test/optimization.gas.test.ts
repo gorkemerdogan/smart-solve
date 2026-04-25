@@ -43,7 +43,9 @@ async function newHarnesses(): Promise<{
     spherical: ObjectiveHarness;
     semiWeighted: ObjectiveHarness;
 }> {
-    const MathLibFactory = await ethers.getContractFactory("MathLib");
+    const MathLibFactory = await ethers.getContractFactory(
+        "contracts/libraries/MathLib.sol:MathLib"
+    );
     const math = await MathLibFactory.deploy();
     await math.waitForDeployment();
     const mathAddr = await math.getAddress();

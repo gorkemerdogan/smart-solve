@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 
@@ -446,12 +447,26 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     // Deploy
     // ------------------------------------------------------------
     before(async function () {
-        const MathLibFactory = await ethers.getContractFactory("MathLib");
-        const mathlib = await MathLibFactory.deploy();
-        await mathlib.waitForDeployment();
+        const LocalMathLibFactory = await ethers.getContractFactory(
+            "contracts/libraries/MathLib.sol:MathLib"
+        );
+
+        const localMathLib = await LocalMathLibFactory.deploy();
+        await localMathLib.waitForDeployment();
+
+        const TrigMathLibFactory = await ethers.getContractFactory(
+            "@gorkemerdogan/trigonometry-master/contracts/libraries/MathLib.sol:MathLib"
+        );
+
+        const trigMathLib = await TrigMathLibFactory.deploy();
+        await trigMathLib.waitForDeployment();
 
         const HarnessFactory = await ethers.getContractFactory("IntegrationHarness", {
-            libraries: { MathLib: await mathlib.getAddress() },
+            libraries: {
+                "contracts/libraries/MathLib.sol:MathLib": await localMathLib.getAddress(),
+                "@gorkemerdogan/trigonometry-master/contracts/libraries/MathLib.sol:MathLib":
+                    await trigMathLib.getAddress(),
+            },
         });
 
         harness = (await HarnessFactory.deploy()) as unknown as IntegrationHarness;

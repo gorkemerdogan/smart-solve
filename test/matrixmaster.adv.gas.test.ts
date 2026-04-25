@@ -450,7 +450,9 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
     let powerSeed: string;
 
     before(async function () {
-        const MathLibFactory = await ethers.getContractFactory("MathLib");
+        const MathLibFactory = await ethers.getContractFactory(
+            "contracts/libraries/MathLib.sol:MathLib"
+        );
         const mathlib = await MathLibFactory.deploy();
         await mathlib.waitForDeployment();
 
