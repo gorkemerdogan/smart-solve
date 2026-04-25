@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
-import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 
 describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
-    this.timeout(0); // - minutes
+    this.timeout(0); // Infinity minutes
 
     // ------------------------------------------------------------
     // Types
@@ -367,7 +366,6 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     // ------------------------------------------------------------
     // Benchmark sets
     // ------------------------------------------------------------
-
     const COMMON_INTERVALS: IntervalSpec[] = [
         { label: "[0,1]", a: 0, b: 1 },
         { label: "[0,5]", a: 0, b: 5 },
@@ -447,7 +445,6 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     // ------------------------------------------------------------
     // Deploy
     // ------------------------------------------------------------
-
     before(async function () {
         const MathLibFactory = await ethers.getContractFactory("MathLib");
         const mathlib = await MathLibFactory.deploy();
@@ -486,7 +483,6 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     // ------------------------------------------------------------
     // Main suite
     // ------------------------------------------------------------
-
     it("should execute the full deterministic accuracy and gas benchmark suite", async function () {
         const records: TestRecord[] = [];
         const [signer] = await ethers.getSigners();

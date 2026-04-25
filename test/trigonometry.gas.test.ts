@@ -333,8 +333,8 @@ describe("Trigonometry - Gas Growth Tests", function () {
     });
 
     // ------------------------------------------------------------
-// Section 3: Gas Consumption over Full Domain (1° resolution, repeated)
-// ------------------------------------------------------------
+    // Section 3: Gas Consumption over Full Domain (1 degree resolution, repeated)
+    // ------------------------------------------------------------
 
     describe("Section 3: Gas Consumption over Full Domain", function () {
         let testNo = 0;

@@ -38,7 +38,7 @@ const T = 30;
 const FIXED_SEED = 37n;
 const DEGREES = [2, 4, 8, 16];
 
-// SCALE = 1e12 in harness, so 1_000_000 means 1e-6 tolerance
+// SCALE = 1e12 in harness -> 1e-6 tolerance
 const SCALAR_TOL = 1_000_000n;
 const VECTOR_TOL = 1_000_000n;
 

@@ -13,7 +13,7 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
 
     /**
      * Common reporting tolerance for all differentiation test cases.
-     * Since SCALE = 1e12, this corresponds to 1e-4 in decimal terms.
+     * SCALE = 1e12 -> 1e-4 in decimal terms.
      */
     const TOLERANCE_SCALED = 100000000n; // 1e8 / 1e12 = 1e-4
 
@@ -82,7 +82,6 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
 
     /**
      * Shared in-memory result store.
-     * Each of the 324 test cases pushes one entry here.
      */
     const allResults: TestResult[] = [];
 
@@ -312,7 +311,6 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
     });
 
     /**
-     * 324 individual test cases:
      * 3 functions × 3 methods × 6 input points × 6 step sizes
      */
     for (const fnObj of functions) {
@@ -322,7 +320,6 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
                     for (const h of hValues) {
                         it(`${method.name} | ${fnObj.displayName} | x=${x} | h=${h.num}/${h.den}`, async function () {
                             const selector = harness.interface.getFunction(fnObj.name)!.selector;
-
                             await runCase({
                                 methodName: method.name,
                                 methodFn: method.fn,

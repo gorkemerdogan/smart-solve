@@ -469,8 +469,6 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                     expectedHex = "OUT_OF_RANGE";
                 }
 
-                //const expectedHex = await harness.fromFloat(expectedScaled);
-
                 for (const method of METHODS) {
                     overallAttempts += 1;
 

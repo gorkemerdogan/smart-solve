@@ -485,7 +485,7 @@ function makePivotStressDenseMatrixScaled(n: number, tag: string): bigint[][] {
         A.push(row);
     }
 
-    // Make first column heavier to stress elimination / pivoting behavior
+    // Make first column heavier to stress pivoting behavior
     for (let i = 1; i < n; i++) {
         A[i][0] += boundedScaled(`${tag}:col0:${i}`, 3, 7);
     }
@@ -585,12 +585,6 @@ function makeNearDependentRectMatrixScaled(m: number, n: number, tag: string): b
         })
     );
 }
-
-type NamedSanityCase = {
-    caseName: string;
-    n: number;
-    makeMatrix: (tag: string, n: number) => bigint[][];
-};
 
 // ------------------------------------------------------------
 // Reporting Helpers
@@ -1153,7 +1147,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
 
             printTestExplanation({ method, testExplanation });
 
-            // GDLS should use its own safer settings.
+            // GDLS settings.
             const GD_MAX_ITER = 50n;
             const alpha = await qFrac(1, 50);
             const gdTol = await qFrac(1, 1_000_000_000_000); // 1e-12
@@ -1769,7 +1763,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                 const bdata_ls = await qVecFromScaledInts(harness, b_ls);
                 const x0data_ls = await qVecFromScaledInts(harness, x0_ls);
 
-                // Step size must be chosen conservatively.
+                // Step size choice
                 const alpha = await qFrac(1, 20);
                 const tol = TOL_1E_30;
 

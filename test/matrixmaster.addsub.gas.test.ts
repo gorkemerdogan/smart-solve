@@ -42,7 +42,7 @@ const SCALE = 10n ** SCALE_DECIMALS;
 const Q_SCALE_DECIMALS = 18n;
 const Q_SCALE = 10n ** Q_SCALE_DECIMALS;
 
-// Conversion from 1e18-scale expected values to 1e12-scale display/compare values
+// Conversion from 1e18-scale expected values to 1e12-scale comparison values
 const COMPARE_DOWN_SCALE = 10n ** (Q_SCALE_DECIMALS - SCALE_DECIMALS); // 1e6
 
 // Relative error display scale
@@ -240,7 +240,6 @@ function makeRandomMatrixByPattern(
                 continue;
             }
 
-            // dense
             A[p] = makeNonZeroSignedScaledValue(seed, caseId, tag, i, j, `${key}-dense`);
         }
     }
@@ -292,7 +291,6 @@ function computeErrorStats(actual: bigint[], expected: bigint[]) {
     const avgRelErrorScaled =
         relCount > 0n ? sumRelErrorScaled / relCount : 0n;
 
-    // For add/sub, residual is effectively the error matrix.
     // Reporting a single scalar as infinity-norm style residual.
     const residual = maxAbsError;
 

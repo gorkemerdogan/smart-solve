@@ -240,7 +240,7 @@ function printCaseResult(args: {
 // ------------------------------------------------------------
 
 describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function () {
-    this.timeout(0); // - minutes
+    this.timeout(0); // Infinity minutes
     let harness: RootFindingHarness;
     let target: string;
 
