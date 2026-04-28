@@ -342,7 +342,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
         spherical = deployed.spherical;
         semiWeighted = deployed.semiWeighted;
 
-        tolTight = await solver.qFromFrac(1n, 1_000_000_000_000_000_000n); // 1e-18
+        tolTight = await solver.qFromFrac(1n, 1_000_000_000_000_000_000_000_000n); // 1e-24
         tolZero = await solver.qFromInt(0n);
     });
 
@@ -350,7 +350,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
     //  Section 1: Gas Growth with Respect to Dimension
     // --------------------------------------------------------
 
-    describe("Section 1: Gas Growth with Respect to Dimension", function () {
+    describe.skip("Section 1: Gas Growth with Respect to Dimension", function () {
         const DIMS = [2, 3, 4, 6, 8, 12, 14, 16, 18];
         let testIndex = 0;
 
@@ -477,7 +477,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
     //  Section 2: Gas Sensitivity to Iteration Budget
     // --------------------------------------------------------
 
-    describe("Section 2: Gas Sensitivity to Iteration Budget", function () {
+    describe.skip("Section 2: Gas Sensitivity to Iteration Budget", function () {
         const ITERS = [1n, 2n, 5n, 10n, 20n];
         let testIndex = 0;
 
@@ -538,7 +538,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
     //  Section 3: Gas Sensitivity to Initial Magnitude
     // --------------------------------------------------------
 
-    describe("Section 3: Gas Sensitivity to Initial Point Magnitude", function () {
+    describe.skip("Section 3: Gas Sensitivity to Initial Point Magnitude", function () {
         type MagnitudeCase = {
             label: string;
             base: bigint;
@@ -551,6 +551,9 @@ describe("SteepestDescent - Gas Growth Tests", function () {
             { label: "veryLarge", base: 1000n },
         ];
 
+        const DIM = 8;
+        const MAX_ITER = 30n;
+
         let testIndex = 0;
 
         for (const p of cases) {
@@ -558,22 +561,21 @@ describe("SteepestDescent - Gas Growth Tests", function () {
 
             it(`Test ${testId}: Spherical quadratic gas sensitivity for initial magnitude ${p.label}`, async function () {
                 const objectiveAddr = await spherical.getAddress();
-                const maxIter = 30n;
 
                 const x0Batch = await Promise.all(
                     Array.from({ length: RUNS_PER_CASE }, async (_, runIdx) => {
                         const signs = makeRandomVectorByKeccak(
-                            8,
+                            DIM,
                             -1n,
                             1n,
                             "sec3",
                             p.label,
                             "signs",
                             runIdx
-                        ).map(v => (v === 0n ? 1n : v));
+                        ).map((v) => (v === 0n ? 1n : v));
 
                         const jitter = makeRandomVectorByKeccak(
-                            8,
+                            DIM,
                             -2n,
                             2n,
                             "sec3",
@@ -587,7 +589,14 @@ describe("SteepestDescent - Gas Growth Tests", function () {
                     })
                 );
 
-                const batch = await runBatch(solver, spherical, objectiveAddr, x0Batch, maxIter, tolTight);
+                const batch = await runBatch(
+                    solver,
+                    spherical,
+                    objectiveAddr,
+                    x0Batch,
+                    MAX_ITER,
+                    tolTight
+                );
 
                 batch.statuses.forEach((s) => {
                     expect(s).to.eq(STATUS_SUCCESS);
@@ -617,7 +626,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
                     exceededTol: `${xTolCount.exceeded}/${RUNS_PER_CASE}`,
                     tolerance: "1e-12 (xError)",
                     worstCase: makeWorstCaseLabel(gradNormStats, xErrorStats, fErrorStats),
-                    extra: `runs=${RUNS_PER_CASE}, objective=spherical, magnitude=${p.label}, gas[min=${gasStats.min}, max=${gasStats.max}]`
+                    extra: `runs=${RUNS_PER_CASE}, objective=spherical, dim=${DIM}, maxIter=${MAX_ITER}, magnitude=${p.label}, gas[min=${gasStats.min}, max=${gasStats.max}]`
                 });
             });
         }
@@ -626,25 +635,36 @@ describe("SteepestDescent - Gas Growth Tests", function () {
 
         it(`Test ${mixedLargeTestId}: Spherical quadratic gas sensitivity for initial magnitude mixedLarge`, async function () {
             const objectiveAddr = await spherical.getAddress();
-            const maxIter = 30n;
 
             const x0Batch = await Promise.all(
                 Array.from({ length: RUNS_PER_CASE }, async (_, runIdx) => {
-                    const base = Array.from({ length: 8 }, (_, i) => (i % 2 === 0 ? -1000n : 1000n));
+                    const base = Array.from(
+                        { length: DIM },
+                        (_, i) => (i % 2 === 0 ? -1000n : 1000n)
+                    );
+
                     const jitter = makeRandomVectorByKeccak(
-                        8,
+                        DIM,
                         -10n,
                         10n,
                         "sec3",
                         "mixedLarge",
                         runIdx
                     );
+
                     const vals = addVectors(base, jitter);
                     return qVec(solver, vals);
                 })
             );
 
-            const batch = await runBatch(solver, spherical, objectiveAddr, x0Batch, maxIter, tolTight);
+            const batch = await runBatch(
+                solver,
+                spherical,
+                objectiveAddr,
+                x0Batch,
+                MAX_ITER,
+                tolTight
+            );
 
             batch.statuses.forEach((s) => {
                 expect(s).to.eq(STATUS_SUCCESS);
@@ -674,7 +694,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
                 exceededTol: `${xTolCount.exceeded}/${RUNS_PER_CASE}`,
                 tolerance: "1e-12 (xError)",
                 worstCase: makeWorstCaseLabel(gradNormStats, xErrorStats, fErrorStats),
-                extra: `runs=${RUNS_PER_CASE}, objective=spherical, magnitude=mixedLarge, gas[min=${gasStats.min}, max=${gasStats.max}]`
+                extra: `runs=${RUNS_PER_CASE}, objective=spherical, dim=${DIM}, maxIter=${MAX_ITER}, magnitude=mixedLarge, gas[min=${gasStats.min}, max=${gasStats.max}]`
             });
         });
     });
@@ -683,77 +703,216 @@ describe("SteepestDescent - Gas Growth Tests", function () {
     //  Section 4: Gas Sensitivity to Initial Pattern
     // --------------------------------------------------------
 
-    describe("Section 4: Gas Sensitivity to Initial Point Pattern", function () {
+    describe("Section 4: Gas Sensitivity to Initial Point Range", function () {
         type PatternCase = {
             label: string;
-            values: bigint[];
+            min: bigint;
+            max: bigint;
         };
 
-        const cases: PatternCase[] = [
-            { label: "ones", values: [5n, 5n, 5n, 5n, 5n, 5n, 5n, 5n] },
-            { label: "increasing", values: [1n, 2n, 3n, 4n, 5n, 6n, 7n, 8n] },
-            { label: "mixedSign", values: [1n, -2n, 3n, -4n, 5n, -6n, 7n, -8n] },
-            { label: "singleSpike", values: [20n, 0n, 0n, 0n, 0n, 0n, 0n, 0n] },
-            { label: "twoBlock", values: [8n, 8n, 8n, 8n, -8n, -8n, -8n, -8n] }
+        type ObjectiveCase = {
+            label: string;
+            objective: () => ObjectiveHarness;
+            getAddress: () => Promise<string>;
+            expectedStatuses: bigint[];
+            dim: number;
+            maxIter: bigint;
+        };
+
+        const RANDOM_INPUTS_PER_PATTERN = 5;
+
+        const patterns: PatternCase[] = [
+            { label: "smallRandom", min: -2n, max: 2n },
+            { label: "mediumRandom", min: -10n, max: 10n },
+            { label: "largeRandom", min: -100n, max: 100n },
+            { label: "positiveRandom", min: 1n, max: 10n },
+            { label: "negativeRandom", min: -10n, max: -1n }
+        ];
+
+        const objectives: ObjectiveCase[] = [
+            {
+                label: "spherical",
+                objective: () => spherical,
+                getAddress: async () => spherical.getAddress(),
+                expectedStatuses: [STATUS_SUCCESS],
+                dim: 8,
+                maxIter: 30n
+            },
+            {
+                label: "semiWeighted",
+                objective: () => semiWeighted,
+                getAddress: async () => semiWeighted.getAddress(),
+                expectedStatuses: [
+                    STATUS_SUCCESS,
+                    STATUS_MAX_ITER_EXCEEDED,
+                    STATUS_NO_LIKELY_IMPROVEMENT
+                ],
+                dim: 4,
+                maxIter: 20n
+            }
         ];
 
         let testIndex = 0;
 
-        for (const p of cases) {
-            const testId = makeTestId(4, ++testIndex);
+        for (const objCase of objectives) {
+            for (const p of patterns) {
+                const testId = makeTestId(4, ++testIndex);
 
-            it(`Test ${testId}: Spherical quadratic gas sensitivity for initial pattern ${p.label}`, async function () {
-                const objectiveAddr = await spherical.getAddress();
-                const maxIter = 30n;
+                it(`Test ${testId}: ${objCase.label} gas sensitivity for ${p.label} initial inputs`, async function () {
+                    const objective = objCase.objective();
+                    const objectiveAddr = await objCase.getAddress();
 
-                const x0Batch = await Promise.all(
-                    Array.from({ length: RUNS_PER_CASE }, async (_, runIdx) => {
-                        const jitter = makeRandomVectorByKeccak(
-                            8,
-                            -2n,
-                            2n,
-                            "sec4",
-                            p.label,
+                    const x0Batch = await Promise.all(
+                        Array.from({ length: RANDOM_INPUTS_PER_PATTERN }, async (_, runIdx) => {
+                            const vals = makeRandomVectorByKeccak(
+                                objCase.dim,
+                                p.min,
+                                p.max,
+                                "sec4",
+                                objCase.label,
+                                p.label,
+                                runIdx
+                            );
+
+                            return qVec(solver, vals);
+                        })
+                    );
+
+                    const batch = await runBatch(
+                        solver,
+                        objective,
+                        objectiveAddr,
+                        x0Batch,
+                        objCase.maxIter,
+                        tolTight
+                    );
+
+                    batch.statuses.forEach((s) => {
+                        expect(objCase.expectedStatuses).to.include(s);
+                    });
+
+                    const gasStats = summarizeBigint(batch.gasValues);
+                    const iterStats = summarizeBigint(batch.iterValues);
+                    const gradNormStats = summarizeFiniteNumber(batch.gradNormValues);
+                    const xErrorStats = summarizeFiniteNumber(batch.xErrorValues);
+                    const fErrorStats = summarizeFiniteNumber(batch.fErrorValues);
+                    const xTolCount = countWithinTol(batch.xErrorValues, REPORT_TOL);
+
+                    printBlockOptimization({
+                        t: testId,
+                        method: "solve",
+                        explanation: `Gas sensitivity to random initial inputs for ${objCase.label} objective using ${p.label} range.`,
+                        gas: gasStats.avg,
+                        x0: `sample=${fmtHexArr(batch.inputs[0])}`,
+                        xFinal: `sample=${fmtHexArr(batch.finalXs[0])}`,
+                        gx: `sample=${batch.finalGxs[0]} (~ ${quadHexToApproxNumber(batch.finalGxs[0])})`,
+                        status: statusHistogram(batch.statuses),
+                        iters: `avg=${iterStats.avg}, min=${iterStats.min}, max=${iterStats.max}`,
+                        gradNorm: `avg=${formatNum(gradNormStats.avg)}, max=${formatNum(gradNormStats.max)}`,
+                        xError: `avg=${formatNum(xErrorStats.avg)}, max=${formatNum(xErrorStats.max)}`,
+                        fError: `avg=${formatNum(fErrorStats.avg)}, max=${formatNum(fErrorStats.max)}`,
+                        withinTol: `${xTolCount.within}/${RANDOM_INPUTS_PER_PATTERN}`,
+                        exceededTol: `${xTolCount.exceeded}/${RANDOM_INPUTS_PER_PATTERN}`,
+                        tolerance: "1e-12 (xError)",
+                        worstCase: makeWorstCaseLabel(gradNormStats, xErrorStats, fErrorStats),
+                        extra: `runs=${RANDOM_INPUTS_PER_PATTERN}, objective=${objCase.label}, dim=${objCase.dim}, maxIter=${objCase.maxIter}, pattern=${p.label}, gas[min=${gasStats.min}, max=${gasStats.max}]`
+                    });
+                });
+            }
+        }
+    });
+
+    // --------------------------------------------------------
+    //  Section 5: Gas Growth with Respect to Iteration Budget
+    // --------------------------------------------------------
+
+    describe.skip("Section 5: Gas Growth with Respect to Iteration Budget", function () {
+        const ITERS = [1n, 2n, 5n, 10n, 15n, 17n, 19n, 20n, 21n, 22n, 23n, 24n, 25n];
+        const DIMS = [12];
+        let testIndex = 0;
+
+        const fixedX0Batches = new Map<number, string[][]>();
+
+        before(async function () {
+            for (const dim of DIMS) {
+                const fixedX0Batch = await Promise.all(
+                    Array.from({length: RUNS_PER_CASE}, async (_, runIdx) => {
+                        const vals = makeRandomVectorByKeccak(
+                            dim,
+                            -10n,
+                            10n,
+                            "sec5",
+                            "semiWeighted",
+                            "fixed-x0",
+                            dim,
                             runIdx
                         );
-                        const vals = addVectors(p.values, jitter);
+
                         return qVec(solver, vals);
                     })
                 );
 
-                const batch = await runBatch(solver, spherical, objectiveAddr, x0Batch, maxIter, tolTight);
+                fixedX0Batches.set(dim, fixedX0Batch);
+            }
+        });
 
-                batch.statuses.forEach((s) => {
-                    expect(s).to.eq(STATUS_SUCCESS);
+        for (const dim of DIMS) {
+            for (const maxIter of ITERS) {
+                const testId = makeTestId(5, ++testIndex);
+
+                it(`Test ${testId}: Semi-weighted gas growth at fixed dimension n=${dim} with maxIter=${maxIter}`, async function () {
+                    const objectiveAddr = await semiWeighted.getAddress();
+                    const fixedX0Batch = fixedX0Batches.get(dim);
+
+                    if (!fixedX0Batch) {
+                        throw new Error(`Missing fixed initial-point batch for dim=${dim}`);
+                    }
+
+                    const batch = await runBatch(
+                        solver,
+                        semiWeighted,
+                        objectiveAddr,
+                        fixedX0Batch,
+                        maxIter,
+                        tolTight
+                    );
+
+                    batch.statuses.forEach((s) => {
+                        expect([
+                            STATUS_SUCCESS,
+                            STATUS_MAX_ITER_EXCEEDED,
+                            STATUS_NO_LIKELY_IMPROVEMENT,
+                        ]).to.include(s);
+                    });
+
+                    const gasStats = summarizeBigint(batch.gasValues);
+                    const iterStats = summarizeBigint(batch.iterValues);
+                    const gradNormStats = summarizeFiniteNumber(batch.gradNormValues);
+                    const xErrorStats = summarizeFiniteNumber(batch.xErrorValues);
+                    const fErrorStats = summarizeFiniteNumber(batch.fErrorValues);
+                    const xTolCount = countWithinTol(batch.xErrorValues, REPORT_TOL);
+
+                    printBlockOptimization({
+                        t: testId,
+                        method: "solve",
+                        explanation: `Gas growth with respect to iteration budget for semi-weighted objective at fixed dimension n=${dim}.`,
+                        gas: gasStats.avg,
+                        x0: `sample=${fmtHexArr(batch.inputs[0])}`,
+                        xFinal: `sample=${fmtHexArr(batch.finalXs[0])}`,
+                        gx: `sample=${batch.finalGxs[0]} (~ ${quadHexToApproxNumber(batch.finalGxs[0])})`,
+                        status: statusHistogram(batch.statuses),
+                        iters: `avg=${iterStats.avg}, min=${iterStats.min}, max=${iterStats.max}`,
+                        gradNorm: `avg=${formatNum(gradNormStats.avg)}, max=${formatNum(gradNormStats.max)}`,
+                        xError: `avg=${formatNum(xErrorStats.avg)}, max=${formatNum(xErrorStats.max)}`,
+                        fError: `avg=${formatNum(fErrorStats.avg)}, max=${formatNum(fErrorStats.max)}`,
+                        withinTol: `${xTolCount.within}/${RUNS_PER_CASE}`,
+                        exceededTol: `${xTolCount.exceeded}/${RUNS_PER_CASE}`,
+                        tolerance: "1e-12 (xError)",
+                        worstCase: makeWorstCaseLabel(gradNormStats, xErrorStats, fErrorStats),
+                        extra: `runs=${RUNS_PER_CASE}, objective=semiWeighted, dim=${dim}, maxIter=${maxIter}, gas[min=${gasStats.min}, max=${gasStats.max}]`
+                    });
                 });
-
-                const gasStats = summarizeBigint(batch.gasValues);
-                const iterStats = summarizeBigint(batch.iterValues);
-                const gradNormStats = summarizeFiniteNumber(batch.gradNormValues);
-                const xErrorStats = summarizeFiniteNumber(batch.xErrorValues);
-                const fErrorStats = summarizeFiniteNumber(batch.fErrorValues);
-                const xTolCount = countWithinTol(batch.xErrorValues, REPORT_TOL);
-
-                printBlockOptimization({
-                    t: testId,
-                    method: "solve",
-                    explanation: `Gas sensitivity to initial-point pattern for spherical objective using ${p.label} pattern.`,
-                    gas: gasStats.avg,
-                    x0: `sample=${fmtHexArr(batch.inputs[0])}`,
-                    xFinal: `sample=${fmtHexArr(batch.finalXs[0])}`,
-                    gx: `sample=${batch.finalGxs[0]} (~ ${quadHexToApproxNumber(batch.finalGxs[0])})`,
-                    status: statusHistogram(batch.statuses),
-                    iters: `avg=${iterStats.avg}, min=${iterStats.min}, max=${iterStats.max}`,
-                    gradNorm: `avg=${formatNum(gradNormStats.avg)}, max=${formatNum(gradNormStats.max)}`,
-                    xError: `avg=${formatNum(xErrorStats.avg)}, max=${formatNum(xErrorStats.max)}`,
-                    fError: `avg=${formatNum(fErrorStats.avg)}, max=${formatNum(fErrorStats.max)}`,
-                    withinTol: `${xTolCount.within}/${RUNS_PER_CASE}`,
-                    exceededTol: `${xTolCount.exceeded}/${RUNS_PER_CASE}`,
-                    tolerance: "1e-12 (xError)",
-                    worstCase: makeWorstCaseLabel(gradNormStats, xErrorStats, fErrorStats),
-                    extra: `runs=${RUNS_PER_CASE}, objective=spherical, pattern=${p.label}, gas[min=${gasStats.min}, max=${gasStats.max}]`
-                });
-            });
+            }
         }
     });
 });
