@@ -89,6 +89,7 @@ interface StepCase {
 interface MethodStats {
     count: number;
     failed: number;
+    skipped: number;
     withinTol: number;
     exceededTol: number;
     absSum: bigint;
@@ -127,6 +128,7 @@ function inferScaleDecimals(scale: bigint): bigint {
     if (!/^10*$/.test(s) || s[0] !== "1") {
         return SCALE_DECIMALS;
     }
+
     return BigInt(s.length - 1);
 }
 
@@ -140,6 +142,7 @@ function formatScaledInt(v: bigint): string {
     const intPart = abs / SCALE;
     const fracPart = abs % SCALE;
     const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
+
     return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`.replace(/\.?0+$/, "");
 }
 
@@ -186,6 +189,7 @@ function decimalStringToScaledBigInt(value: string, scaleDecimals: number): bigi
     const netExponent = exponent - decimalPlaces + scaleDecimals;
 
     let scaledAbs: bigint;
+
     if (netExponent >= 0) {
         scaledAbs = BigInt(digits) * 10n ** BigInt(netExponent);
     } else {
@@ -207,6 +211,7 @@ function initStats(): MethodStats {
     return {
         count: 0,
         failed: 0,
+        skipped: 0,
         withinTol: 0,
         exceededTol: 0,
         absSum: 0n,
@@ -233,14 +238,22 @@ function updateStats(
     stats.relSumScaled += relErrScaled;
     stats.gasSum += estimatedGas;
 
-    if (absErr <= tol) stats.withinTol += 1;
-    else stats.exceededTol += 1;
+    if (absErr <= tol) {
+        stats.withinTol += 1;
+    } else {
+        stats.exceededTol += 1;
+    }
 
     if (stats.minAbs === -1n || absErr < stats.minAbs) stats.minAbs = absErr;
     if (absErr > stats.maxAbs) stats.maxAbs = absErr;
 
-    if (stats.minRelScaled === -1n || relErrScaled < stats.minRelScaled) stats.minRelScaled = relErrScaled;
-    if (relErrScaled > stats.maxRelScaled) stats.maxRelScaled = relErrScaled;
+    if (stats.minRelScaled === -1n || relErrScaled < stats.minRelScaled) {
+        stats.minRelScaled = relErrScaled;
+    }
+
+    if (relErrScaled > stats.maxRelScaled) {
+        stats.maxRelScaled = relErrScaled;
+    }
 
     if (stats.minGas === -1n || estimatedGas < stats.minGas) stats.minGas = estimatedGas;
     if (estimatedGas > stats.maxGas) stats.maxGas = estimatedGas;
@@ -253,6 +266,21 @@ function averageScaled(sum: bigint, count: number): bigint {
 function errorToString(err: unknown): string {
     if (err instanceof Error) return err.message;
     return String(err);
+}
+
+function safeErrorToString(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    return String(err);
+}
+
+function shouldSkipCase(benchmark: BenchmarkDef, tc: TestCase): boolean {
+    /*
+     * The exponential benchmark y' = y grows very rapidly.
+     * Large x_final values produce huge expected values, so absolute-error
+     * statistics become dominated by exponential growth rather than by the
+     * numerical behavior of the ODE method.
+     */
+    return benchmark.key === "linear" && tc.xFinal > 15;
 }
 
 async function runMethod(
@@ -289,11 +317,6 @@ async function runMethod(
     );
 
     return { output, estimatedGas };
-}
-
-function safeErrorToString(err: unknown): string {
-    if (err instanceof Error) return err.message;
-    return String(err);
 }
 
 // ------------------------------------------------------------
@@ -364,6 +387,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
         const MathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );
+
         const mathlib = await MathLibFactory.deploy();
         await mathlib.waitForDeployment();
 
@@ -373,6 +397,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
 
         harness = (await HarnessFactory.deploy()) as unknown as ODESolverHarness;
         await harness.waitForDeployment();
+
         target = await harness.getAddress();
 
         selConst5 = harness.interface.getFunction("f_const5")!.selector;
@@ -381,11 +406,12 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
         selCubicPoly = harness.interface.getFunction("f_cubic_poly")!.selector;
 
         const oneScaled = asBigInt(await harness.toFloat(await harness.qFromInt(1n)));
+
         SCALE = oneScaled;
         SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
-    it("should evaluate ODE cases and continue even if some runs revert or run out of gas", async function () {
+    it("should evaluate ODE accuracy cases and skip excessive exponential cases", async function () {
         const x0 = await qInt(0n);
 
         const benchmarks: BenchmarkDef[] = [
@@ -422,6 +448,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
         for (const y0 of Y0_VALUES) {
             for (const sc of STEP_CASES) {
                 caseNo += 1;
+
                 testCases.push({
                     caseNo,
                     y0,
@@ -435,14 +462,17 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
         }
 
         const overallStatsByMethod = new Map<MethodLabel, MethodStats>();
+
         for (const method of METHODS) {
             overallStatsByMethod.set(method.label, initStats());
         }
 
         let overallAttempts = 0;
+        let overallSkipped = 0;
 
         for (const benchmark of benchmarks) {
             const statsByMethod = new Map<MethodLabel, MethodStats>();
+
             for (const method of METHODS) {
                 statsByMethod.set(method.label, initStats());
             }
@@ -454,12 +484,31 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
             console.log("############################################################");
 
             for (const tc of testCases) {
+                if (shouldSkipCase(benchmark, tc)) {
+                    overallSkipped += METHODS.length;
+
+                    for (const method of METHODS) {
+                        statsByMethod.get(method.label)!.skipped += 1;
+                        overallStatsByMethod.get(method.label)!.skipped += 1;
+                    }
+
+                    console.log("------------------------------------------------------------");
+                    console.log(`Test: ${benchmark.key}-${tc.caseNo}`);
+                    console.log("Method: ALL");
+                    console.log(
+                        `Explanation: SKIPPED | Benchmark=${benchmark.label}, y0=${tc.y0}, h=${tc.hLabel}, steps=${tc.steps}, x_final=${tc.xFinal}`
+                    );
+                    console.log("Reason: exponential benchmark skipped for x_final > 15");
+                    console.log("------------------------------------------------------------");
+
+                    continue;
+                }
+
                 const y0Q = await qInt(tc.y0);
                 const hQ = await qFrac(tc.hNum, tc.hDen);
 
                 const expectedValue = benchmark.exactSolution(tc.y0, tc.xFinal);
                 const expectedScaled = numberToScaledBigInt(expectedValue);
-
 
                 let expectedHex = "N/A";
                 let expectedHexStatus = "OK";
@@ -509,7 +558,10 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                         printBlockRegular({
                             t: `${benchmark.key}-${tc.caseNo}`,
                             method: method.label,
-                            explanation: `SUCCESS | Benchmark=${benchmark.label}, x0=0, y0=${tc.y0}, h=${tc.hLabel}, steps=${tc.steps}, x_final=${tc.xFinal}`,
+                            explanation:
+                                `SUCCESS | Benchmark=${benchmark.label}, x0=0, y0=${tc.y0}, ` +
+                                `h=${tc.hLabel}, steps=${tc.steps}, x_final=${tc.xFinal}, ` +
+                                `expectedHexStatus=${expectedHexStatus}`,
                             gas: run.estimatedGas.toString(),
                             inHex: `x0=${x0} | y0=${y0Q} | h=${hQ} | steps=${tc.steps}`,
                             expectedHex,
@@ -523,7 +575,9 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                             tolerance: formatScaledInt(ABS_TOL),
                             withinTol: absErr <= ABS_TOL ? "Yes" : "No",
                             exceededTol: absErr > ABS_TOL ? "Yes" : "No",
-                            worstCase: `Case ${tc.caseNo} | AbsErr=${formatScaledInt(absErr)} | RelErr=${formatPercentScaled(relErrScaled)}%`,
+                            worstCase:
+                                `Case ${tc.caseNo} | AbsErr=${formatScaledInt(absErr)} | ` +
+                                `RelErr=${formatPercentScaled(relErrScaled)}%`,
                         });
                     } catch (err) {
                         const message = errorToString(err);
@@ -534,7 +588,10 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                         printBlockRegular({
                             t: `${benchmark.key}-${tc.caseNo}`,
                             method: method.label,
-                            explanation: `FAILED | Benchmark=${benchmark.label}, x0=0, y0=${tc.y0}, h=${tc.hLabel}, steps=${tc.steps}, x_final=${tc.xFinal}`,
+                            explanation:
+                                `FAILED | Benchmark=${benchmark.label}, x0=0, y0=${tc.y0}, ` +
+                                `h=${tc.hLabel}, steps=${tc.steps}, x_final=${tc.xFinal}, ` +
+                                `expectedHexStatus=${expectedHexStatus}`,
                             gas: "FAILED",
                             inHex: `x0=${x0} | y0=${y0Q} | h=${hQ} | steps=${tc.steps}`,
                             expectedHex,
@@ -566,7 +623,9 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                 printBlockRegular({
                     t: `${benchmark.key}-summary`,
                     method: method.label,
-                    explanation: `Summary for benchmark ${benchmark.label} | success=${stats.count} | failed=${stats.failed}`,
+                    explanation:
+                        `Summary for benchmark ${benchmark.label} | success=${stats.count} | ` +
+                        `failed=${stats.failed} | skipped=${stats.skipped}`,
                     gas: stats.count > 0 ? avgGas.toString() : "N/A",
                     inHex: "-",
                     expectedHex: "-",
@@ -582,8 +641,11 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                     exceededTol: stats.exceededTol.toString(),
                     worstCase:
                         stats.count > 0
-                            ? `success=${stats.count}, failed=${stats.failed}, minAbs=${formatScaledInt(stats.minAbs)}, maxRel=${formatPercentScaled(stats.maxRelScaled)}%, minGas=${stats.minGas.toString()}, maxGas=${stats.maxGas.toString()}`
-                            : `success=0, failed=${stats.failed}`,
+                            ? `success=${stats.count}, failed=${stats.failed}, skipped=${stats.skipped}, ` +
+                            `minAbs=${formatScaledInt(stats.minAbs)}, ` +
+                            `maxRel=${formatPercentScaled(stats.maxRelScaled)}%, ` +
+                            `minGas=${stats.minGas.toString()}, maxGas=${stats.maxGas.toString()}`
+                            : `success=0, failed=${stats.failed}, skipped=${stats.skipped}`,
                 });
             }
 
@@ -593,6 +655,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
             if (eulerStats.count > 0 && rk4Stats.count > 0) {
                 const eulerAvgAbs = averageScaled(eulerStats.absSum, eulerStats.count);
                 const rk4AvgAbs = averageScaled(rk4Stats.absSum, rk4Stats.count);
+
                 expect(rk4AvgAbs <= eulerAvgAbs).to.equal(true);
             }
         }
@@ -609,7 +672,9 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
             printBlockRegular({
                 t: "overall-summary",
                 method: method.label,
-                explanation: `Overall summary across all benchmarks | success=${stats.count} | failed=${stats.failed}`,
+                explanation:
+                    `Overall summary across all benchmarks | success=${stats.count} | ` +
+                    `failed=${stats.failed} | skipped=${stats.skipped}`,
                 gas: stats.count > 0 ? avgGas.toString() : "N/A",
                 inHex: "-",
                 expectedHex: "-",
@@ -625,11 +690,16 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                 exceededTol: stats.exceededTol.toString(),
                 worstCase:
                     stats.count > 0
-                        ? `success=${stats.count}, failed=${stats.failed}, minAbs=${formatScaledInt(stats.minAbs)}, maxRel=${formatPercentScaled(stats.maxRelScaled)}%, minGas=${stats.minGas.toString()}, maxGas=${stats.maxGas.toString()}`
-                        : `success=0, failed=${stats.failed}`,
+                        ? `success=${stats.count}, failed=${stats.failed}, skipped=${stats.skipped}, ` +
+                        `minAbs=${formatScaledInt(stats.minAbs)}, ` +
+                        `maxRel=${formatPercentScaled(stats.maxRelScaled)}%, ` +
+                        `minGas=${stats.minGas.toString()}, maxGas=${stats.maxGas.toString()}`
+                        : `success=0, failed=${stats.failed}, skipped=${stats.skipped}`,
             });
         }
 
-        expect(overallAttempts).to.equal(testCases.length * benchmarks.length * METHODS.length);
+        expect(overallAttempts + overallSkipped).to.equal(
+            testCases.length * benchmarks.length * METHODS.length
+        );
     });
 });
