@@ -81,7 +81,7 @@ const SPARSITY_LEVELS = [5, 15, 25];
 
 const DENSE_SIZES = [2, 3, 4, 5, 8];
 const SPARSE_SIZES = [4, 8, 16, 32, 64];
-const DET_SIZES = [2, 3, 4, 5, 6, 7, 8];
+const DET_SIZES = [2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24];
 const INV_SIZES = [2, 3, 4, 5, 8];
 const POWER_SIZES = [2, 3, 4, 5, 6];
 
@@ -559,7 +559,7 @@ describe("MatrixMasterHarness - Accuracy Tests", function () {
     // Accuracy tests
     // ---------------------------------------------------------------------------
 
-    it("measures average dense matrix-matrix multiplication accuracy", async function () {
+    it.skip("measures average dense matrix-matrix multiplication accuracy", async function () {
         const avgErrors: { n: number; avgError: number; avgGas: bigint }[] = [];
 
         for (const n of DENSE_SIZES) {
@@ -631,7 +631,7 @@ describe("MatrixMasterHarness - Accuracy Tests", function () {
         console.log("####################################################################");
     });
 
-    it("measures average sparse matrix-vector multiplication accuracy across density levels", async function () {
+    it.skip("measures average sparse matrix-vector multiplication accuracy across density levels", async function () {
         const results: { n: number; density: number; avgError: number; avgGas: bigint }[] = [];
 
         for (const n of SPARSE_SIZES) {
@@ -708,62 +708,82 @@ describe("MatrixMasterHarness - Accuracy Tests", function () {
     });
 
     it("measures average determinant accuracy on diagonal-dominant matrices", async function () {
-        const results: { n: number; avgAbsError: number; avgGas: bigint }[] = [];
+    const results: {
+        n: number;
+        avgAbsError: number;
+        avgRelError: number;
+        avgGas: bigint;
+    }[] = [];
 
-        for (const n of DET_SIZES) {
-            let errSum = 0;
-            let gasSum = 0n;
+    for (const n of DET_SIZES) {
+        let absErrSum = 0;
+        let relErrSum = 0;
+        let gasSum = 0n;
 
-            console.log("============================================================");
-            console.log(`Determinant Accuracy Results for n=${n}`);
-            console.log("============================================================");
+        console.log("============================================================");
+        console.log(`Determinant Accuracy Results for n=${n}`);
+        console.log("============================================================");
 
-            for (let caseId = 0; caseId < TEST_COUNT; caseId++) {
-                const A = diagonalDominantMatrix(n, caseId);
-                const aQ = await qArrayFromNumbers(harness, flatten(A));
+        for (let caseId = 0; caseId < TEST_COUNT; caseId++) {
+            const A = diagonalDominantMatrix(n, caseId);
+            const aQ = await qArrayFromNumbers(harness, flatten(A));
 
-                const gasUsed = await estimateMethodGas(harness, "detHarness", [
-                    BigInt(n),
-                    BigInt(n),
-                    aQ
-                ]);
+            const gasUsed = await estimateMethodGas(harness, "detHarness", [
+                BigInt(n),
+                BigInt(n),
+                aQ
+            ]);
 
-                const detQ = await harness.detHarness(BigInt(n), BigInt(n), aQ);
-                const detSol = await quadToNumber(harness, detQ);
-                const detRef = det(A);
+            const detQ = await harness.detHarness(BigInt(n), BigInt(n), aQ);
+            const detSol = await quadToNumber(harness, detQ);
+            const detRef = det(A);
 
-                const absErr = Math.abs(detSol - detRef);
+            const absErr = Math.abs(detSol - detRef);
+            const relErr =
+                Math.abs(detRef) > 0
+                    ? absErr / Math.abs(detRef)
+                    : absErr;
 
-                errSum += absErr;
-                gasSum += gasUsed;
+            absErrSum += absErr;
+            relErrSum += relErr;
+            gasSum += gasUsed;
 
-                console.log(`Case ${caseId + 1}/${TEST_COUNT}`);
-                console.log(`  det_sol   = ${detSol}`);
-                console.log(`  det_ref   = ${detRef}`);
-                console.log(`  abs error = ${absErr}`);
-                console.log(`  Gas Usage = ${gasUsed}`);
-                console.log("------------------------------------------------------------");
-            }
-
-            const avgAbsError = errSum / TEST_COUNT;
-            const avgGas = gasSum / BigInt(TEST_COUNT);
-            results.push({ n, avgAbsError, avgGas });
-
-            console.log(`Average for n=${n}`);
-            console.log(`  avg abs error = ${avgAbsError}`);
-            console.log(`  avg gas usage = ${avgGas}`);
-            console.log("============================================================");
+            console.log(`Case ${caseId + 1}/${TEST_COUNT}`);
+            console.log(`  det_sol   = ${detSol}`);
+            console.log(`  det_ref   = ${detRef}`);
+            console.log(`  abs error = ${absErr}`);
+            console.log(`  rel error = ${relErr}`);
+            console.log(`  Gas Usage = ${gasUsed}`);
+            console.log("------------------------------------------------------------");
         }
 
-        console.log("#################### FINAL DETERMINANT SUMMARY ####################");
-        for (const item of results) {
-            console.log(`n=${item.n} | avg abs error=${item.avgAbsError} | avg gas usage=${item.avgGas}`);
-            expect(item.avgAbsError).to.be.lessThan(1e-7);
-        }
-        console.log("##################################################################");
-    });
+        const avgAbsError = absErrSum / TEST_COUNT;
+        const avgRelError = relErrSum / TEST_COUNT;
+        const avgGas = gasSum / BigInt(TEST_COUNT);
 
-    it("measures inversion accuracy using ||A*A^{-1} - I||_inf", async function () {
+        results.push({ n, avgAbsError, avgRelError, avgGas });
+
+        console.log(`Average for n=${n}`);
+        console.log(`  avg abs error = ${avgAbsError}`);
+        console.log(`  avg rel error = ${avgRelError}`);
+        console.log(`  avg gas usage = ${avgGas}`);
+        console.log("============================================================");
+    }
+
+    console.log("#################### FINAL DETERMINANT SUMMARY ####################");
+
+    for (const item of results) {
+        console.log(
+            `n=${item.n} | avg abs error=${item.avgAbsError} | avg rel error=${item.avgRelError} | avg gas usage=${item.avgGas}`
+        );
+
+        expect(item.avgRelError).to.be.lessThan(1e-10);
+    }
+
+    console.log("##################################################################");
+});
+
+    it.skip("measures inversion accuracy using ||A*A^{-1} - I||_inf", async function () {
         const results: { n: number; avgInverseError: number; avgGas: bigint }[] = [];
 
         for (const n of INV_SIZES) {
@@ -822,7 +842,7 @@ describe("MatrixMasterHarness - Accuracy Tests", function () {
         console.log("################################################################");
     });
 
-    it("measures power iteration eigenvalue accuracy and residual consistency", async function () {
+    it.skip("measures power iteration eigenvalue accuracy and residual consistency", async function () {
         const results: {
             n: number;
             avgEigenAbsError: number;

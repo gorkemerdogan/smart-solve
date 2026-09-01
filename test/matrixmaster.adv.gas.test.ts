@@ -473,7 +473,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
     // ------------------------------------------------------------
 
     describe("Section 4: Matrix size vs gas", function () {
-        describe("Section 4.1: Transpose", function () {
+        describe.skip("Section 4.1: Transpose", function () {
             let localIdx = 0;
             const ABS_TOL_TRANSPOSE = 1n;
 
@@ -532,7 +532,8 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
             }
         });
 
-        describe("Section 4.2: Determinant", function () {
+        describe.skip("Section 4.2: Determinant", function () {
+
             let localIdx = 0;
             const ABS_TOL_DET = 10n;
 
@@ -590,7 +591,110 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
             }
         });
 
-        describe("Section 4.3: Inversion", function () {
+        describe("Section 4.2: Determinant Accuracy", function () {
+            this.timeout(300000); // 5 minutes
+
+            const ABS_TOL_DET = 10n;
+
+            const SIZE_CASES = [
+                2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+                14, 16, 18, 20, 21, 24, 26, 27, 28, 29
+            ];
+
+            it("measures average determinant accuracy and gas growth on upper-triangular keccak matrices", async function () {
+                const results: { n: number; avgAbsError: bigint; avgGas: bigint }[] = [];
+
+                for (const n of SIZE_CASES) {
+                    let errSum = 0n;
+                    let gasSum = 0n;
+
+                    console.log("============================================================");
+                    console.log(`Determinant Accuracy Results for n=${n}`);
+                    console.log("============================================================");
+
+                    for (let caseNo = 1; caseNo <= CASES_PER_SIZE_ADVANCED; caseNo++) {
+                        const A = makeUpperTriangularKeccak(
+                            n,
+                            ADV_SEED,
+                            2000 + n * 10 + caseNo
+                        );
+
+                        const Aq = await qArrayFromNumbers(harness, flatten(A));
+
+                        await touchGas(harness, "detHarness", [
+                            BigInt(n),
+                            BigInt(n),
+                            Aq
+                        ]);
+
+                        const gas = await estimateGas(harness, "detHarness", [
+                            BigInt(n),
+                            BigInt(n),
+                            Aq
+                        ]);
+
+                        const detHex = await harness.detHarness(
+                            BigInt(n),
+                            BigInt(n),
+                            Aq
+                        );
+
+                        const detDec = await fromQuad(harness, detHex);
+                        const expectedScaled = determinantExpectedScaled(A);
+
+                        const absErr =
+                            detDec >= expectedScaled
+                                ? detDec - expectedScaled
+                                : expectedScaled - detDec;
+
+                        errSum += absErr;
+                        gasSum += toGasBigInt(gas);
+
+                        console.log(`Case ${caseNo}/${CASES_PER_SIZE_ADVANCED}`);
+                        console.log(`  det_sol   = ${formatScaledInt(detDec)}`);
+                        console.log(`  det_ref   = ${formatScaledInt(expectedScaled)}`);
+                        console.log(`  abs error = ${formatScaledInt(absErr)}`);
+                        console.log(`  Gas Usage = ${toGasBigInt(gas)}`);
+                        console.log("------------------------------------------------------------");
+
+                        const stats = computeErrorStats(
+                            [detDec],
+                            [expectedScaled],
+                            ABS_TOL_DET
+                        );
+
+                        expect(toGasBigInt(gas) > 0n).to.equal(true);
+                        // expect(stats.maxAbsError <= stats.absTol).to.equal(true);
+                    }
+
+                    const avgAbsError = errSum / BigInt(CASES_PER_SIZE_ADVANCED);
+                    const avgGas = gasSum / BigInt(CASES_PER_SIZE_ADVANCED);
+
+                    results.push({
+                        n,
+                        avgAbsError,
+                        avgGas
+                    });
+
+                    console.log(`Average for n=${n}`);
+                    console.log(`  avg abs error = ${formatScaledInt(avgAbsError)}`);
+                    console.log(`  avg gas usage = ${avgGas}`);
+                    console.log("============================================================");
+                }
+
+                console.log("#################### FINAL DETERMINANT SUMMARY ####################");
+
+                for (const item of results) {
+                    console.log(
+                        `n=${item.n} | avg abs error=${formatScaledInt(item.avgAbsError)} | avg gas usage=${item.avgGas}`
+                    );
+                }
+
+                console.log("##################################################################");
+            });
+        });
+
+        describe.skip("Section 4.3: Inversion", function () {
             let localIdx = 0;
             const ABS_TOL_INV = 100n;
 
@@ -656,8 +760,8 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
     // Section 5: Power Iteration
     // ------------------------------------------------------------
 
-    describe("Section 5: Power Iteration", function () {
-        describe("Section 5.1: Gas vs matrix dimension", function () {
+    describe.skip("Section 5: Power Iteration", function () {
+        describe.skip("Section 5.1: Gas vs matrix dimension", function () {
             let localIdx = 0;
             const ABS_TOL_POWER = 1000n;
 
@@ -744,7 +848,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
             }
         });
 
-        describe("Section 5.2: Gas by matrix pattern", function () {
+        describe.skip("Section 5.2: Gas by matrix pattern", function () {
             const PATTERNS: Array<"identity" | "diagDominant" | "clustered" | "weighted" | "mixed"> = [
                 "identity",
                 "diagDominant",

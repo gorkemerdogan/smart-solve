@@ -239,7 +239,7 @@ function printCaseResult(args: {
 // Test suite
 // ------------------------------------------------------------
 
-describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function () {
+describe("RootFinding Library/Harness Microbenchmarks - Multi-Case Accuracy & Gas", function () {
     this.timeout(0); // Infinity minutes
     let harness: RootFindingHarness;
     let target: string;
@@ -492,7 +492,7 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
         const root = 2n * SCALE;
 
         const summaries = await runBenchmark({
-            name: "Quadratic benchmark: f(x)=x^2-4",
+            name: "Library/harness microbenchmark: f(x)=x^2-4",
             fSelector: selX2Minus4,
             dfSelector: selDf2x,
             expectedRootScaled: root,
@@ -533,7 +533,7 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
         const root = cubicRoot;
 
         const summaries = await runBenchmark({
-            name: "Cubic benchmark: f(x)=x^3-x-2",
+            name: "Library/harness microbenchmark: f(x)=x^3-x-2",
             fSelector: selCubic,
             dfSelector: selDfCubic,
             expectedRootScaled: root,
@@ -574,7 +574,7 @@ describe("RootFinding Library - Multi-Case Accuracy & Gas Benchmarks", function 
         const root = quarticRoot;
 
         const summaries = await runBenchmark({
-            name: "Quartic benchmark: f(x)=x^4-10",
+            name: "Library/harness microbenchmark: f(x)=x^4-10",
             fSelector: selQuartic,
             dfSelector: selDfQuartic,
             expectedRootScaled: root,
