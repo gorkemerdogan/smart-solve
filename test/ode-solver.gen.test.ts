@@ -2,7 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
-import { printBlockRegular } from "./test-utils";
+import { classifyExecutionFailure, printBlockRegular } from "./test-utils";
 
 // ------------------------------------------------------------
 // Types
@@ -89,6 +89,9 @@ interface StepCase {
 interface MethodStats {
     count: number;
     failed: number;
+    reverted: number;
+    outOfGas: number;
+    otherFailures: number;
     skipped: number;
     withinTol: number;
     exceededTol: number;
@@ -211,6 +214,9 @@ function initStats(): MethodStats {
     return {
         count: 0,
         failed: 0,
+        reverted: 0,
+        outOfGas: 0,
+        otherFailures: 0,
         skipped: 0,
         withinTol: 0,
         exceededTol: 0,
@@ -231,14 +237,14 @@ function updateStats(
     absErr: bigint,
     relErrScaled: bigint,
     estimatedGas: bigint,
-    tol: bigint
+    passed: boolean
 ): void {
     stats.count += 1;
     stats.absSum += absErr;
     stats.relSumScaled += relErrScaled;
     stats.gasSum += estimatedGas;
 
-    if (absErr <= tol) {
+    if (passed) {
         stats.withinTol += 1;
     } else {
         stats.exceededTol += 1;
@@ -379,6 +385,16 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
     ];
 
     const ABS_TOL = 1_000_000n; // 1e-6 at SCALE = 1e12
+    const REL_TOL_BY_METHOD: Record<MethodLabel, bigint> = {
+        Euler: 600_000_000_000n,        // 60%
+        "RK2 Midpoint": 30_000_000_000n, // 3%
+        "RK2 Heun": 30_000_000_000n,     // 3%
+        RK4: 100_000_000n,              // 0.01%
+    };
+
+    function accuracyPass(method: MethodLabel, absErr: bigint, relErrScaled: bigint): boolean {
+        return absErr <= ABS_TOL || relErrScaled <= REL_TOL_BY_METHOD[method];
+    }
 
     const qInt = async (x: number | bigint) => await harness.qFromInt(x);
     const qFrac = async (num: number | bigint, den: number | bigint) => await harness.qFromFrac(num, den);
@@ -538,13 +554,14 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                         const actualScaled = await outScaled(harness, run.output);
                         const absErr = scaledAbsError(actualScaled, expectedScaled);
                         const relErrScaled = scaledRelErrorScaled(actualScaled, expectedScaled);
+                        const passed = accuracyPass(method.label, absErr, relErrScaled);
 
                         updateStats(
                             statsByMethod.get(method.label)!,
                             absErr,
                             relErrScaled,
                             run.estimatedGas,
-                            ABS_TOL
+                            passed
                         );
 
                         updateStats(
@@ -552,7 +569,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                             absErr,
                             relErrScaled,
                             run.estimatedGas,
-                            ABS_TOL
+                            passed
                         );
 
                         printBlockRegular({
@@ -572,24 +589,35 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                             avgAbsError: formatScaledInt(absErr),
                             residual: formatScaledInt(absErr),
                             normalizedResidual: formatScaledInt(relErrScaled),
-                            tolerance: formatScaledInt(ABS_TOL),
-                            withinTol: absErr <= ABS_TOL ? "Yes" : "No",
-                            exceededTol: absErr > ABS_TOL ? "Yes" : "No",
+                            tolerance: `abs<=${formatScaledInt(ABS_TOL)} OR rel<=${formatPercentScaled(REL_TOL_BY_METHOD[method.label])}%`,
+                            withinTol: passed ? "Yes" : "No",
+                            exceededTol: passed ? "No" : "Yes",
                             worstCase:
                                 `Case ${tc.caseNo} | AbsErr=${formatScaledInt(absErr)} | ` +
                                 `RelErr=${formatPercentScaled(relErrScaled)}%`,
                         });
                     } catch (err) {
                         const message = errorToString(err);
+                        const failureKind = classifyExecutionFailure(err);
 
                         statsByMethod.get(method.label)!.failed += 1;
                         overallStatsByMethod.get(method.label)!.failed += 1;
+                        if (failureKind === "revert") {
+                            statsByMethod.get(method.label)!.reverted += 1;
+                            overallStatsByMethod.get(method.label)!.reverted += 1;
+                        } else if (failureKind === "out-of-gas") {
+                            statsByMethod.get(method.label)!.outOfGas += 1;
+                            overallStatsByMethod.get(method.label)!.outOfGas += 1;
+                        } else {
+                            statsByMethod.get(method.label)!.otherFailures += 1;
+                            overallStatsByMethod.get(method.label)!.otherFailures += 1;
+                        }
 
                         printBlockRegular({
                             t: `${benchmark.key}-${tc.caseNo}`,
                             method: method.label,
                             explanation:
-                                `FAILED | Benchmark=${benchmark.label}, x0=0, y0=${tc.y0}, ` +
+                                `FAILED (${failureKind}) | Benchmark=${benchmark.label}, x0=0, y0=${tc.y0}, ` +
                                 `h=${tc.hLabel}, steps=${tc.steps}, x_final=${tc.xFinal}, ` +
                                 `expectedHexStatus=${expectedHexStatus}`,
                             gas: "FAILED",
@@ -602,7 +630,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                             avgAbsError: "FAILED",
                             residual: "FAILED",
                             normalizedResidual: "FAILED",
-                            tolerance: formatScaledInt(ABS_TOL),
+                            tolerance: `abs<=${formatScaledInt(ABS_TOL)} OR rel<=${formatPercentScaled(REL_TOL_BY_METHOD[method.label])}%`,
                             withinTol: "FAILED",
                             exceededTol: "FAILED",
                             worstCase: message,
@@ -619,13 +647,16 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                 const avgAbs = averageScaled(stats.absSum, stats.count);
                 const avgRel = averageScaled(stats.relSumScaled, stats.count);
                 const avgGas = averageScaled(stats.gasSum, stats.count);
+                const totalCases = stats.count + stats.failed + stats.skipped;
+                const passRate = totalCases === 0 ? 0 : (stats.withinTol * 100) / totalCases;
 
                 printBlockRegular({
                     t: `${benchmark.key}-summary`,
                     method: method.label,
                     explanation:
-                        `Summary for benchmark ${benchmark.label} | success=${stats.count} | ` +
-                        `failed=${stats.failed} | skipped=${stats.skipped}`,
+                        `Summary for benchmark ${benchmark.label} | total=${totalCases} | successful executions=${stats.count} | ` +
+                        `failed=${stats.failed} (revert=${stats.reverted}, outOfGas=${stats.outOfGas}, other=${stats.otherFailures}) | ` +
+                        `skipped=${stats.skipped} | passRate=${passRate.toFixed(2)}% | averages=successful executions only`,
                     gas: stats.count > 0 ? avgGas.toString() : "N/A",
                     inHex: "-",
                     expectedHex: "-",
@@ -636,7 +667,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                     avgAbsError: stats.count > 0 ? formatScaledInt(avgAbs) : "N/A",
                     residual: stats.count > 0 ? formatScaledInt(stats.maxAbs) : "N/A",
                     normalizedResidual: stats.count > 0 ? formatScaledInt(avgRel) : "N/A",
-                    tolerance: formatScaledInt(ABS_TOL),
+                    tolerance: `abs<=${formatScaledInt(ABS_TOL)} OR rel<=${formatPercentScaled(REL_TOL_BY_METHOD[method.label])}%`,
                     withinTol: stats.withinTol.toString(),
                     exceededTol: stats.exceededTol.toString(),
                     worstCase:
@@ -668,13 +699,16 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
             const avgAbs = averageScaled(stats.absSum, stats.count);
             const avgRel = averageScaled(stats.relSumScaled, stats.count);
             const avgGas = averageScaled(stats.gasSum, stats.count);
+            const totalCases = stats.count + stats.failed + stats.skipped;
+            const passRate = totalCases === 0 ? 0 : (stats.withinTol * 100) / totalCases;
 
             printBlockRegular({
                 t: "overall-summary",
                 method: method.label,
                 explanation:
-                    `Overall summary across all benchmarks | success=${stats.count} | ` +
-                    `failed=${stats.failed} | skipped=${stats.skipped}`,
+                    `Overall summary across all benchmarks | total=${totalCases} | successful executions=${stats.count} | ` +
+                    `failed=${stats.failed} (revert=${stats.reverted}, outOfGas=${stats.outOfGas}, other=${stats.otherFailures}) | ` +
+                    `skipped=${stats.skipped} | passRate=${passRate.toFixed(2)}% | averages=successful executions only`,
                 gas: stats.count > 0 ? avgGas.toString() : "N/A",
                 inHex: "-",
                 expectedHex: "-",
@@ -685,7 +719,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                 avgAbsError: stats.count > 0 ? formatScaledInt(avgAbs) : "N/A",
                 residual: stats.count > 0 ? formatScaledInt(stats.maxAbs) : "N/A",
                 normalizedResidual: stats.count > 0 ? formatScaledInt(avgRel) : "N/A",
-                tolerance: formatScaledInt(ABS_TOL),
+                tolerance: `abs<=${formatScaledInt(ABS_TOL)} OR rel<=${formatPercentScaled(REL_TOL_BY_METHOD[method.label])}%`,
                 withinTol: stats.withinTol.toString(),
                 exceededTol: stats.exceededTol.toString(),
                 worstCase:
@@ -701,5 +735,17 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
         expect(overallAttempts + overallSkipped).to.equal(
             testCases.length * benchmarks.length * METHODS.length
         );
+
+        for (const method of METHODS) {
+            const stats = overallStatsByMethod.get(method.label)!;
+            expect(
+                stats.failed,
+                `${method.label} had unexpected execution failures: revert=${stats.reverted}, outOfGas=${stats.outOfGas}, other=${stats.otherFailures}`
+            ).to.equal(0);
+            expect(
+                stats.exceededTol,
+                `${method.label} exceeded its documented hybrid accuracy threshold in ${stats.exceededTol} executed cases`
+            ).to.equal(0);
+        }
     });
 });

@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { classifyExecutionFailure, type ExecutionFailureKind } from "./test-utils";
 
 // ------------------------------------------------------------
 // Contract Type
@@ -144,6 +145,92 @@ function reshapeMatrix(flat: bigint[], rows: number, cols: number): bigint[][] {
 
 function fmtVec(v: bigint[]): string {
     return `[${v.map(formatScaledInt).join(", ")}]`;
+}
+
+type FailureCounts = Record<ExecutionFailureKind, number> & { failed: number };
+
+function emptyFailureCounts(): FailureCounts {
+    return { failed: 0, revert: 0, "out-of-gas": 0, failure: 0 };
+}
+
+function countExecutionFailure(counts: FailureCounts, error: unknown): ExecutionFailureKind {
+    const kind = classifyExecutionFailure(error);
+    counts.failed++;
+    counts[kind]++;
+    return kind;
+}
+
+function printReliabilitySummary(args: {
+    label: string;
+    total: number;
+    successful: number;
+    numericalPassed: number;
+    failures?: FailureCounts;
+}) {
+    const failures = args.failures ?? emptyFailureCounts();
+    const numericalFailed = args.successful - args.numericalPassed;
+    const passRate = args.total === 0 ? 0 : args.numericalPassed / args.total;
+    console.log(`Reliability Summary  : ${args.label}`);
+    console.log(`Total Cases          : ${args.total}`);
+    console.log(`Successful Cases     : ${args.successful}`);
+    console.log(`Numerical Failures   : ${numericalFailed}`);
+    console.log(`Execution Failures   : ${failures.failed}`);
+    console.log(`Reverted Cases       : ${failures.revert}`);
+    console.log(`Out-of-Gas Cases     : ${failures["out-of-gas"]}`);
+    console.log(`Other Failures       : ${failures.failure}`);
+    console.log(`Pass Rate            : ${(passRate * 100).toFixed(2)}%`);
+    console.log("Averages             : successful executions only");
+}
+
+function assertAccuracyBatch(args: {
+    label: string;
+    total: number;
+    errors: bigint[];
+    residuals: bigint[];
+    failures?: FailureCounts;
+    errorTolerance?: bigint;
+    residualTolerance?: bigint;
+}) {
+    const failures = args.failures ?? emptyFailureCounts();
+    const errorTolerance = args.errorTolerance ?? SCALE / 1_000_000n;
+    const residualTolerance = args.residualTolerance ?? SCALE / 100_000n;
+    const numericalPassed = args.errors.filter(
+        (error, i) => error <= errorTolerance && args.residuals[i] <= residualTolerance
+    ).length;
+
+    printReliabilitySummary({
+        label: args.label,
+        total: args.total,
+        successful: args.errors.length,
+        numericalPassed,
+        failures,
+    });
+
+    expect(failures.failed, `${args.label}: unexpected execution failures`).to.equal(0);
+    expect(args.errors.length, `${args.label}: successful case count`).to.equal(args.total);
+    expect(numericalPassed, `${args.label}: cases within numerical tolerances`).to.equal(args.total);
+}
+
+function assertReconstructionBatch(args: {
+    label: string;
+    total: number;
+    errors: bigint[];
+    failures?: FailureCounts;
+    tolerance?: bigint;
+}) {
+    const failures = args.failures ?? emptyFailureCounts();
+    const tolerance = args.tolerance ?? SCALE / 1_000_000n;
+    const numericalPassed = args.errors.filter(error => error <= tolerance).length;
+    printReliabilitySummary({
+        label: args.label,
+        total: args.total,
+        successful: args.errors.length,
+        numericalPassed,
+        failures,
+    });
+    expect(failures.failed, `${args.label}: unexpected execution failures`).to.equal(0);
+    expect(args.errors.length, `${args.label}: successful case count`).to.equal(args.total);
+    expect(numericalPassed, `${args.label}: cases within reconstruction tolerance`).to.equal(args.total);
 }
 
 // ------------------------------------------------------------
@@ -666,13 +753,13 @@ function printSummaryBlock(args: {
     console.log("============================================================");
     console.log(`Method               : ${args.method}`);
     console.log(`Test Explanation     : ${args.testExplanation}`);
-    console.log(`Test Count           : ${args.count}`);
-    console.log(`Average Abs. Error   : ${formatScaledInt(args.avgErr)}`);
-    console.log(`Average Residual     : ${formatScaledInt(args.avgRes)}`);
+    console.log(`Successful Cases     : ${args.count}`);
+    console.log(`Average Abs. Error   : ${formatScaledInt(args.avgErr)} (successful cases only)`);
+    console.log(`Average Residual     : ${formatScaledInt(args.avgRes)} (successful cases only)`);
     if (args.avgIter !== undefined) {
         console.log(`Average Iterations   : ${args.avgIter.toString()}`);
     }
-    console.log(`Average Gas          : ${args.avgGas.toString()}`);
+    console.log(`Average Gas          : ${args.avgGas.toString()} (successful cases only)`);
     console.log(`Min Gas              : ${args.minGas.toString()}`);
     console.log(`Max Gas              : ${args.maxGas.toString()}`);
     console.log("============================================================");
@@ -693,9 +780,9 @@ function printLUSummaryBlock(args: {
     console.log("============================================================");
     console.log(`Method               : ${args.method}`);
     console.log(`Test Explanation     : ${args.testExplanation}`);
-    console.log(`Test Count           : ${args.count}`);
-    console.log(`Average Recon. Error : ${formatScaledInt(args.avgRecon)}`);
-    console.log(`Average Gas          : ${args.avgGas.toString()}`);
+    console.log(`Successful Cases     : ${args.count}`);
+    console.log(`Average Recon. Error : ${formatScaledInt(args.avgRecon)} (successful cases only)`);
+    console.log(`Average Gas          : ${args.avgGas.toString()} (successful cases only)`);
     console.log(`Min Gas              : ${args.minGas.toString()}`);
     console.log(`Max Gas              : ${args.maxGas.toString()}`);
     console.log("============================================================");
@@ -930,7 +1017,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     maxGas: maxBigInt(gases),
                 });
 
-                expect(errs.length).to.equal(T);
+                assertAccuracyBatch({ label: `${method} n=${n}`, total: T, errors: errs, residuals });
             }
         });
 
@@ -984,7 +1071,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     maxGas: maxBigInt(gases),
                 });
 
-                expect(reconErrs.length).to.equal(T);
+                assertReconstructionBatch({ label: `${method} n=${n}`, total: T, errors: reconErrs });
             }
         });
 
@@ -1000,6 +1087,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                 const residuals: bigint[] = [];
                 const gases: bigint[] = [];
                 const itersArr: bigint[] = [];
+                const failures = emptyFailureCounts();
 
                 for (let t = 0; t < T; t++) {
                     const tag = `JAC:n=${n}:t=${t}`;
@@ -1012,42 +1100,54 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     const bdata = await qVecFromScaledInts(harness, b);
                     const x0data = await qVecFromScaledInts(harness, x0);
 
-                    const [out, iters] = await harness.jacobi(BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15);
-                    const xComp = await scaledVec(harness, out);
+                    try {
+                        const [out, iters] = await harness.jacobi(BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15);
+                        const xComp = await scaledVec(harness, out);
 
-                    const err = vecInfNorm(subVec(xComp, xTrue));
-                    const res = vecInfNorm(subVec(matVecMulScaled(A, xComp), b));
-                    const gas = await estimateJacobiGas(harness, BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15);
+                        const err = vecInfNorm(subVec(xComp, xTrue));
+                        const res = vecInfNorm(subVec(matVecMulScaled(A, xComp), b));
+                        const gas = await estimateJacobiGas(harness, BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15);
 
-                    printCaseBlock({
-                        method,
-                        testExplanation: `${testExplanation} | n=${n} | case=${t + 1}/${T}`,
-                        gas,
-                        err,
-                        res,
-                        iters: asBigInt(iters),
-                    });
+                        printCaseBlock({
+                            method,
+                            testExplanation: `${testExplanation} | n=${n} | case=${t + 1}/${T}`,
+                            gas,
+                            err,
+                            res,
+                            iters: asBigInt(iters),
+                        });
 
-                    errs.push(err);
-                    residuals.push(res);
-                    gases.push(gas);
-                    itersArr.push(asBigInt(iters));
+                        errs.push(err);
+                        residuals.push(res);
+                        gases.push(gas);
+                        itersArr.push(asBigInt(iters));
+                    } catch (error) {
+                        const failureKind = countExecutionFailure(failures, error);
+                        console.log("------------------------------------------------------------");
+                        console.log(`Method               : ${method}`);
+                        console.log(`Test Explanation     : ${testExplanation} | n=${n} | case=${t + 1}/${T}`);
+                        console.log(`Status               : ${failureKind}`);
+                        console.log(`Failure Reason       : ${(error as Error).message}`);
+                        console.log("------------------------------------------------------------");
+                    }
                 }
 
-                printSummaryBlock({
-                    method,
-                    testExplanation: `${testExplanation} | summary for n=${n}`,
-                    title: `Jacobi Summary for n=${n}`,
-                    count: T,
-                    avgErr: avgBigInt(errs),
-                    avgRes: avgBigInt(residuals),
-                    avgGas: avgBigInt(gases),
-                    minGas: minBigInt(gases),
-                    maxGas: maxBigInt(gases),
-                    avgIter: avgBigInt(itersArr),
-                });
+                if (gases.length > 0) {
+                    printSummaryBlock({
+                        method,
+                        testExplanation: `${testExplanation} | summary for n=${n}`,
+                        title: `Jacobi Summary for n=${n}`,
+                        count: gases.length,
+                        avgErr: avgBigInt(errs),
+                        avgRes: avgBigInt(residuals),
+                        avgGas: avgBigInt(gases),
+                        minGas: minBigInt(gases),
+                        maxGas: maxBigInt(gases),
+                        avgIter: avgBigInt(itersArr),
+                    });
+                }
 
-                expect(errs.length).to.equal(T);
+                assertAccuracyBatch({ label: `${method} n=${n}`, total: T, errors: errs, residuals, failures });
             }
         });
 
@@ -1063,7 +1163,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                 const residuals: bigint[] = [];
                 const gases: bigint[] = [];
                 const itersArr: bigint[] = [];
-                let failedCount = 0;
+                const failures = emptyFailureCounts();
 
                 for (let t = 0; t < T; t++) {
                     const tag = `GS:n=${n}:t=${t}`;
@@ -1114,12 +1214,12 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                         gases.push(gas);
                         itersArr.push(asBigInt(iters));
                     } catch (err) {
-                        failedCount++;
+                        const failureKind = countExecutionFailure(failures, err);
 
                         console.log("------------------------------------------------------------");
                         console.log(`Method               : ${method}`);
                         console.log(`Test Explanation     : ${testExplanation} | n=${n} | case=${t + 1}/${T}`);
-                        console.log(`Status               : failed`);
+                        console.log(`Status               : ${failureKind}`);
                         console.log(`Failure Reason       : ${(err as Error).message}`);
                         console.log("------------------------------------------------------------");
                     }
@@ -1139,6 +1239,13 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                         avgIter: avgBigInt(itersArr),
                     });
                 }
+                assertAccuracyBatch({
+                    label: `${method} n=${n}`,
+                    total: T,
+                    errors: errs,
+                    residuals,
+                    failures,
+                });
             }
         });
 
@@ -1161,7 +1268,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                 const residuals: bigint[] = [];
                 const gases: bigint[] = [];
                 const itersArr: bigint[] = [];
-                let failedCount = 0;
+                const failures = emptyFailureCounts();
 
                 for (let t = 0; t < T; t++) {
                     const tag = `GDLS:m=${m}:n=${n}:t=${t}`;
@@ -1218,24 +1325,15 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                         gases.push(gas);
                         itersArr.push(asBigInt(iters));
                     } catch (err: any) {
-                        failedCount++;
+                        const failureKind = countExecutionFailure(failures, err);
 
                         console.log("------------------------------------------------------------");
                         console.log(`Method               : ${method}`);
                         console.log(`Test Explanation     : ${testExplanation} | m=${m} | n=${n} | case=${t + 1}/${T}`);
-                        console.log(`Status               : failed`);
+                        console.log(`Status               : ${failureKind}`);
                         console.log(`Failure Reason       : ${err?.shortMessage ?? err?.message ?? "unknown error"}`);
                         console.log("------------------------------------------------------------");
 
-                        // If too many runs fail, stop wasting time on this size.
-                        if (failedCount >= 3) {
-                            console.log("------------------------------------------------------------");
-                            console.log(`Method               : ${method}`);
-                            console.log(`Status               : early stop for size m=${m}, n=${n}`);
-                            console.log(`Reason               : too many failed runs`);
-                            console.log("------------------------------------------------------------");
-                            break;
-                        }
                     }
                 }
 
@@ -1259,10 +1357,19 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     console.log(`Method               : ${method}`);
                     console.log(`Test Explanation     : ${testExplanation} | summary for m=${m}, n=${n}`);
                     console.log(`Test Count           : 0`);
-                    console.log(`Failed Runs          : ${failedCount}`);
+                    console.log(`Failed Runs          : ${failures.failed}`);
                     console.log(`Status               : no successful run`);
                     console.log("============================================================");
                 }
+                assertAccuracyBatch({
+                    label: `${method} m=${m}, n=${n}`,
+                    total: T,
+                    errors: errs,
+                    residuals,
+                    failures,
+                    errorTolerance: SCALE / 100n,
+                    residualTolerance: SCALE / 10n,
+                });
             }
         });
     });
@@ -1343,7 +1450,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     avgIter: avgBigInt(itersArr),
                 });
 
-                expect(errs.length).to.equal(T);
+                assertAccuracyBatch({ label: `${method} x0=${cfg.name}`, total: T, errors: errs, residuals });
             }
         });
 
@@ -1413,7 +1520,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     avgIter: avgBigInt(itersArr),
                 });
 
-                expect(errs.length).to.equal(T);
+                assertAccuracyBatch({ label: `${method} x0=${cfg.name}`, total: T, errors: errs, residuals });
             }
         });
     });
@@ -1539,8 +1646,6 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                 residualArr.push(residual);
                 gasArr.push(gas);
 
-                expect(solErr >= 0n).to.equal(true);
-                expect(residual >= 0n).to.equal(true);
             }
 
             printSummaryBlock({
@@ -1553,6 +1658,12 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                 avgGas: avgBigInt(gasArr),
                 minGas: minBigInt(gasArr),
                 maxGas: maxBigInt(gasArr),
+            });
+            assertAccuracyBatch({
+                label: "LU solution recovery sanity cases",
+                total: sanityCases.length,
+                errors: errArr,
+                residuals: residualArr,
             });
         });
     });
@@ -1909,6 +2020,12 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     minGas: minBigInt(gases),
                     maxGas: maxBigInt(gases),
                 });
+                assertAccuracyBatch({
+                    label: `${method} case=${matrixCase.caseName}`,
+                    total: CASE_REPEAT,
+                    errors: errs,
+                    residuals,
+                });
             }
         });
 
@@ -1961,6 +2078,11 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     minGas: minBigInt(gases),
                     maxGas: maxBigInt(gases),
                 });
+                assertReconstructionBatch({
+                    label: `${method} case=${matrixCase.caseName}`,
+                    total: CASE_REPEAT,
+                    errors: reconErrs,
+                });
             }
         });
 
@@ -1976,6 +2098,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                 const residuals: bigint[] = [];
                 const gases: bigint[] = [];
                 const itersArr: bigint[] = [];
+                const failures = emptyFailureCounts();
 
                 for (let t = 0; t < CASE_REPEAT; t++) {
                     const tag = `JAC_CASE:${matrixCase.caseName}:t=${t}`;
@@ -2026,10 +2149,11 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                         gases.push(gas);
                         itersArr.push(asBigInt(iters));
                     } catch (e: any) {
+                        const failureKind = countExecutionFailure(failures, e);
                         console.log("------------------------------------------------------------");
                         console.log(`Method               : ${method}`);
                         console.log(`Test Explanation     : ${testExplanation} | case=${matrixCase.caseName} | run=${t + 1}/${CASE_REPEAT}`);
-                        console.log(`Status               : failed`);
+                        console.log(`Status               : ${failureKind}`);
                         console.log(`Reason               : ${e?.shortMessage ?? e?.message ?? "unknown error"}`);
                         console.log("------------------------------------------------------------");
                         continue;
@@ -2059,6 +2183,13 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     console.log("Status               : all runs failed");
                     console.log("============================================================");
                 }
+                assertAccuracyBatch({
+                    label: `${method} case=${matrixCase.caseName}`,
+                    total: CASE_REPEAT,
+                    errors: errs,
+                    residuals,
+                    failures,
+                });
             }
         });
 
@@ -2075,7 +2206,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                 const gases: bigint[] = [];
                 const itersArr: bigint[] = [];
 
-                let failedRuns = 0;
+                const failures = emptyFailureCounts();
 
                 for (let t = 0; t < CASE_REPEAT; t++) {
                     const tag = `GS_CASE:${matrixCase.caseName}:t=${t}`;
@@ -2128,12 +2259,12 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                         gases.push(gas);
                         itersArr.push(asBigInt(iters));
                     } catch (e: any) {
-                        failedRuns++;
+                        const failureKind = countExecutionFailure(failures, e);
 
                         console.log("------------------------------------------------------------");
                         console.log(`Method               : ${method}`);
                         console.log(`Test Explanation     : ${caseRunExplanation}`);
-                        console.log(`Status               : failed`);
+                        console.log(`Status               : ${failureKind}`);
                         console.log(`Reason               : ${e?.message ?? String(e)}`);
                         console.log("------------------------------------------------------------");
                     }
@@ -2159,10 +2290,17 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     console.log(`Method               : ${method}`);
                     console.log(`Test Explanation     : ${testExplanation} | summary for case=${matrixCase.caseName}`);
                     console.log(`Test Count           : 0`);
-                    console.log(`Failed Runs          : ${failedRuns}`);
+                    console.log(`Failed Runs          : ${failures.failed}`);
                     console.log(`Status               : no successful run`);
                     console.log("============================================================");
                 }
+                assertAccuracyBatch({
+                    label: `${method} case=${matrixCase.caseName}`,
+                    total: CASE_REPEAT,
+                    errors: errs,
+                    residuals,
+                    failures,
+                });
             }
         });
 
@@ -2180,7 +2318,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                 const residuals: bigint[] = [];
                 const gases: bigint[] = [];
                 const itersArr: bigint[] = [];
-                let failedRuns = 0;
+                const failures = emptyFailureCounts();
 
                 for (let t = 0; t < CASE_REPEAT; t++) {
                     const tag = `GDLS_CASE:${matrixCase.caseName}:t=${t}`;
@@ -2237,12 +2375,12 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                         gases.push(gas);
                         itersArr.push(asBigInt(iters));
                     } catch (e: any) {
-                        failedRuns++;
+                        const failureKind = countExecutionFailure(failures, e);
 
                         console.log("------------------------------------------------------------");
                         console.log(`Method               : ${method}`);
                         console.log(`Test Explanation     : ${caseRunExplanation}`);
-                        console.log(`Status               : failed`);
+                        console.log(`Status               : ${failureKind}`);
                         console.log(`Reason               : ${e?.shortMessage ?? e?.message ?? "unknown error"}`);
                         console.log("------------------------------------------------------------");
                     }
@@ -2268,10 +2406,19 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     console.log(`Method               : ${method}`);
                     console.log(`Test Explanation     : ${testExplanation} | summary for case=${matrixCase.caseName}`);
                     console.log(`Test Count           : 0`);
-                    console.log(`Failed Runs          : ${failedRuns}`);
+                    console.log(`Failed Runs          : ${failures.failed}`);
                     console.log(`Status               : no successful run`);
                     console.log("============================================================");
                 }
+                assertAccuracyBatch({
+                    label: `${method} case=${matrixCase.caseName}`,
+                    total: CASE_REPEAT,
+                    errors: errs,
+                    residuals,
+                    failures,
+                    errorTolerance: SCALE / 100n,
+                    residualTolerance: SCALE / 10n,
+                });
             }
         });
     });

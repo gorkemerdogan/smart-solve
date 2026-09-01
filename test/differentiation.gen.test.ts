@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { classifyExecutionFailure, type ExecutionFailureKind } from "./test-utils";
 
 describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
     let harness: any;
@@ -11,11 +12,8 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
      */
     const SCALE = 10n ** 12n;
 
-    /**
-     * Common reporting tolerance for all differentiation test cases.
-     * SCALE = 1e12 -> 1e-4 in decimal terms.
-     */
-    const TOLERANCE_SCALED = 100000000n; // 1e8 / 1e12 = 1e-4
+    /** Fixed-point allowance added to the analytical truncation-error bound. */
+    const NUMERICAL_SLACK_SCALED = 1000n; // 1e-9 at SCALE=1e12
 
     /**
      * Six input points.
@@ -84,6 +82,12 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
      * Shared in-memory result store.
      */
     const allResults: TestResult[] = [];
+    const executionFailures: {
+        method: string;
+        functionName: string;
+        kind: ExecutionFailureKind;
+        reason: string;
+    }[] = [];
 
     before(async function () {
         const MathLibFactory = await ethers.getContractFactory(
@@ -124,6 +128,31 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
             return 0n;
         }
         return (numerator * SCALE) / denominator;
+    }
+
+    function expectedErrorBoundScaled(args: {
+        methodName: string;
+        functionName: string;
+        x: number;
+        hNum: number;
+        hDen: number;
+    }): bigint {
+        const h = args.hNum / args.hDen;
+        let truncationError = 0;
+
+        if (args.functionName === "f(x)=x^2" && args.methodName !== "centeredDiff") {
+            truncationError = h;
+        } else if (args.functionName === "f(x)=x^3") {
+            if (args.methodName === "centeredDiff") {
+                truncationError = h * h;
+            } else if (args.methodName === "forwardDiff") {
+                truncationError = Math.abs(3 * args.x * h + h * h);
+            } else {
+                truncationError = Math.abs(-3 * args.x * h + h * h);
+            }
+        }
+
+        return BigInt(Math.ceil(truncationError * Number(SCALE))) + NUMERICAL_SLACK_SCALED;
     }
 
     function formatScaled(value: bigint, decimals: number = 12): string {
@@ -184,8 +213,11 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
 
         return {
             count,
+            successfulCount: count,
+            failedCount: exceededToleranceCount,
             withinToleranceCount,
             exceededToleranceCount,
+            passRate: count > 0 ? withinToleranceCount / count : 0,
             avgAbsError,
             avgRelError,
             avgTolUsage,
@@ -196,21 +228,32 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
         };
     }
 
-    function printSummary(title: string, results: TestResult[]) {
+    function printSummary(title: string, results: TestResult[], failures = executionFailures) {
         const s = summarize(results);
+        const total = s.count + failures.length;
+        const reverted = failures.filter(f => f.kind === "revert").length;
+        const outOfGas = failures.filter(f => f.kind === "out-of-gas").length;
+        const otherFailures = failures.filter(f => f.kind === "failure").length;
 
         console.log("\n============================================================");
         console.log(title);
         console.log("============================================================");
-        console.log(`Total Tests           : ${s.count}`);
+        console.log(`Total Tests           : ${total}`);
+        console.log(`Successful Executions : ${s.successfulCount}`);
+        console.log(`Failed Cases          : ${s.failedCount + failures.length}`);
+        console.log(`Numerical Failures    : ${s.failedCount}`);
+        console.log(`Reverted Cases        : ${reverted}`);
+        console.log(`Out-of-Gas Cases      : ${outOfGas}`);
+        console.log(`Other Failures        : ${otherFailures}`);
+        console.log(`Pass Rate             : ${(total > 0 ? s.withinToleranceCount / total * 100 : 0).toFixed(2)}%`);
         console.log(`Within Tolerance      : ${s.withinToleranceCount}`);
         console.log(`Exceeded Tolerance    : ${s.exceededToleranceCount}`);
-        console.log(`Average Abs. Error    : ${formatScaled(s.avgAbsError)}`);
-        console.log(`Average Rel. Error    : ${formatScaled(s.avgRelError)}`);
+        console.log(`Average Abs. Error    : ${formatScaled(s.avgAbsError)} (successful executions only)`);
+        console.log(`Average Rel. Error    : ${formatScaled(s.avgRelError)} (successful executions only)`);
         console.log(`Average Tol. Usage    : ${formatScaled(s.avgTolUsage)}`);
         console.log(`Max Abs. Error        : ${formatScaled(s.maxAbsError)}`);
-        console.log(`Tolerance             : ${formatScaled(TOLERANCE_SCALED)}`);
-        console.log(`Average Gas           : ${s.avgGas.toString()}`);
+        console.log("Tolerance             : analytical truncation bound + 1e-9 fixed-point allowance");
+        console.log(`Average Gas           : ${s.avgGas.toString()} (successful executions only)`);
         console.log(`Min Gas               : ${s.minGas.toString()}`);
         console.log(`Max Gas               : ${s.maxGas.toString()}`);
     }
@@ -244,31 +287,55 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
         const xQuad = await qFromInt(params.x);
         const hQuad = await qFromFrac(params.hNum, params.hDen);
 
-        const estimatedGas = BigInt(
-            (
-                await harness[params.methodFn].estimateGas(
-                    await harness.getAddress(),
-                    params.targetSelector,
-                    xQuad,
-                    hQuad
-                )
-            ).toString()
-        );
+        let estimatedGas: bigint;
+        let numericalQuad: string;
+        try {
+            estimatedGas = BigInt(
+                (
+                    await harness[params.methodFn].estimateGas(
+                        await harness.getAddress(),
+                        params.targetSelector,
+                        xQuad,
+                        hQuad
+                    )
+                ).toString()
+            );
 
-        const numericalQuad = await harness[params.methodFn](
-            await harness.getAddress(),
-            params.targetSelector,
-            xQuad,
-            hQuad
-        );
+            numericalQuad = await harness[params.methodFn](
+                await harness.getAddress(),
+                params.targetSelector,
+                xQuad,
+                hQuad
+            );
+        } catch (error) {
+            const kind = classifyExecutionFailure(error);
+            const reason = error instanceof Error ? error.message : String(error);
+            executionFailures.push({
+                method: params.methodName,
+                functionName: params.functionDisplayName,
+                kind,
+                reason,
+            });
+            expect.fail(
+                `${params.methodName} ${kind} for ${params.functionDisplayName} at ` +
+                `x=${params.x}, h=${params.hNum}/${params.hDen}: ${reason}`
+            );
+        }
 
         const numericalScaled = await toScaledInt(numericalQuad);
         const absoluteErrorScaled = absBigInt(numericalScaled - params.exactScaled);
 
         const exactAbsScaled = absBigInt(params.exactScaled);
         const relativeErrorScaled = scaledRatio(absoluteErrorScaled, exactAbsScaled);
-        const toleranceUsageScaled = scaledRatio(absoluteErrorScaled, TOLERANCE_SCALED);
-        const passed = absoluteErrorScaled <= TOLERANCE_SCALED;
+        const toleranceScaled = expectedErrorBoundScaled({
+            methodName: params.methodName,
+            functionName: params.functionDisplayName,
+            x: params.x,
+            hNum: params.hNum,
+            hDen: params.hDen,
+        });
+        const toleranceUsageScaled = scaledRatio(absoluteErrorScaled, toleranceScaled);
+        const passed = absoluteErrorScaled <= toleranceScaled;
 
         const result: TestResult = {
             method: params.methodName,
@@ -280,7 +347,7 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
             exactScaled: params.exactScaled,
             absoluteErrorScaled,
             relativeErrorScaled,
-            toleranceScaled: TOLERANCE_SCALED,
+            toleranceScaled,
             toleranceUsageScaled,
             estimatedGas,
             passed,
@@ -288,6 +355,13 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
 
         allResults.push(result);
         printCaseResult(result);
+
+        expect(
+            passed,
+            `${params.methodName} exceeded absolute-error tolerance for ${params.functionDisplayName} ` +
+            `at x=${params.x}, h=${params.hNum}/${params.hDen}: ` +
+            `error=${formatScaled(absoluteErrorScaled)}, tolerance=${formatScaled(toleranceScaled)}`
+        ).to.equal(true);
     }
 
     describe("Sanity checks", function () {
@@ -341,25 +415,27 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
 
     describe("Summary reports", function () {
         it("should print overall summary", async function () {
-            expect(allResults.length).to.equal(324);
+            expect(allResults.length + executionFailures.length).to.equal(324);
             printSummary("OVERALL SUMMARY", allResults);
         });
 
         for (const fnObj of functions) {
             it(`should print summary for ${fnObj.displayName}`, async function () {
                 const filtered = allResults.filter((r) => r.functionName === fnObj.displayName);
-                expect(filtered.length).to.equal(108);
+                const failures = executionFailures.filter(f => f.functionName === fnObj.displayName);
+                expect(filtered.length + failures.length).to.equal(108);
 
-                printSummary(`SUMMARY - ${fnObj.displayName}`, filtered);
+                printSummary(`SUMMARY - ${fnObj.displayName}`, filtered, failures);
             });
         }
 
         for (const method of methods) {
             it(`should print summary for ${method.name}`, async function () {
                 const filtered = allResults.filter((r) => r.method === method.name);
-                expect(filtered.length).to.equal(108);
+                const failures = executionFailures.filter(f => f.method === method.name);
+                expect(filtered.length + failures.length).to.equal(108);
 
-                printSummary(`SUMMARY - ${method.name}`, filtered);
+                printSummary(`SUMMARY - ${method.name}`, filtered, failures);
             });
         }
 
@@ -369,9 +445,12 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
                     const filtered = allResults.filter(
                         (r) => r.method === method.name && r.functionName === fnObj.displayName
                     );
-                    expect(filtered.length).to.equal(36);
+                    const failures = executionFailures.filter(
+                        f => f.method === method.name && f.functionName === fnObj.displayName
+                    );
+                    expect(filtered.length + failures.length).to.equal(36);
 
-                    printSummary(`SUMMARY - ${method.name} | ${fnObj.displayName}`, filtered);
+                    printSummary(`SUMMARY - ${method.name} | ${fnObj.displayName}`, filtered, failures);
                 });
             }
         }

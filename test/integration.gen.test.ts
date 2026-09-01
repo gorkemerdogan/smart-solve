@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { classifyExecutionFailure, type ExecutionFailureKind } from "./test-utils";
 
 describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     this.timeout(0); // Infinity minutes
@@ -30,7 +31,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
 
     type MethodName = "trapezoidal" | "simpson13" | "simpson38";
     type FunctionKey = "f_one" | "f_linear" | "f_square" | "f_cube" | "f_sin" | "f_inv" | "f_piecewise";
-    type RunStatus = "success" | "revert";
+    type RunStatus = "success" | ExecutionFailureKind;
 
     interface IntervalSpec {
         label: string;
@@ -69,6 +70,9 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
         estimatedGas: bigint | null;
         gasUsed: bigint | null;
         status: RunStatus;
+        passed: boolean;
+        absTolerance: number;
+        relTolerance: number;
         errorMessage: string | null;
     }
 
@@ -82,6 +86,14 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     const SCALE = 1_000_000_000_000n; // 1e12
     const N_VALUES = [12n, 24n, 48n, 96n, 192n, 384n, 768n, 1152n, 1536n, 1920n, 2304n, 2688n, 3072n];
     const METHODS: MethodName[] = ["trapezoidal", "simpson13", "simpson38"];
+
+    // Smooth benchmarks must meet a 2% relative-error target (or a tight
+    // absolute target near zero). The discontinuous piecewise benchmark uses
+    // an explicit, looser absolute guard appropriate for the coarsest grid.
+    const SMOOTH_ABS_TOL = 1e-9;
+    const SMOOTH_REL_TOL = 2e-2;
+    const PIECEWISE_ABS_TOL = 2.5e-1;
+    const PIECEWISE_REL_TOL = 1e-1;
 
     let SIN_INTERVALS_QUAD: QuadIntervalSpec[] = [];
 
@@ -136,6 +148,12 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
         return Math.abs(actual - expected) / denom;
     }
 
+    function tolerancesFor(fn: BenchmarkFunction): { abs: number; rel: number } {
+        return fn.key === "f_piecewise"
+            ? { abs: PIECEWISE_ABS_TOL, rel: PIECEWISE_REL_TOL }
+            : { abs: SMOOTH_ABS_TOL, rel: SMOOTH_REL_TOL };
+    }
+
     function mean(values: number[]): number {
         if (values.length === 0) return 0;
         return values.reduce((acc, v) => acc + v, 0) / values.length;
@@ -182,6 +200,10 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     function printOverallSummary(records: TestRecord[]): void {
         const success = records.filter((r) => r.status === "success");
         const reverted = records.filter((r) => r.status === "revert");
+        const outOfGas = records.filter((r) => r.status === "out-of-gas");
+        const failed = records.filter((r) => r.status === "failure");
+        const numericalPasses = success.filter((r) => r.passed);
+        const numericalFailures = success.filter((r) => !r.passed);
 
         const absErrors = success.map((r) => r.absError!).filter((v) => v !== null);
         const relErrors = success.map((r) => r.relError!).filter((v) => v !== null);
@@ -193,15 +215,20 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
         console.log("============================================================");
         console.log(`Total Tests           : ${records.length}`);
         console.log(`Successful Tests      : ${success.length}`);
+        console.log(`Numerical Passes      : ${numericalPasses.length}`);
+        console.log(`Numerical Failures    : ${numericalFailures.length}`);
+        console.log(`Execution Failures    : ${failed.length}`);
         console.log(`Reverted Tests        : ${reverted.length}`);
+        console.log(`Out-of-Gas Tests      : ${outOfGas.length}`);
+        console.log(`Pass Rate             : ${records.length === 0 ? "0.00" : ((numericalPasses.length / records.length) * 100).toFixed(2)}%`);
 
         if (success.length > 0) {
-            console.log(`Average Abs. Error    : ${mean(absErrors)}`);
-            console.log(`Average Rel. Error    : ${mean(relErrors)}`);
+            console.log(`Average Abs. Error (successful executions only): ${mean(absErrors)}`);
+            console.log(`Average Rel. Error (successful executions only): ${mean(relErrors)}`);
             console.log(`Min Abs. Error        : ${minNumber(absErrors)}`);
             console.log(`Max Abs. Error        : ${maxNumber(absErrors)}`);
-            console.log(`Average Estimated Gas : ${meanBigInt(estimatedGases).toString()}`);
-            console.log(`Average Gas Used      : ${meanBigInt(gasUsedValues).toString()}`);
+            console.log(`Average Estimated Gas (successful executions only): ${meanBigInt(estimatedGases).toString()}`);
+            console.log(`Average Gas Used (successful executions only): ${meanBigInt(gasUsedValues).toString()}`);
             console.log(`Min Estimated Gas     : ${minBigInt(estimatedGases).toString()}`);
             console.log(`Max Estimated Gas     : ${maxBigInt(estimatedGases).toString()}`);
             console.log(`Min Gas Used          : ${minBigInt(gasUsedValues).toString()}`);
@@ -216,6 +243,10 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             const subset = records.filter((r) => r.method === method);
             const success = subset.filter((r) => r.status === "success");
             const reverted = subset.filter((r) => r.status === "revert");
+            const outOfGas = subset.filter((r) => r.status === "out-of-gas");
+            const failed = subset.filter((r) => r.status === "failure");
+            const numericalPasses = success.filter((r) => r.passed);
+            const numericalFailures = success.filter((r) => !r.passed);
 
             const absErrors = success.map((r) => r.absError!).filter((v) => v !== null);
             const relErrors = success.map((r) => r.relError!).filter((v) => v !== null);
@@ -227,15 +258,20 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             console.log("============================================================");
             console.log(`Total Tests           : ${subset.length}`);
             console.log(`Successful Tests      : ${success.length}`);
+            console.log(`Numerical Passes      : ${numericalPasses.length}`);
+            console.log(`Numerical Failures    : ${numericalFailures.length}`);
+            console.log(`Execution Failures    : ${failed.length}`);
             console.log(`Reverted Tests        : ${reverted.length}`);
+            console.log(`Out-of-Gas Tests      : ${outOfGas.length}`);
+            console.log(`Pass Rate             : ${subset.length === 0 ? "0.00" : ((numericalPasses.length / subset.length) * 100).toFixed(2)}%`);
 
             if (success.length > 0) {
-                console.log(`Average Abs. Error    : ${mean(absErrors)}`);
-                console.log(`Average Rel. Error    : ${mean(relErrors)}`);
+                console.log(`Average Abs. Error (successful executions only): ${mean(absErrors)}`);
+                console.log(`Average Rel. Error (successful executions only): ${mean(relErrors)}`);
                 console.log(`Min Abs. Error        : ${minNumber(absErrors)}`);
                 console.log(`Max Abs. Error        : ${maxNumber(absErrors)}`);
-                console.log(`Average Estimated Gas : ${meanBigInt(estimatedGases).toString()}`);
-                console.log(`Average Gas Used      : ${meanBigInt(gasUsedValues).toString()}`);
+                console.log(`Average Estimated Gas (successful executions only): ${meanBigInt(estimatedGases).toString()}`);
+                console.log(`Average Gas Used (successful executions only): ${meanBigInt(gasUsedValues).toString()}`);
                 console.log(`Min Estimated Gas     : ${minBigInt(estimatedGases).toString()}`);
                 console.log(`Max Estimated Gas     : ${maxBigInt(estimatedGases).toString()}`);
                 console.log(`Min Gas Used          : ${minBigInt(gasUsedValues).toString()}`);
@@ -259,6 +295,9 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             console.log(`Actual        : ${record.actual}`);
             console.log(`Abs. Error    : ${record.absError}`);
             console.log(`Rel. Error    : ${record.relError}`);
+            console.log(`Accuracy      : ${record.passed ? "PASS" : "FAIL"}`);
+            console.log(`Abs. Tolerance: ${record.absTolerance}`);
+            console.log(`Rel. Tolerance: ${record.relTolerance}`);
             console.log(`Estimated Gas : ${record.estimatedGas?.toString()}`);
             console.log(`Gas Used      : ${record.gasUsed?.toString()}`);
         } else {
@@ -295,6 +334,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
 
         try {
             const expected = fn.exactIntegral(aLabelNum, bLabelNum);
+            const tolerances = tolerancesFor(fn);
 
             const txRequest = await harness.getFunction(method).populateTransaction(
                 target,
@@ -325,6 +365,8 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
 
             const result = await harness[method](target, selector, aQuad, bQuad, n);
             const actual = await quadToNumber(result);
+            const absError = Math.abs(actual - expected);
+            const relError = computeRelativeError(actual, expected);
 
             return {
                 method,
@@ -336,14 +378,18 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
                 n,
                 expected,
                 actual,
-                absError: Math.abs(actual - expected),
-                relError: computeRelativeError(actual, expected),
+                absError,
+                relError,
                 estimatedGas,
                 gasUsed,
                 status: "success",
+                passed: absError <= tolerances.abs || relError <= tolerances.rel,
+                absTolerance: tolerances.abs,
+                relTolerance: tolerances.rel,
                 errorMessage: null,
             };
         } catch (err) {
+            const tolerances = tolerancesFor(fn);
             return {
                 method,
                 func: fn.key,
@@ -358,7 +404,10 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
                 relError: null,
                 estimatedGas: null,
                 gasUsed: null,
-                status: "revert",
+                status: classifyExecutionFailure(err),
+                passed: false,
+                absTolerance: tolerances.abs,
+                relTolerance: tolerances.rel,
                 errorMessage: extractErrorMessage(err),
             };
         }
@@ -563,5 +612,17 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
 
         printOverallSummary(records);
         printMethodSummaries(records);
+
+        const executionFailures = records.filter((r) => r.status !== "success");
+        const numericalFailures = records.filter((r) => r.status === "success" && !r.passed);
+
+        expect(
+            executionFailures,
+            `Unexpected integration execution failures: ${executionFailures.slice(0, 5).map((r) => `${r.method}/${r.func}/${r.intervalLabel}/n=${r.n}:${r.status}`).join(", ")}`
+        ).to.deep.equal([]);
+        expect(
+            numericalFailures,
+            `Integration accuracy threshold exceeded: ${numericalFailures.slice(0, 5).map((r) => `${r.method}/${r.func}/${r.intervalLabel}/n=${r.n}:abs=${r.absError},rel=${r.relError}`).join(", ")}`
+        ).to.deep.equal([]);
     });
 });

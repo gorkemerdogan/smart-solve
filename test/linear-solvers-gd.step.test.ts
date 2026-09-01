@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { classifyExecutionFailure, type ExecutionFailureKind } from "./test-utils";
 
 // ------------------------------------------------------------
 // Contract Type
@@ -70,6 +71,23 @@ function formatScaledInt(v: bigint): string {
     const fracPart = abs % SCALE;
     const fracStr = fracPart.toString().padStart(Number(SCALE_DECIMALS), "0");
     return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`.replace(/\.?0+$/, "");
+}
+
+function assertGdAccuracy(label: string, total: number, errors: bigint[], residuals: bigint[]) {
+    const errorTolerance = SCALE / 100n;
+    const residualTolerance = SCALE / 10n;
+    const passed = errors.filter(
+        (error, i) => error <= errorTolerance && residuals[i] <= residualTolerance
+    ).length;
+    console.log(`Total Cases          : ${total}`);
+    console.log(`Successful Cases     : ${errors.length}`);
+    console.log(`Failed Cases         : ${total - passed}`);
+    console.log("Reverted Cases       : 0");
+    console.log("Out-of-Gas Cases     : 0");
+    console.log(`Pass Rate            : ${((passed / total) * 100).toFixed(2)}%`);
+    console.log("Averages             : successful executions only");
+    expect(errors.length, `${label}: successful case count`).to.equal(total);
+    expect(passed, `${label}: cases within numerical tolerances`).to.equal(total);
 }
 
 function sumBigInt(arr: bigint[]): bigint {
@@ -381,7 +399,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     avgIter: avgBigInt(itersArr),
                 });
 
-                expect(errs.length).to.equal(T);
+                assertGdAccuracy(`GD size (m,n)=(${cfg.m},${cfg.n})`, T, errs, residuals);
             }
         });
     });
@@ -450,7 +468,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     avgIter: avgBigInt(itersArr),
                 });
 
-                expect(errs.length).to.equal(T);
+                assertGdAccuracy(`GD alpha=${cfg.name}`, T, errs, residuals);
             }
         });
     });
@@ -472,6 +490,12 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
             const x0data = await qVecFromScaledInts(harness, x0);
 
             let atLeastOneWorked = false;
+            const failures: Record<ExecutionFailureKind, number> = {
+                revert: 0,
+                "out-of-gas": 0,
+                failure: 0,
+            };
+            let successfulCases = 0;
 
             for (const iterBudget of iterBudgets) {
                 try {
@@ -497,13 +521,26 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     });
 
                     atLeastOneWorked = true;
-                } catch {
+                    successfulCases++;
+                } catch (error) {
+                    const failureKind = classifyExecutionFailure(error);
+                    failures[failureKind]++;
                     printFeasibilityLine({
                         label: `GD feasibility for (m,n)=(${m},${n}), maxIter=${iterBudget.toString()}`,
-                        status: "execution became impractical or exceeded the available gas budget",
+                        status: `expected feasibility-limit ${failureKind}: execution became impractical`,
                     });
                 }
             }
+
+            const failedCases = iterBudgets.length - successfulCases;
+            console.log(`Total Cases          : ${iterBudgets.length}`);
+            console.log(`Successful Cases     : ${successfulCases}`);
+            console.log(`Failed Cases         : ${failedCases} (expected in this feasibility-limit experiment)`);
+            console.log(`Reverted Cases       : ${failures.revert}`);
+            console.log(`Out-of-Gas Cases     : ${failures["out-of-gas"]}`);
+            console.log(`Other Failures       : ${failures.failure}`);
+            console.log(`Pass Rate            : ${((successfulCases / iterBudgets.length) * 100).toFixed(2)}%`);
+            console.log("Gas/accuracy averages: successful executions only");
 
             expect(atLeastOneWorked).to.equal(true);
         });

@@ -664,7 +664,10 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
                         );
 
                         expect(toGasBigInt(gas) > 0n).to.equal(true);
-                        // expect(stats.maxAbsError <= stats.absTol).to.equal(true);
+                        expect(
+                            stats.maxAbsError <= stats.absTol,
+                            `n=${n}, case=${caseNo}: determinant absolute error exceeds tolerance`
+                        ).to.equal(true);
                     }
 
                     const avgAbsError = errSum / BigInt(CASES_PER_SIZE_ADVANCED);
@@ -678,7 +681,11 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
 
                     console.log(`Average for n=${n}`);
                     console.log(`  avg abs error = ${formatScaledInt(avgAbsError)}`);
-                    console.log(`  avg gas usage = ${avgGas}`);
+                    console.log(`  avg gas usage = ${avgGas} (successful executions only)`);
+                    console.log(`  total cases = ${CASES_PER_SIZE_ADVANCED}`);
+                    console.log(`  successful cases = ${CASES_PER_SIZE_ADVANCED}`);
+                    console.log("  failed/reverted/out-of-gas cases = 0/0/0");
+                    console.log("  pass rate = 100.00%");
                     console.log("============================================================");
                 }
 
@@ -686,7 +693,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
 
                 for (const item of results) {
                     console.log(
-                        `n=${item.n} | avg abs error=${formatScaledInt(item.avgAbsError)} | avg gas usage=${item.avgGas}`
+                        `n=${item.n} | avg abs error=${formatScaledInt(item.avgAbsError)} | avg gas usage=${item.avgGas} (successful executions only) | failures=0`
                     );
                 }
 

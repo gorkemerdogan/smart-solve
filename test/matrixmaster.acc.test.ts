@@ -713,12 +713,16 @@ describe("MatrixMasterHarness - Accuracy Tests", function () {
         avgAbsError: number;
         avgRelError: number;
         avgGas: bigint;
+        failedCases: number;
     }[] = [];
+
+    const REL_TOL_DET = 1e-10;
 
     for (const n of DET_SIZES) {
         let absErrSum = 0;
         let relErrSum = 0;
         let gasSum = 0n;
+        let failedCases = 0;
 
         console.log("============================================================");
         console.log(`Determinant Accuracy Results for n=${n}`);
@@ -747,6 +751,7 @@ describe("MatrixMasterHarness - Accuracy Tests", function () {
             absErrSum += absErr;
             relErrSum += relErr;
             gasSum += gasUsed;
+            if (!Number.isFinite(relErr) || relErr >= REL_TOL_DET) failedCases++;
 
             console.log(`Case ${caseId + 1}/${TEST_COUNT}`);
             console.log(`  det_sol   = ${detSol}`);
@@ -761,12 +766,18 @@ describe("MatrixMasterHarness - Accuracy Tests", function () {
         const avgRelError = relErrSum / TEST_COUNT;
         const avgGas = gasSum / BigInt(TEST_COUNT);
 
-        results.push({ n, avgAbsError, avgRelError, avgGas });
+        results.push({ n, avgAbsError, avgRelError, avgGas, failedCases });
 
         console.log(`Average for n=${n}`);
         console.log(`  avg abs error = ${avgAbsError}`);
         console.log(`  avg rel error = ${avgRelError}`);
-        console.log(`  avg gas usage = ${avgGas}`);
+        console.log(`  avg gas usage = ${avgGas} (successful executions only)`);
+        console.log(`  total cases = ${TEST_COUNT}`);
+        console.log(`  successful executions = ${TEST_COUNT}`);
+        console.log(`  numerical failures = ${failedCases}`);
+        console.log("  reverted cases = 0");
+        console.log("  out-of-gas cases = 0");
+        console.log(`  pass rate = ${(((TEST_COUNT - failedCases) / TEST_COUNT) * 100).toFixed(2)}%`);
         console.log("============================================================");
     }
 
@@ -774,10 +785,10 @@ describe("MatrixMasterHarness - Accuracy Tests", function () {
 
     for (const item of results) {
         console.log(
-            `n=${item.n} | avg abs error=${item.avgAbsError} | avg rel error=${item.avgRelError} | avg gas usage=${item.avgGas}`
+            `n=${item.n} | avg abs error=${item.avgAbsError} | avg rel error=${item.avgRelError} | avg gas usage=${item.avgGas} (successful executions only) | failed=${item.failedCases}`
         );
 
-        expect(item.avgRelError).to.be.lessThan(1e-10);
+        expect(item.failedCases, `n=${item.n}: determinant cases outside relative tolerance`).to.equal(0);
     }
 
     console.log("##################################################################");

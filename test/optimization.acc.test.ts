@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { classifyExecutionFailure } from "./test-utils";
 
 // ------------------------------------------------------------
 // Types
@@ -43,7 +44,13 @@ type BenchmarkSummary = {
     averageGasScaled: bigint;
     minGas: bigint;
     maxGas: bigint;
+    executionSuccessCount: number;
     successCount: number;
+    numericalPassCount: number;
+    failedCount: number;
+    revertedCount: number;
+    outOfGasCount: number;
+    otherFailureCount: number;
 };
 
 // ------------------------------------------------------------
@@ -59,6 +66,8 @@ const FIXED_SEED = 37n;
 const NUM_TESTS = 30;
 const RANDOM_MIN = -10n;
 const RANDOM_MAX = 10n;
+const DISTANCE_TOL_SCALED = 100_000_000n; // 1e-4 at the harness scale
+const OBJECTIVE_TOL_SCALED = 10_000n;     // 1e-8 at the harness scale
 
 // ------------------------------------------------------------
 // Helpers
@@ -156,8 +165,7 @@ function maxBigInt(values: bigint[]): bigint {
 function isSuccessfulStatus(status: bigint): boolean {
     return (
         status === STATUS_SUCCESS ||
-        status === STATUS_ZERO_GRADIENT ||
-        status === STATUS_NO_LIKELY_IMPROVEMENT
+        status === STATUS_ZERO_GRADIENT
     );
 }
 
@@ -258,15 +266,23 @@ function printBenchmarkSummary(summary: BenchmarkSummary): void {
     console.log("============================================================");
     console.log(`Benchmark                : ${summary.objectiveName}`);
     console.log(`Number of Tests          : ${summary.numberOfTests}`);
+    console.log(`Successful Executions    : ${summary.executionSuccessCount}`);
+    console.log(`Execution Failures       : ${summary.failedCount}`);
+    console.log(`Reverted Cases           : ${summary.revertedCount}`);
+    console.log(`Out-of-Gas Cases         : ${summary.outOfGasCount}`);
+    console.log(`Other Failures           : ${summary.otherFailureCount}`);
+    console.log(`Numerical Passes         : ${summary.numericalPassCount}`);
+    console.log(`Numerical Failures       : ${summary.executionSuccessCount - summary.numericalPassCount}`);
     console.log(`Average Distance to Optimum : ${formatScaledInt(summary.averageDistance)}`);
     console.log(`Min Distance             : ${formatScaledInt(summary.minDistance)}`);
     console.log(`Max Distance             : ${formatScaledInt(summary.maxDistance)}`);
     console.log(`Average Final Objective Value : ${formatScaledInt(summary.averageFinalObjectiveValue)}`);
     console.log(`Average Iterations       : ${formatIntegerAverageScaled(summary.averageIterationsScaled)}`);
-    console.log(`Average Gas Consumption  : ${formatIntegerAverageScaled(summary.averageGasScaled)}`);
+    console.log(`Average Gas Consumption (successful executions only): ${formatIntegerAverageScaled(summary.averageGasScaled)}`);
     console.log(`Min Gas                  : ${summary.minGas.toString()}`);
     console.log(`Max Gas                  : ${summary.maxGas.toString()}`);
     console.log(`Success Rate             : ${formatIntegerAverageScaled(successRateScaled)}% (${summary.successCount}/${summary.numberOfTests})`);
+    console.log(`Numerical Pass Rate      : ${((summary.numericalPassCount * 100) / summary.numberOfTests).toFixed(2)}%`);
     console.log("============================================================");
 }
 
@@ -349,7 +365,13 @@ describe("SteepestDescent Library - Accuracy & Gas Summary Benchmarks", function
         const finalObjectiveValues: bigint[] = [];
         const iterationCounts: bigint[] = [];
         const gasValues: bigint[] = [];
+        let executionSuccessCount = 0;
         let successCount = 0;
+        let numericalPassCount = 0;
+        let failedCount = 0;
+        let revertedCount = 0;
+        let outOfGasCount = 0;
+        let otherFailureCount = 0;
 
         for (let testNo = 1; testNo <= NUM_TESTS; testNo++) {
             const x0 = await buildDeterministicInitialVector(
@@ -361,25 +383,42 @@ describe("SteepestDescent Library - Accuracy & Gas Summary Benchmarks", function
                 RANDOM_MAX
             );
 
-            const result = await solveWithGas(
-                solver,
-                await args.objective.getAddress(),
-                x0,
-                args.maxIter,
-                TOL_1E_9
-            );
+            try {
+                const result = await solveWithGas(
+                    solver,
+                    await args.objective.getAddress(),
+                    x0,
+                    args.maxIter,
+                    TOL_1E_9
+                );
 
-            const xComputed = await scaledVec(solver, result.xRaw);
-            const distance = vecInfNorm(subVec(xComputed, zeroVector));
-            const finalObjective = absBigInt(asBigInt(await solver.toFloat(result.gRaw)));
+                const xComputed = await scaledVec(solver, result.xRaw);
+                const distance = vecInfNorm(subVec(xComputed, zeroVector));
+                const finalObjective = absBigInt(asBigInt(await solver.toFloat(result.gRaw)));
 
-            distances.push(distance);
-            finalObjectiveValues.push(finalObjective);
-            iterationCounts.push(result.iterations);
-            gasValues.push(result.gasUsed);
+                executionSuccessCount++;
+                distances.push(distance);
+                finalObjectiveValues.push(finalObjective);
+                iterationCounts.push(result.iterations);
+                gasValues.push(result.gasUsed);
 
-            if (isSuccessfulStatus(result.status)) {
-                successCount++;
+                const successfulStatus = isSuccessfulStatus(result.status);
+                if (successfulStatus) successCount++;
+                if (
+                    successfulStatus &&
+                    distance <= DISTANCE_TOL_SCALED &&
+                    finalObjective <= OBJECTIVE_TOL_SCALED
+                ) {
+                    numericalPassCount++;
+                }
+            } catch (error) {
+                failedCount++;
+                const kind = classifyExecutionFailure(error);
+                if (kind === "revert") revertedCount++;
+                else if (kind === "out-of-gas") outOfGasCount++;
+                else otherFailureCount++;
+
+                console.log(`Unexpected ${kind} in ${args.objectiveName}, case ${testNo}: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
 
@@ -393,14 +432,26 @@ describe("SteepestDescent Library - Accuracy & Gas Summary Benchmarks", function
             minDistance: minBigInt(distances),
             maxDistance: maxBigInt(distances),
             averageFinalObjectiveValue: avgBigInt(finalObjectiveValues),
-            averageIterationsScaled: (iterationSum * 1000n) / BigInt(NUM_TESTS),
-            averageGasScaled: (gasSum * 1000n) / BigInt(NUM_TESTS),
+            averageIterationsScaled: executionSuccessCount === 0 ? 0n : (iterationSum * 1000n) / BigInt(executionSuccessCount),
+            averageGasScaled: executionSuccessCount === 0 ? 0n : (gasSum * 1000n) / BigInt(executionSuccessCount),
             minGas: minBigInt(gasValues),
             maxGas: maxBigInt(gasValues),
+            executionSuccessCount,
             successCount,
+            numericalPassCount,
+            failedCount,
+            revertedCount,
+            outOfGasCount,
+            otherFailureCount,
         };
 
         printBenchmarkSummary(summary);
+        expect(summary.failedCount, `${args.objectiveName} had unexpected execution failures`).to.equal(0);
+        expect(summary.successCount, `${args.objectiveName} returned a non-success solver status`).to.equal(NUM_TESTS);
+        expect(
+            summary.numericalPassCount,
+            `${args.objectiveName} exceeded distance<=1e-4 or objective<=1e-8 in one or more cases`
+        ).to.equal(NUM_TESTS);
         return summary;
     }
 

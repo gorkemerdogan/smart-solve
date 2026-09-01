@@ -10,12 +10,46 @@ export interface Harness extends Contract {
     [key: string]: any;
 }
 
+export type ExecutionFailureKind = "revert" | "out-of-gas" | "failure";
+
+/**
+ * Classify an unexpected execution failure without hiding the original error.
+ * The classification is intentionally conservative: only recognizable EVM
+ * revert and gas-limit messages receive a specific label.
+ */
+export function classifyExecutionFailure(error: unknown): ExecutionFailureKind {
+    const message = error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : String(error);
+    const normalized = message.toLowerCase();
+
+    if (
+        normalized.includes("out of gas") ||
+        normalized.includes("out-of-gas") ||
+        normalized.includes("exceeds block gas limit") ||
+        normalized.includes("gas required exceeds allowance") ||
+        normalized.includes("intrinsic gas too low")
+    ) {
+        return "out-of-gas";
+    }
+
+    if (
+        normalized.includes("revert") ||
+        normalized.includes("call exception") ||
+        normalized.includes("execution reverted")
+    ) {
+        return "revert";
+    }
+
+    return "failure";
+}
+
 // ------------------------------------------------------------
 //  Gas Estimation Utilities
 // ------------------------------------------------------------
 
 /**
- * @notify        Executes a transaction to touch the gas and confirms it. Reverts are caught and ignored.
+ * @notify        Executes a transaction to touch the gas and confirms it. Failures are classified and propagated.
  * @param harness The contract harness instance.
  * @param method  The name of the contract method to call.
  * @param args    The arguments for the contract method.
@@ -33,8 +67,9 @@ export async function touchGas(harness: Harness, method: string, args: any[]): P
         // Wait for the transaction to be mined for a reliable touch
         await tx.wait();
     } catch (error) {
-        // Log the error for debugging
-        console.warn(`touchGas failed for ${method}:`, error instanceof Error ? error.message : error);
+        const kind = classifyExecutionFailure(error);
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(`touchGas ${kind} for ${method}: ${reason}`);
     }
 }
 
