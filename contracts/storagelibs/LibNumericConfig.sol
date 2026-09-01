@@ -11,6 +11,7 @@ import { QuadConstants as QC } from "../libraries/QuadConstants.sol";
 library LibNumericConfig {
 
     uint256 private constant DEFAULT_MAX_ITER = 100;
+    uint256 private constant ROOT_FINDING_DEFAULT_MAX_ITER = 200;
 
     // Fixed storage slot for numeric config (unique hash key)
     bytes32 internal constant SLOT = keccak256("smart-solve.numeric.config.v1");
@@ -124,5 +125,45 @@ library LibNumericConfig {
             return QC.DEFAULT_DIFF_STEP();
         }
         return h;
+    }
+
+    // ------------------------------------------------------------
+    // Root-finding effective configuration
+    // ------------------------------------------------------------
+
+    /**
+     * @notice Returns the root-finding minimum tolerance.
+     * @dev RootFinding historically supports a tighter floor than the shared
+     *      numerical default. Keep that behavior explicit and centralized.
+     */
+    function getRootFindingMinTol() internal view returns (bytes16) {
+        bytes16 t = cfg().minTol;
+        if (MathLib.cmp(t, MathLib.fromInt(0)) == 0) {
+            return QC.EPS_1e36();
+        }
+        return t;
+    }
+
+    /**
+     * @notice Returns the effective root-finding configuration.
+     */
+    function getRootFindingConfig()
+        internal
+        view
+        returns (bytes16 tol, bytes16 minTol, uint256 maxIter)
+    {
+        minTol = getRootFindingMinTol();
+        tol = cfg().tol;
+        if (MathLib.cmp(tol, MathLib.fromInt(0)) == 0) {
+            tol = QC.DEFAULT_TOL();
+        }
+        if (MathLib.cmp(tol, minTol) < 0) {
+            tol = minTol;
+        }
+
+        maxIter = cfg().maxIter;
+        if (maxIter == 0) {
+            maxIter = ROOT_FINDING_DEFAULT_MAX_ITER;
+        }
     }
 }

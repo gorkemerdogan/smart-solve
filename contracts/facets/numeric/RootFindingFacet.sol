@@ -3,8 +3,6 @@ pragma solidity ^0.8.20;
 
 import { RootFinding } from "../../libraries/numeric/RootFinding.sol";
 import { LibNumericConfig } from "../../storagelibs/LibNumericConfig.sol";
-import { QuadConstants } from "../../libraries/QuadConstants.sol";
-import { MathLib } from "../../libraries/MathLib.sol";
 
 /**
  * @title  RootFindingFacet
@@ -17,25 +15,8 @@ contract RootFindingFacet {
 
     /// Loads configuration values, applying fallback defaults if unset.
     function _readCfg() internal view returns (bytes16 tol, uint256 maxIter) {
-        LibNumericConfig.NumericConfig storage cfg = LibNumericConfig.cfg();
-
-        bytes16 minTol = cfg.minTol;
-        tol = cfg.tol;
-        maxIter = cfg.maxIter;
-
-        if (minTol == bytes16(0)) {
-            minTol = QuadConstants.EPS_1e15();
-        }
-
-        if (tol == bytes16(0)) {
-            tol = QuadConstants.EPS_1e12();
-        }
-
-        tol = (MathLib.cmp(tol, minTol) < 0) ? minTol : tol; // tol must be at least equal to minTol
-
-        if (maxIter == 0) {
-            maxIter = 200;
-        }
+        bytes16 ignoredMinTol;
+        (tol, ignoredMinTol, maxIter) = LibNumericConfig.getRootFindingConfig();
     }
 
     /**

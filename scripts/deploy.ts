@@ -18,6 +18,7 @@ const NUMERIC_FACETS = [
 ] as const;
 
 const MATHLIB_NUMERIC_FACETS = new Set<string>([
+  "NumericConfigFacet",
   "RootFindingFacet",
   "IntegrationFacet",
   "DifferentiationFacet",
