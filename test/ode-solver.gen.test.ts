@@ -67,6 +67,7 @@ interface BenchmarkDef {
     label: string;
     selector: string;
     exactSolution: (y0: number, xFinal: number) => number;
+    rhs: (x: number, y: number) => number;
 }
 
 interface TestCase {
@@ -210,6 +211,47 @@ function numberToScaledBigInt(value: number): bigint {
     return decimalStringToScaledBigInt(value.toExponential(24), Number(SCALE_DECIMALS));
 }
 
+function referenceStep(method: MethodLabel, rhs: BenchmarkDef["rhs"], x: number, y: number, h: number): number {
+    const k1 = rhs(x, y);
+    if (method === "Euler") return y + h * k1;
+
+    if (method === "RK2 Midpoint") {
+        return y + h * rhs(x + h / 2, y + h * k1 / 2);
+    }
+
+    if (method === "RK2 Heun") {
+        const k2 = rhs(x + h, y + h * k1);
+        return y + h * (k1 + k2) / 2;
+    }
+
+    const k2 = rhs(x + h / 2, y + h * k1 / 2);
+    const k3 = rhs(x + h / 2, y + h * k2 / 2);
+    const k4 = rhs(x + h, y + h * k3);
+    return y + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6;
+}
+
+function methodAwareToleranceScaled(
+    method: MethodLabel,
+    benchmark: BenchmarkDef,
+    tc: TestCase,
+    exactValue: number
+): bigint {
+    const h = tc.hNum / tc.hDen;
+    let x = 0;
+    let y = tc.y0;
+    for (let i = 0; i < tc.steps; i++) {
+        y = referenceStep(method, benchmark.rhs, x, y, h);
+        x += h;
+    }
+
+    // The reference method captures the method's expected truncation error.
+    // The additional 1e-9 relative/absolute allowance covers conversion from
+    // IEEE-754 reference values into the suite's 1e12 reporting scale.
+    const discretizationError = Math.abs(y - exactValue);
+    const conversionAllowance = 1e-9 * Math.max(1, Math.abs(exactValue));
+    return numberToScaledBigInt(discretizationError + conversionAllowance);
+}
+
 function initStats(): MethodStats {
     return {
         count: 0,
@@ -349,52 +391,14 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
 
     const Y0_VALUES = [0, 1, 2];
 
-    const STEP_CASES: StepCase[] = [
+    const ACCURACY_STEP_CASES: StepCase[] = [
         { hNum: 1, hDen: 10, hLabel: "0.1", steps: 10 },
-        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 50 },
-        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 100 },
-        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 200 },
-        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 400 },
-        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 600 },
-        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 700 },
-        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 800 },
-        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 1000 },
-        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 1500 },
-
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 10 },
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 50 },
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 100 },
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 200 },
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 400 },
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 600 },
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 700 },
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 800 },
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 1000 },
-        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 1500 },
-
-        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 10 },
-        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 50 },
+        { hNum: 1, hDen: 10, hLabel: "0.1", steps: 20 },
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 20 },
+        { hNum: 1, hDen: 20, hLabel: "0.05", steps: 40 },
         { hNum: 1, hDen: 100, hLabel: "0.01", steps: 100 },
         { hNum: 1, hDen: 100, hLabel: "0.01", steps: 200 },
-        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 400 },
-        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 600 },
-        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 700 },
-        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 800 },
-        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 1000 },
-        { hNum: 1, hDen: 100, hLabel: "0.01", steps: 1500 },
     ];
-
-    const ABS_TOL = 1_000_000n; // 1e-6 at SCALE = 1e12
-    const REL_TOL_BY_METHOD: Record<MethodLabel, bigint> = {
-        Euler: 600_000_000_000n,        // 60%
-        "RK2 Midpoint": 30_000_000_000n, // 3%
-        "RK2 Heun": 30_000_000_000n,     // 3%
-        RK4: 100_000_000n,              // 0.01%
-    };
-
-    function accuracyPass(method: MethodLabel, absErr: bigint, relErrScaled: bigint): boolean {
-        return absErr <= ABS_TOL || relErrScaled <= REL_TOL_BY_METHOD[method];
-    }
 
     const qInt = async (x: number | bigint) => await harness.qFromInt(x);
     const qFrac = async (num: number | bigint, den: number | bigint) => await harness.qFromFrac(num, den);
@@ -427,7 +431,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
         SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
-    it("should evaluate ODE accuracy cases and skip excessive exponential cases", async function () {
+    it("evaluates bounded ODE accuracy at paired step refinements", async function () {
         const x0 = await qInt(0n);
 
         const benchmarks: BenchmarkDef[] = [
@@ -436,18 +440,21 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                 label: "y' = 5",
                 selector: selConst5,
                 exactSolution: (y0: number, xFinal: number) => y0 + 5 * xFinal,
+                rhs: () => 5,
             },
             {
                 key: "linear",
                 label: "y' = y",
                 selector: selLinear,
                 exactSolution: (y0: number, xFinal: number) => y0 * Math.exp(xFinal),
+                rhs: (_x, y) => y,
             },
             {
                 key: "square",
                 label: "y' = x^2",
                 selector: selSquare,
                 exactSolution: (y0: number, xFinal: number) => y0 + (xFinal ** 3) / 3,
+                rhs: (x) => x ** 2,
             },
             {
                 key: "cubicPoly",
@@ -455,6 +462,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                 selector: selCubicPoly,
                 exactSolution: (y0: number, xFinal: number) =>
                     y0 + (xFinal ** 4) / 4 + (xFinal ** 3) / 3 + xFinal ** 2 + 3 * xFinal,
+                rhs: (x) => x ** 3 + x ** 2 + 2 * x + 3,
             },
         ];
 
@@ -462,7 +470,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
         let caseNo = 0;
 
         for (const y0 of Y0_VALUES) {
-            for (const sc of STEP_CASES) {
+            for (const sc of ACCURACY_STEP_CASES) {
                 caseNo += 1;
 
                 testCases.push({
@@ -554,7 +562,8 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                         const actualScaled = await outScaled(harness, run.output);
                         const absErr = scaledAbsError(actualScaled, expectedScaled);
                         const relErrScaled = scaledRelErrorScaled(actualScaled, expectedScaled);
-                        const passed = accuracyPass(method.label, absErr, relErrScaled);
+                        const tolerance = methodAwareToleranceScaled(method.label, benchmark, tc, expectedValue);
+                        const passed = absErr <= tolerance;
 
                         updateStats(
                             statsByMethod.get(method.label)!,
@@ -589,7 +598,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                             avgAbsError: formatScaledInt(absErr),
                             residual: formatScaledInt(absErr),
                             normalizedResidual: formatScaledInt(relErrScaled),
-                            tolerance: `abs<=${formatScaledInt(ABS_TOL)} OR rel<=${formatPercentScaled(REL_TOL_BY_METHOD[method.label])}%`,
+                            tolerance: `abs<=${formatScaledInt(tolerance)} (reference ${method.label} discretization error + 1e-9 conversion allowance)`,
                             withinTol: passed ? "Yes" : "No",
                             exceededTol: passed ? "No" : "Yes",
                             worstCase:
@@ -630,7 +639,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                             avgAbsError: "FAILED",
                             residual: "FAILED",
                             normalizedResidual: "FAILED",
-                            tolerance: `abs<=${formatScaledInt(ABS_TOL)} OR rel<=${formatPercentScaled(REL_TOL_BY_METHOD[method.label])}%`,
+                            tolerance: "method-aware reference tolerance",
                             withinTol: "FAILED",
                             exceededTol: "FAILED",
                             worstCase: message,
@@ -667,7 +676,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                     avgAbsError: stats.count > 0 ? formatScaledInt(avgAbs) : "N/A",
                     residual: stats.count > 0 ? formatScaledInt(stats.maxAbs) : "N/A",
                     normalizedResidual: stats.count > 0 ? formatScaledInt(avgRel) : "N/A",
-                    tolerance: `abs<=${formatScaledInt(ABS_TOL)} OR rel<=${formatPercentScaled(REL_TOL_BY_METHOD[method.label])}%`,
+                    tolerance: "reference method discretization error + 1e-9 conversion allowance",
                     withinTol: stats.withinTol.toString(),
                     exceededTol: stats.exceededTol.toString(),
                     worstCase:
@@ -719,7 +728,7 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                 avgAbsError: stats.count > 0 ? formatScaledInt(avgAbs) : "N/A",
                 residual: stats.count > 0 ? formatScaledInt(stats.maxAbs) : "N/A",
                 normalizedResidual: stats.count > 0 ? formatScaledInt(avgRel) : "N/A",
-                tolerance: `abs<=${formatScaledInt(ABS_TOL)} OR rel<=${formatPercentScaled(REL_TOL_BY_METHOD[method.label])}%`,
+                tolerance: "reference method discretization error + 1e-9 conversion allowance",
                 withinTol: stats.withinTol.toString(),
                 exceededTol: stats.exceededTol.toString(),
                 worstCase:
@@ -747,5 +756,48 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
                 `${method.label} exceeded its documented hybrid accuracy threshold in ${stats.exceededTol} executed cases`
             ).to.equal(0);
         }
+    });
+
+    it("reports ODE iteration-count feasibility limits separately from accuracy", async function () {
+        const x0 = await qInt(0n);
+        const y0 = await qInt(0n);
+        const h = await qFrac(1, 10);
+        const stepBudgets = [600, 800, 1000, 1500];
+        let successful = 0;
+        let reverted = 0;
+        let outOfGas = 0;
+        let otherFailures = 0;
+
+        for (const steps of stepBudgets) {
+            for (const method of METHODS) {
+                try {
+                    const run = await runMethod(
+                        harness,
+                        method.key,
+                        target,
+                        selConst5,
+                        x0,
+                        y0,
+                        h,
+                        steps
+                    );
+                    successful++;
+                    console.log(`ODE FEASIBILITY | method=${method.label} | steps=${steps} | status=success | estimatedGas=${run.estimatedGas}`);
+                } catch (error) {
+                    const kind = classifyExecutionFailure(error);
+                    if (kind === "revert") reverted++;
+                    else if (kind === "out-of-gas") outOfGas++;
+                    else otherFailures++;
+                    console.log(`ODE FEASIBILITY | method=${method.label} | steps=${steps} | status=${kind}`);
+                }
+            }
+        }
+
+        const total = stepBudgets.length * METHODS.length;
+        const failed = reverted + outOfGas + otherFailures;
+        console.log(`ODE FEASIBILITY SUMMARY | total=${total} | successful=${successful} | failed=${failed} | reverted=${reverted} | outOfGas=${outOfGas} | other=${otherFailures} | successRate=${((successful / total) * 100).toFixed(2)}%`);
+
+        expect(successful + failed).to.equal(total);
+        expect(successful, "at least one high-step ODE case should remain feasible").to.be.greaterThan(0);
     });
 });

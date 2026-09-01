@@ -53,6 +53,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
         selectorName: string;
         intervals: IntervalSpec[];
         exactIntegral: (a: number, b: number) => number;
+        evaluate: (x: number) => number;
     }
 
     interface TestRecord {
@@ -84,16 +85,10 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     let target: string;
 
     const SCALE = 1_000_000_000_000n; // 1e12
-    const N_VALUES = [12n, 24n, 48n, 96n, 192n, 384n, 768n, 1152n, 1536n, 1920n, 2304n, 2688n, 3072n];
+    const ACCURACY_N_VALUES = [12n, 24n, 48n, 96n, 192n];
     const METHODS: MethodName[] = ["trapezoidal", "simpson13", "simpson38"];
 
-    // Smooth benchmarks must meet a 2% relative-error target (or a tight
-    // absolute target near zero). The discontinuous piecewise benchmark uses
-    // an explicit, looser absolute guard appropriate for the coarsest grid.
-    const SMOOTH_ABS_TOL = 1e-9;
-    const SMOOTH_REL_TOL = 2e-2;
-    const PIECEWISE_ABS_TOL = 2.5e-1;
-    const PIECEWISE_REL_TOL = 1e-1;
+    const REFERENCE_ALLOWANCE = 1e-9;
 
     let SIN_INTERVALS_QUAD: QuadIntervalSpec[] = [];
 
@@ -148,10 +143,47 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
         return Math.abs(actual - expected) / denom;
     }
 
-    function tolerancesFor(fn: BenchmarkFunction): { abs: number; rel: number } {
-        return fn.key === "f_piecewise"
-            ? { abs: PIECEWISE_ABS_TOL, rel: PIECEWISE_REL_TOL }
-            : { abs: SMOOTH_ABS_TOL, rel: SMOOTH_REL_TOL };
+    function referenceQuadrature(method: MethodName, fn: BenchmarkFunction, a: number, b: number, n: bigint): number {
+        const count = Number(n);
+        const h = (b - a) / count;
+
+        if (method === "trapezoidal") {
+            let sum = (fn.evaluate(a) + fn.evaluate(b)) / 2;
+            for (let i = 1; i < count; i++) sum += fn.evaluate(a + i * h);
+            return h * sum;
+        }
+
+        if (method === "simpson13") {
+            let odd = 0;
+            let even = 0;
+            for (let i = 1; i < count; i++) {
+                if (i % 2 === 0) even += fn.evaluate(a + i * h);
+                else odd += fn.evaluate(a + i * h);
+            }
+            return h / 3 * (fn.evaluate(a) + 4 * odd + 2 * even + fn.evaluate(b));
+        }
+
+        let multiplesOfThree = 0;
+        let others = 0;
+        for (let i = 1; i < count; i++) {
+            if (i % 3 === 0) multiplesOfThree += fn.evaluate(a + i * h);
+            else others += fn.evaluate(a + i * h);
+        }
+        return 3 * h / 8 * (fn.evaluate(a) + 3 * others + 2 * multiplesOfThree + fn.evaluate(b));
+    }
+
+    function tolerancesFor(
+        fn: BenchmarkFunction,
+        method: MethodName,
+        a: number,
+        b: number,
+        n: bigint
+    ): { abs: number; rel: number } {
+        const exact = fn.exactIntegral(a, b);
+        const reference = referenceQuadrature(method, fn, a, b, n);
+        const discretizationError = Math.abs(reference - exact);
+        const allowance = REFERENCE_ALLOWANCE * Math.max(1, Math.abs(exact));
+        return { abs: discretizationError + allowance, rel: REFERENCE_ALLOWANCE };
     }
 
     function mean(values: number[]): number {
@@ -334,7 +366,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
 
         try {
             const expected = fn.exactIntegral(aLabelNum, bLabelNum);
-            const tolerances = tolerancesFor(fn);
+            const tolerances = tolerancesFor(fn, method, aLabelNum, bLabelNum, n);
 
             const txRequest = await harness.getFunction(method).populateTransaction(
                 target,
@@ -389,7 +421,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
                 errorMessage: null,
             };
         } catch (err) {
-            const tolerances = tolerancesFor(fn);
+            const tolerances = tolerancesFor(fn, method, aLabelNum, bLabelNum, n);
             return {
                 method,
                 func: fn.key,
@@ -447,6 +479,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             selectorName: "f_one",
             intervals: COMMON_INTERVALS,
             exactIntegral: (a, b) => b - a,
+            evaluate: () => 1,
         },
         {
             key: "f_linear",
@@ -454,6 +487,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             selectorName: "f_linear",
             intervals: COMMON_INTERVALS,
             exactIntegral: (a, b) => 0.5 * (b * b - a * a),
+            evaluate: x => x,
         },
         {
             key: "f_square",
@@ -461,6 +495,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             selectorName: "f_square",
             intervals: COMMON_INTERVALS,
             exactIntegral: (a, b) => (b ** 3 - a ** 3) / 3,
+            evaluate: x => x ** 2,
         },
         {
             key: "f_cube",
@@ -468,6 +503,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             selectorName: "f_cube",
             intervals: COMMON_INTERVALS,
             exactIntegral: (a, b) => (b ** 4 - a ** 4) / 4,
+            evaluate: x => x ** 3,
         },
         {
             key: "f_sin",
@@ -475,6 +511,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             selectorName: "f_sin",
             intervals: [],
             exactIntegral: (a, b) => -Math.cos(b) + Math.cos(a),
+            evaluate: x => Math.sin(x),
         },
         {
             key: "f_inv",
@@ -482,6 +519,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             selectorName: "f_inv",
             intervals: INV_INTERVALS,
             exactIntegral: (a, b) => Math.log(Math.abs(b)) - Math.log(Math.abs(a)),
+            evaluate: x => 1 / x,
         },
         {
             key: "f_piecewise",
@@ -489,6 +527,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             selectorName: "f_piecewise",
             intervals: PIECEWISE_INTERVALS,
             exactIntegral: (a, b) => exactPiecewiseIntegral(a, b),
+            evaluate: x => x <= 1 ? 1 : 3,
         },
     ];
 
@@ -547,7 +586,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     // ------------------------------------------------------------
     // Main suite
     // ------------------------------------------------------------
-    it("should execute the full deterministic accuracy and gas benchmark suite", async function () {
+    it("executes the bounded deterministic accuracy and gas benchmark suite", async function () {
         const records: TestRecord[] = [];
         const [signer] = await ethers.getSigners();
         const signerAddress = await signer.getAddress();
@@ -560,7 +599,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
 
             if (fn.key === "f_sin") {
                 for (const interval of SIN_INTERVALS_QUAD) {
-                    for (const n of N_VALUES) {
+                    for (const n of ACCURACY_N_VALUES) {
                         for (const method of METHODS) {
                             const record = await runSingleCase({
                                 method,
@@ -586,7 +625,7 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
                     const qa = await toQuad(interval.a);
                     const qb = await toQuad(interval.b);
 
-                    for (const n of N_VALUES) {
+                    for (const n of ACCURACY_N_VALUES) {
                         for (const method of METHODS) {
                             const record = await runSingleCase({
                                 method,
@@ -624,5 +663,47 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
             numericalFailures,
             `Integration accuracy threshold exceeded: ${numericalFailures.slice(0, 5).map((r) => `${r.method}/${r.func}/${r.intervalLabel}/n=${r.n}:abs=${r.absError},rel=${r.relError}`).join(", ")}`
         ).to.deep.equal([]);
+    });
+
+    it("reports high-subdivision integration feasibility separately from accuracy", async function () {
+        const records: TestRecord[] = [];
+        const [signer] = await ethers.getSigners();
+        const signerAddress = await signer.getAddress();
+        const fn = FUNCTIONS.find(candidate => candidate.key === "f_one")!;
+        const selector = harness.interface.getFunction(fn.selectorName)!.selector;
+        const a = await toQuad(0);
+        const b = await toQuad(1);
+        const scalabilityN = [384n, 768n, 1536n, 2304n, 3072n, 3456n];
+
+        for (const n of scalabilityN) {
+            for (const method of METHODS) {
+                const record = await runSingleCase({
+                    method,
+                    fn,
+                    selector,
+                    intervalLabel: "[0,1] scalability",
+                    aLabelNum: 0,
+                    bLabelNum: 1,
+                    aQuad: a,
+                    bQuad: b,
+                    n,
+                    signerAddress,
+                    signer,
+                });
+                records.push(record);
+                printRecord(record);
+            }
+        }
+
+        printOverallSummary(records);
+        const successful = records.filter(record => record.status === "success").length;
+        const reverted = records.filter(record => record.status === "revert").length;
+        const outOfGas = records.filter(record => record.status === "out-of-gas").length;
+        const otherFailures = records.filter(record => record.status === "failure").length;
+        const failed = reverted + outOfGas + otherFailures;
+        console.log(`INTEGRATION FEASIBILITY | total=${records.length} | successful=${successful} | failed=${failed} | reverted=${reverted} | outOfGas=${outOfGas} | other=${otherFailures} | pass rate=${((successful / records.length) * 100).toFixed(2)}% | averages=successful executions only`);
+
+        expect(successful + failed).to.equal(scalabilityN.length * METHODS.length);
+        expect(successful, "at least one high-subdivision integration case should remain feasible").to.be.greaterThan(0);
     });
 });

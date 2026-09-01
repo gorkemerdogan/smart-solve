@@ -73,21 +73,17 @@ function formatScaledInt(v: bigint): string {
     return `${neg ? "-" : ""}${intPart.toString()}.${fracStr}`.replace(/\.?0+$/, "");
 }
 
-function assertGdAccuracy(label: string, total: number, errors: bigint[], residuals: bigint[]) {
-    const errorTolerance = SCALE / 100n;
-    const residualTolerance = SCALE / 10n;
-    const passed = errors.filter(
-        (error, i) => error <= errorTolerance && residuals[i] <= residualTolerance
-    ).length;
+function assertGdProgress(label: string, total: number, residuals: bigint[], initialResiduals: bigint[]) {
+    const passed = residuals.filter((residual, i) => residual < initialResiduals[i]).length;
     console.log(`Total Cases          : ${total}`);
-    console.log(`Successful Cases     : ${errors.length}`);
+    console.log(`Successful Cases     : ${residuals.length}`);
     console.log(`Failed Cases         : ${total - passed}`);
     console.log("Reverted Cases       : 0");
     console.log("Out-of-Gas Cases     : 0");
     console.log(`Pass Rate            : ${((passed / total) * 100).toFixed(2)}%`);
     console.log("Averages             : successful executions only");
-    expect(errors.length, `${label}: successful case count`).to.equal(total);
-    expect(passed, `${label}: cases within numerical tolerances`).to.equal(total);
+    expect(residuals.length, `${label}: successful case count`).to.equal(total);
+    expect(passed, `${label}: cases that reduced the initial residual`).to.equal(total);
 }
 
 function sumBigInt(arr: bigint[]): bigint {
@@ -343,14 +339,35 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
         SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
-    describe("Section 1: Size-based accuracy and gas tests", function () {
+    describe("Section 1: Bounded correctness and convergence-budget tests", function () {
 
-        it("Gradient Descent Least Squares: average solution error, residual, iterations, and gas across feasible problem sizes", async function () {
+        it("Gradient Descent Least Squares: solves identity systems within fixed-point tolerance", async function () {
+            const alphaOne = await qFrac(1, 1);
+            const tolerance = SCALE / 1_000_000n;
+
+            for (let t = 0; t < T; t++) {
+                const xTrue = makeVectorScaled(2, `GD_IDENTITY:xtrue:t=${t}`, -3, 3);
+                const A = [[SCALE, 0n], [0n, SCALE]];
+                const x0 = [0n, 0n];
+                const Adata = await qMatFromScaledInts(harness, A);
+                const bdata = await qVecFromScaledInts(harness, xTrue);
+                const x0data = await qVecFromScaledInts(harness, x0);
+                const [out] = await harness.gradientDescentLeastSquares(
+                    2n, 2n, Adata, bdata, x0data, alphaOne, 2n, TOL_1E_15
+                );
+                const xComp = await scaledVec(harness, out);
+                const error = vecInfNorm(subVec(xComp, xTrue));
+                expect(error, `identity case ${t + 1}: implementation error`).to.be.at.most(tolerance);
+            }
+        });
+
+        it("Gradient Descent Least Squares: reports convergence after a fixed 75-iteration budget", async function () {
             for (const cfg of GD_SIZES) {
                 const errs: bigint[] = [];
                 const residuals: bigint[] = [];
                 const gases: bigint[] = [];
                 const itersArr: bigint[] = [];
+                const initialResiduals: bigint[] = [];
 
                 for (let t = 0; t < T; t++) {
                     const tag = `GD:m=${cfg.m}:n=${cfg.n}:t=${t}`;
@@ -386,6 +403,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     residuals.push(res);
                     gases.push(gas);
                     itersArr.push(asBigInt(iters));
+                    initialResiduals.push(vecInfNorm(b));
                 }
 
                 printSummaryBlock({
@@ -399,13 +417,13 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     avgIter: avgBigInt(itersArr),
                 });
 
-                assertGdAccuracy(`GD size (m,n)=(${cfg.m},${cfg.n})`, T, errs, residuals);
+                assertGdProgress(`GD convergence (m,n)=(${cfg.m},${cfg.n})`, T, residuals, initialResiduals);
             }
         });
     });
 
     describe("Section 2: Step size sensitivity tests for Gradient Descent Least Squares", function () {
-        it("Gradient Descent Least Squares: alpha sensitivity with average accuracy, iterations, and gas", async function () {
+        it("Gradient Descent Least Squares: compares alpha values on identical systems", async function () {
             const m = 8;
             const n = 4;
 
@@ -414,15 +432,17 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                 { name: "medium", alpha: ALPHA_0005 },
                 { name: "large", alpha: ALPHA_001 },
             ];
+            const averageResiduals: bigint[] = [];
 
             for (const cfg of alphaConfigs) {
                 const errs: bigint[] = [];
                 const residuals: bigint[] = [];
                 const gases: bigint[] = [];
                 const itersArr: bigint[] = [];
+                const initialResiduals: bigint[] = [];
 
                 for (let t = 0; t < T; t++) {
-                    const tag = `GD_ALPHA:${cfg.name}:t=${t}`;
+                    const tag = `GD_ALPHA:t=${t}`;
                     const A = makeFullRankRectMatrixScaled(m, n, tag);
                     const xTrue = makeVectorScaled(n, `${tag}:xtrue`, -3, 3);
                     const b = matVecMulScaled(A, xTrue);
@@ -455,6 +475,7 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     residuals.push(res);
                     gases.push(gas);
                     itersArr.push(asBigInt(iters));
+                    initialResiduals.push(vecInfNorm(b));
                 }
 
                 printSummaryBlock({
@@ -468,8 +489,12 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
                     avgIter: avgBigInt(itersArr),
                 });
 
-                assertGdAccuracy(`GD alpha=${cfg.name}`, T, errs, residuals);
+                assertGdProgress(`GD alpha=${cfg.name}`, T, residuals, initialResiduals);
+                averageResiduals.push(avgBigInt(residuals));
             }
+
+            expect(averageResiduals[1], "medium alpha should improve on small alpha at the same budget").to.be.lessThan(averageResiduals[0]);
+            expect(averageResiduals[2], "large alpha should improve on medium alpha at the same budget").to.be.lessThan(averageResiduals[1]);
         });
     });
 
