@@ -473,7 +473,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
     // ------------------------------------------------------------
 
     describe("Section 4: Matrix size vs gas", function () {
-        describe.skip("Section 4.1: Transpose", function () {
+        describe("Section 4.1: Transpose", function () {
             let localIdx = 0;
             const ABS_TOL_TRANSPOSE = 1n;
 
@@ -532,7 +532,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
             }
         });
 
-        describe.skip("Section 4.2: Determinant", function () {
+        describe("Section 4.2: Determinant", function () {
 
             let localIdx = 0;
             const ABS_TOL_DET = 10n;
@@ -701,7 +701,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
             });
         });
 
-        describe.skip("Section 4.3: Inversion", function () {
+        describe("Section 4.3: Inversion", function () {
             let localIdx = 0;
             const ABS_TOL_INV = 100n;
 
@@ -767,8 +767,8 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
     // Section 5: Power Iteration
     // ------------------------------------------------------------
 
-    describe.skip("Section 5: Power Iteration", function () {
-        describe.skip("Section 5.1: Gas vs matrix dimension", function () {
+    describe("Section 5: Power Iteration", function () {
+        describe("Section 5.1: Gas vs matrix dimension", function () {
             let localIdx = 0;
             const ABS_TOL_POWER = 1000n;
 
@@ -855,7 +855,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
             }
         });
 
-        describe.skip("Section 5.2: Gas by matrix pattern", function () {
+        describe("Section 5.2: Gas by matrix pattern", function () {
             const PATTERNS: Array<"identity" | "diagDominant" | "clustered" | "weighted" | "mixed"> = [
                 "identity",
                 "diagDominant",
