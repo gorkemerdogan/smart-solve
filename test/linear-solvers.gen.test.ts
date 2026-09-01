@@ -62,6 +62,12 @@ type LinearSolversHarness = Contract & {
 let SCALE_DECIMALS = 32n;
 let SCALE = 10n ** SCALE_DECIMALS;
 
+// The n=20 corpus performs 15 near-block-limit executions and matching gas
+// estimates for multiple solvers. Keep it available for thesis feasibility
+// runs without making the default generated suite impractical for CI or local
+// verification.
+const RUN_HEAVY_SCALABILITY = process.env.RUN_HEAVY_SCALABILITY === "1";
+
 // ------------------------------------------------------------
 // Basic Helpers
 // ------------------------------------------------------------
@@ -1097,7 +1103,11 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
             });
         });
 
-        it("Gaussian Elimination: average solution error, residual, and gas across matrix sizes", async function () {
+        it("Gaussian Elimination: [opt-in] n=20 solution error, residual, and gas", async function () {
+            if (!RUN_HEAVY_SCALABILITY) {
+                this.skip();
+            }
+
             const method = "Gaussian Elimination";
             const testExplanation =
                 "Size-based gas and accuracy evaluation on deterministic diagonally dominant systems. For each matrix dimension, 15 cases are solved and per-case gas, solution error, and residual are recorded.";
@@ -1154,7 +1164,11 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
             }
         });
 
-        it("LU Decomposition: average reconstruction error and gas across matrix sizes", async function () {
+        it("LU Decomposition: [opt-in] n=20 reconstruction error and gas", async function () {
+            if (!RUN_HEAVY_SCALABILITY) {
+                this.skip();
+            }
+
             const method = "LU Decomposition";
             const testExplanation =
                 "Size-based reconstruction and gas evaluation on deterministic diagonally dominant systems. For each matrix dimension, 15 cases are factorized and LU reconstruction error together with gas usage is recorded.";
@@ -1284,7 +1298,11 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
             }
         });
 
-        it("Jacobi: reports the n=20 block-gas feasibility boundary separately from accuracy", async function () {
+        it("Jacobi: [opt-in] reports the n=20 block-gas feasibility boundary separately from accuracy", async function () {
+            if (!RUN_HEAVY_SCALABILITY) {
+                this.skip();
+            }
+
             const n = 20;
             const failures = emptyFailureCounts();
             const errors: bigint[] = [];
@@ -1351,7 +1369,11 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
             expect(errors.length, "at least one n=20 Jacobi case should remain feasible").to.be.greaterThan(0);
         });
 
-        it("Gauss-Seidel: average solution error, residual, iterations, and gas across matrix sizes", async function () {
+        it("Gauss-Seidel: [opt-in] n=20 solution error, residual, iterations, and gas", async function () {
+            if (!RUN_HEAVY_SCALABILITY) {
+                this.skip();
+            }
+
             const method = "Gauss-Seidel";
             const testExplanation =
                 "Size-based iteration, gas, and accuracy evaluation on deterministic diagonally dominant systems. For each matrix dimension, 15 cases are solved using a zero initial guess, fixed tolerance, and fixed maximum iteration budget.";
