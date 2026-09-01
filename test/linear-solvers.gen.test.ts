@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 import { classifyExecutionFailure, type ExecutionFailureKind } from "./test-utils";
+import { printPrecisionMetadata } from "./precision-utils";
 
 // ------------------------------------------------------------
 // Contract Type
@@ -944,7 +945,7 @@ function printSanitySummaryBlock(args: {
 // Test Suite
 // ------------------------------------------------------------
 
-describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests", function () {
+describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas Tests", function () {
     this.timeout(300000); // 5 minutes
     let harness: LinearSolversHarness;
 
@@ -1068,6 +1069,13 @@ describe("LinearSolvers Library - Randomized Accuracy, Iteration, and Gas Tests"
     ];
 
     before(async () => {
+        printPrecisionMetadata({
+            classification: "fixed-point/truncated comparison",
+            comparisonScale: "1e12 Solidity toFloat output with BigInt error arithmetic",
+            oraclePrecision: "exact scaled-integer systems and residual calculations",
+            conversion: "binary128 -> truncating 1e12 fixed-point integer -> BigInt",
+            claim: "1e12-scale solution/residual agreement; not binary128 accuracy",
+        });
         const MathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );

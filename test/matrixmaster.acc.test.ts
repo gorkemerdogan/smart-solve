@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { printPrecisionMetadata } from "./precision-utils";
 
 // ------------------------------------------------------------
 // Types
@@ -525,13 +526,20 @@ async function quadArrayToNumbers(h: MatrixMasterHarness, arr: string[]): Promis
 // Test Suite Setup
 // ------------------------------------------------------------
 
-describe("MatrixMasterHarness - Accuracy Tests", function () {
+describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", function () {
     this.timeout(300000); // 5 minutes
     let harness: MatrixMasterHarness;
     let TOL_1E_18: string;
     let SEED: string;
 
     before(async () => {
+        printPrecisionMetadata({
+            classification: "JavaScript-number-limited comparison",
+            comparisonScale: "mixed: truncating 1e12 fixed-point and JavaScript Number",
+            oraclePrecision: "exact integer references for some operations; JS Number for determinant/eigenvalue paths",
+            conversion: "binary128 -> 1e12 fixed-point; selected paths then convert to JS Number",
+            claim: "fixed-point/method accuracy at the reported tolerance; not binary128 accuracy",
+        });
         const MathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );

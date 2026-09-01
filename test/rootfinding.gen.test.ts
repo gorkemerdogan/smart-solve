@@ -2,6 +2,11 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import {
+    binary128ToScaledInt,
+    decimalStringToScaledInt,
+    printPrecisionMetadata,
+} from "./precision-utils";
 
 // ------------------------------------------------------------
 // Types
@@ -43,8 +48,9 @@ type RootFindingHarness = Contract & {
 // Global numeric helpers
 // ------------------------------------------------------------
 
-let SCALE_DECIMALS = 18n;
-let SCALE = 10n ** SCALE_DECIMALS;
+const SCALE_DECIMALS = 33n;
+const SCALE = 10n ** SCALE_DECIMALS;
+const ROOT_ERROR_TOL_SCALED = SCALE / (10n ** 28n); // 1e-28
 
 const FIXED_SEED = 37n;
 const NUMBER_OF_TESTS = 90;
@@ -62,12 +68,6 @@ function asBigInt(v: unknown): bigint {
     }
 
     throw new Error(`Cannot convert value to bigint: ${String(v)}`);
-}
-
-function inferScaleDecimals(scale: bigint): bigint {
-    const s = scale.toString();
-    if (!/^10*$/.test(s) || s[0] !== "1") return SCALE_DECIMALS;
-    return BigInt(s.length - 1);
 }
 
 function absBigInt(x: bigint): bigint {
@@ -95,8 +95,8 @@ function scaledRelError(actual: bigint, expected: bigint): bigint {
 }
 
 async function outScaled(harness: RootFindingHarness, q: string): Promise<bigint> {
-    const raw = await harness.toFloat(q);
-    return asBigInt(raw);
+    void harness;
+    return binary128ToScaledInt(q, Number(SCALE_DECIMALS));
 }
 
 function avgBigInt(values: bigint[]): bigint {
@@ -179,14 +179,26 @@ function printMethodSummary(
     s: MethodSummary,
     totalTests: number
 ) {
+    const numericalPasses = s.absErrorsConv.filter(error => error <= ROOT_ERROR_TOL_SCALED).length;
     console.log("============================================================");
     console.log(`Benchmark            : ${benchmarkName}`);
     console.log(`Method               : ${method}`);
     console.log(`Number of Tests      : ${totalTests}`);
     console.log(`Converged Tests      : ${s.convergedCount}`);
+    console.log(`Numerical Passes     : ${numericalPasses}`);
+    console.log(`Numerical Failures   : ${s.convergedCount - numericalPasses}`);
+    console.log(`Pass Rate            : ${((numericalPasses / totalTests) * 100).toFixed(2)}%`);
     console.log(`Average Abs. Error   : ${formatScaledInt(avgBigInt(s.absErrorsConv))}`);
     console.log(`Average Rel. Error   : ${formatScaledInt(avgBigInt(s.relErrorsConv))}`);
     console.log(`Average Residual     : ${formatScaledInt(avgBigInt(s.residualsConv))}`);
+    console.log(`Accuracy Threshold   : abs(root-reference) <= ${formatScaledInt(ROOT_ERROR_TOL_SCALED)}`);
+    printPrecisionMetadata({
+        classification: "binary128-aware comparison",
+        comparisonScale: "1e33 (direct bytes16 decoding; truncation toward zero)",
+        oraclePrecision: "33+ decimal digits for irrational roots; exact for integer roots",
+        conversion: "binary128 bytes16 -> exact BigInt rational -> 1e33 integer",
+        claim: "root accuracy is measured to a 1e-28 threshold without JavaScript Number",
+    });
     console.log(`Average Iterations   : ${avgBigInt(s.iterationsAll).toString()}`);
     console.log(`Min Gas              : ${minBigInt(s.gasesAll).toString()}`);
     console.log(`Average Gas          : ${avgBigInt(s.gasesAll).toString()}`);
@@ -239,7 +251,7 @@ function printCaseResult(args: {
 // Test suite
 // ------------------------------------------------------------
 
-describe("RootFinding Library/Harness Microbenchmarks - Multi-Case Accuracy & Gas", function () {
+describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", function () {
     this.timeout(0); // Infinity minutes
     let harness: RootFindingHarness;
     let target: string;
@@ -256,15 +268,8 @@ describe("RootFinding Library/Harness Microbenchmarks - Multi-Case Accuracy & Ga
     const qInt = async (x: number | bigint) => await harness.qFromInt(x);
     const qFrac = async (num: number | bigint, den: number | bigint) => await harness.qFromFrac(num, den);
 
-    async function scaledFromDecimal(
-        integerPart: bigint,
-        fractionalDigits: string
-    ): Promise<bigint> {
-        const frac = fractionalDigits.replace(/_+/g, "");
-        const den = 10n ** BigInt(frac.length);
-        const num = integerPart * den + BigInt(frac);
-        const q = await harness.qFromFrac(num, den);
-        return await outScaled(harness, q);
+    function scaledFromDecimal(value: string): bigint {
+        return decimalStringToScaledInt(value, Number(SCALE_DECIMALS));
     }
 
     before(async () => {
@@ -291,11 +296,7 @@ describe("RootFinding Library/Harness Microbenchmarks - Multi-Case Accuracy & Ga
         selQuartic = harness.interface.getFunction("f_quartic")!.selector;
         selDfQuartic = harness.interface.getFunction("df_quartic")!.selector;
 
-        TOL_1E_30 = await qFrac(1n, 1_000_000_000_000_000_000_000_000n);
-
-        const oneScaled = asBigInt(await harness.toFloat(await qInt(1n)));
-        SCALE = oneScaled;
-        SCALE_DECIMALS = inferScaleDecimals(oneScaled);
+        TOL_1E_30 = await qFrac(1n, 10n ** 30n);
     });
 
     async function runBenchmark(cfg: BenchmarkConfig) {
@@ -485,6 +486,14 @@ describe("RootFinding Library/Harness Microbenchmarks - Multi-Case Accuracy & Ga
         printMethodSummary(cfg.name, "Newton", summaries.Newton, NUMBER_OF_TESTS);
         printMethodSummary(cfg.name, "Secant", summaries.Secant, NUMBER_OF_TESTS);
 
+        for (const [method, summary] of Object.entries(summaries)) {
+            expect(summary.convergedCount, `${cfg.name}/${method}: convergence count`).to.equal(NUMBER_OF_TESTS);
+            expect(
+                maxBigInt(summary.absErrorsConv),
+                `${cfg.name}/${method}: root error exceeded the 1e-28 binary128-aware threshold`
+            ).to.be.at.most(ROOT_ERROR_TOL_SCALED);
+        }
+
         return summaries;
     }
 
@@ -529,7 +538,7 @@ describe("RootFinding Library/Harness Microbenchmarks - Multi-Case Accuracy & Ga
     });
 
     it("should run cubic benchmark: f(x)=x^3-x-2", async function () {
-        const cubicRoot = await scaledFromDecimal(1n, "521379706805");
+        const cubicRoot = scaledFromDecimal("1.521379706804567569604080832254438");
         const root = cubicRoot;
 
         const summaries = await runBenchmark({
@@ -570,7 +579,7 @@ describe("RootFinding Library/Harness Microbenchmarks - Multi-Case Accuracy & Ga
     });
 
     it("should run quartic benchmark: f(x)=x^4-10", async function () {
-        const quarticRoot = await scaledFromDecimal(1n, "778279410038");
+        const quarticRoot = scaledFromDecimal("1.778279410038922801225421195192684");
         const root = quarticRoot;
 
         const summaries = await runBenchmark({

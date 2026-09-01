@@ -1,19 +1,21 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { classifyExecutionFailure, type ExecutionFailureKind } from "./test-utils";
+import { binary128ToScaledInt, printPrecisionMetadata } from "./precision-utils";
 
-describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
+describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests)", function () {
     let harness: any;
     let mathLib: any;
 
     /**
-     * Fixed-point scale used by the Solidity harness.
-     * The contract reports numerical values as integers scaled by 1e12.
+     * Decimal reporting scale applied after directly decoding bytes16.
      */
-    const SCALE = 10n ** 12n;
+    const SCALE_DECIMALS = 30;
+    const SCALE = 10n ** BigInt(SCALE_DECIMALS);
 
-    /** Fixed-point allowance added to the analytical truncation-error bound. */
-    const NUMERICAL_SLACK_SCALED = 1000n; // 1e-9 at SCALE=1e12
+    // Conservative binary128 unit-roundoff proxy (1e-34) and operation safety factor.
+    const BINARY128_ROUNDOFF_DEN = 10n ** 34n;
+    const ROUNDING_SAFETY_FACTOR = 64n;
 
     /**
      * Six input points.
@@ -115,8 +117,7 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
     }
 
     async function toScaledInt(q: string): Promise<bigint> {
-        const value = await harness.toFloat(q);
-        return BigInt(value.toString());
+        return binary128ToScaledInt(q, SCALE_DECIMALS);
     }
 
     function absBigInt(x: bigint): bigint {
@@ -137,32 +138,49 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
         hNum: number;
         hDen: number;
     }): bigint {
-        const h = args.hNum / args.hDen;
-        let truncationError = 0;
+        const hNum = BigInt(args.hNum);
+        const hDen = BigInt(args.hDen);
+        let errorNum = 0n;
+        let errorDen = 1n;
 
         if (args.functionName === "f(x)=x^2" && args.methodName !== "centeredDiff") {
-            truncationError = h;
+            errorNum = hNum;
+            errorDen = hDen;
         } else if (args.functionName === "f(x)=x^3") {
             if (args.methodName === "centeredDiff") {
-                truncationError = h * h;
+                errorNum = hNum * hNum;
+                errorDen = hDen * hDen;
             } else if (args.methodName === "forwardDiff") {
-                truncationError = Math.abs(3 * args.x * h + h * h);
+                errorNum = 3n * BigInt(args.x) * hNum * hDen + hNum * hNum;
+                errorDen = hDen * hDen;
             } else {
-                truncationError = Math.abs(-3 * args.x * h + h * h);
+                errorNum = -3n * BigInt(args.x) * hNum * hDen + hNum * hNum;
+                errorDen = hDen * hDen;
             }
         }
 
-        return BigInt(Math.ceil(truncationError * Number(SCALE))) + NUMERICAL_SLACK_SCALED;
+        const magnitude = absBigInt(errorNum);
+        const scaledCeiling = (magnitude * SCALE + errorDen - 1n) / errorDen;
+
+        // Finite differences subtract nearby function values and divide by h.
+        // Bound the resulting cancellation amplification by C*u*max(1,|f|)/h,
+        // with u approximated conservatively as 1e-34 for binary128.
+        const xMagnitude = BigInt(Math.abs(args.x) + 1);
+        const functionMagnitudeBound = xMagnitude ** 3n;
+        const roundoffNum = ROUNDING_SAFETY_FACTOR * functionMagnitudeBound * hDen * SCALE;
+        const roundoffDen = hNum * BINARY128_ROUNDOFF_DEN;
+        const roundoffAllowance = (roundoffNum + roundoffDen - 1n) / roundoffDen;
+        return scaledCeiling + roundoffAllowance;
     }
 
-    function formatScaled(value: bigint, decimals: number = 12): string {
+    function formatScaled(value: bigint, decimals: number = SCALE_DECIMALS): string {
         const negative = value < 0n;
         const absValue = negative ? -value : value;
 
         const integerPart = absValue / SCALE;
         const fractionalPart = absValue % SCALE;
 
-        const fracStr = fractionalPart.toString().padStart(12, "0").slice(0, decimals);
+        const fracStr = fractionalPart.toString().padStart(SCALE_DECIMALS, "0").slice(0, decimals);
         return `${negative ? "-" : ""}${integerPart.toString()}.${fracStr}`;
     }
 
@@ -252,7 +270,14 @@ describe("DifferentiationHarness - Accuracy Test Set (324 tests)", function () {
         console.log(`Average Rel. Error    : ${formatScaled(s.avgRelError)} (successful executions only)`);
         console.log(`Average Tol. Usage    : ${formatScaled(s.avgTolUsage)}`);
         console.log(`Max Abs. Error        : ${formatScaled(s.maxAbsError)}`);
-        console.log("Tolerance             : analytical truncation bound + 1e-9 fixed-point allowance");
+        console.log("Tolerance             : exact polynomial method-error bound + C*u*max(1,|f|)/h cancellation allowance");
+        printPrecisionMetadata({
+            classification: "binary128-aware comparison",
+            comparisonScale: "1e30 (direct bytes16 decoding; truncation toward zero)",
+            oraclePrecision: "exact integer/rational polynomial derivative and truncation formulas",
+            conversion: "binary128 bytes16 -> exact BigInt rational -> 1e30 integer",
+            claim: "30-decimal reporting of method error; not zero-error differentiation",
+        });
         console.log(`Average Gas           : ${s.avgGas.toString()} (successful executions only)`);
         console.log(`Min Gas               : ${s.minGas.toString()}`);
         console.log(`Max Gas               : ${s.maxGas.toString()}`);

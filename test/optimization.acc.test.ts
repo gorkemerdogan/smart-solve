@@ -3,6 +3,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 import { classifyExecutionFailure } from "./test-utils";
+import { printPrecisionMetadata } from "./precision-utils";
 
 // ------------------------------------------------------------
 // Types
@@ -290,7 +291,7 @@ function printBenchmarkSummary(summary: BenchmarkSummary): void {
 // Test Suite
 // ------------------------------------------------------------
 
-describe("SteepestDescent Library - Accuracy & Gas Summary Benchmarks", function () {
+describe("SteepestDescent Library - 1e12 Fixed-Point Accuracy & Gas Benchmarks", function () {
     let solver: SteepestDescentHarness & { toFloat(q: string): Promise<unknown> };
     let spherical: ObjectiveHarness;
     let weighted: ObjectiveHarness;
@@ -299,6 +300,13 @@ describe("SteepestDescent Library - Accuracy & Gas Summary Benchmarks", function
     let TOL_1E_9: string;
 
     before(async () => {
+        printPrecisionMetadata({
+            classification: "fixed-point/truncated comparison",
+            comparisonScale: "1e12 Solidity toFloat output with BigInt error arithmetic",
+            oraclePrecision: "exact known minimizers/objective values for selected objectives",
+            conversion: "binary128 -> truncating 1e12 fixed-point integer -> BigInt",
+            claim: "1e12-scale optimizer output agreement at method-specific tolerances; not binary128 accuracy",
+        });
         const MathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );

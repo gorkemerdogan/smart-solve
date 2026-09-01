@@ -130,7 +130,9 @@ contract ODESolverHarness {
     /**
      * @notice Converts a quadruple-precision number into a scaled integer (scaled by SCALE).
      * @param  x Quadruple-precision value.
-     * @return Integer representing x * SCALE.
+     * @dev MathLib.toInt truncates toward zero. This is a 1e12 fixed-point
+     *      reporting helper, not a binary128-precision conversion.
+     * @return Integer representing trunc(x * SCALE).
      */
     function toFloat(bytes16 x) external pure returns (int256) {
         bytes16 qScale = MathLib.fromUInt(SCALE);

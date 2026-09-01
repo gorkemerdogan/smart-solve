@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { binary128ToRational, binary128ToScaledInt, printPrecisionMetadata } from "./precision-utils";
 
 // ------------------------------------------------------------
 // Types
@@ -38,16 +39,17 @@ const T = 30;
 const FIXED_SEED = 37n;
 const DEGREES = [2, 4, 8, 16];
 
-// SCALE = 1e12 in harness -> 1e-6 tolerance
+// Direct binary128 decoding at 1e30 -> absolute tolerance 1e-24.
 const SCALAR_TOL = 1_000_000n;
 const VECTOR_TOL = 1_000_000n;
+const SCALAR_REL_TOL_DEN = 10n ** 28n; // relative tolerance 1e-28
 
 // ------------------------------------------------------------
 // Scale helpers
 // ------------------------------------------------------------
 
-let SCALE_DECIMALS = 12n;
-let SCALE = 10n ** SCALE_DECIMALS;
+const SCALE_DECIMALS = 30n;
+const SCALE = 10n ** SCALE_DECIMALS;
 
 function asBigInt(v: unknown): bigint {
     if (typeof v === "bigint") return v;
@@ -64,12 +66,6 @@ function asBigInt(v: unknown): bigint {
     throw new Error(`Cannot convert value to bigint: ${String(v)}`);
 }
 
-function inferScaleDecimals(scale: bigint): bigint {
-    const s = scale.toString();
-    if (!/^10*$/.test(s) || s[0] !== "1") return SCALE_DECIMALS;
-    return BigInt(s.length - 1);
-}
-
 function absBigInt(x: bigint): bigint {
     return x < 0n ? -x : x;
 }
@@ -84,27 +80,20 @@ function formatScaledInt(v: bigint): string {
 }
 
 async function outScaled(harness: PolynomialHarness, q: string): Promise<bigint> {
-    const [ok, raw] = await harness.toFloat(q);
-    if (!ok) {
-        throw new Error("toFloat overflow during scaled conversion");
-    }
-    return asBigInt(raw);
+    void harness;
+    return binary128ToScaledInt(q, Number(SCALE_DECIMALS));
 }
 
 async function scaledVec(harness: PolynomialHarness, values: string[]): Promise<bigint[]> {
-    return Promise.all(
-        values.map(async v => {
-            const [ok, raw] = await harness.toFloat(v);
-            if (!ok) {
-                throw new Error("toFloat overflow during scaled conversion");
-            }
-            return asBigInt(raw);
-        })
-    );
+    return Promise.all(values.map(v => outScaled(harness, v)));
 }
 
 function scaledAbsError(actual: bigint, expected: bigint): bigint {
     return absBigInt(actual - expected);
+}
+
+function scalarTolerance(expected: bigint): bigint {
+    return SCALAR_TOL + absBigInt(expected) / SCALAR_REL_TOL_DEN;
 }
 
 function vecInfNorm(v: bigint[]): bigint {
@@ -114,6 +103,24 @@ function vecInfNorm(v: bigint[]): bigint {
         if (ax > m) m = ax;
     }
     return m;
+}
+
+function vectorTolerance(expected: bigint[]): bigint {
+    return VECTOR_TOL + vecInfNorm(expected) / SCALAR_REL_TOL_DEN;
+}
+
+function syntheticOperationTolerance(encodedPoly: Frac[], root: Frac): bigint {
+    const rootMagnitude = absBigInt(fracToScaledTrunc(root));
+    let evaluationMagnitude = 0n;
+    for (let i = encodedPoly.length - 1; i >= 0; i--) {
+        evaluationMagnitude = (evaluationMagnitude * rootMagnitude) / SCALE
+            + absBigInt(fracToScaledTrunc(encodedPoly[i]));
+    }
+    // Synthetic division forms the zero remainder by repeated multiply-adds;
+    // use the absolute Horner sum as a condition scale, plus operation count
+    // and a conservative cancellation safety factor.
+    return SCALAR_TOL
+        + (64n * evaluationMagnitude * BigInt(encodedPoly.length)) / SCALAR_REL_TOL_DEN;
 }
 
 function subVec(a: bigint[], b: bigint[]): bigint[] {
@@ -454,6 +461,14 @@ async function qVecFromFrac(harness: PolynomialHarness, values: Frac[]): Promise
     return Promise.all(values.map(v => qFromFrac(harness, v)));
 }
 
+function exactEncodedFrac(value: string): Frac {
+    return binary128ToRational(value);
+}
+
+function exactEncodedVec(values: string[]): Frac[] {
+    return values.map(exactEncodedFrac);
+}
+
 // ------------------------------------------------------------
 // Logging helpers
 // ------------------------------------------------------------
@@ -467,6 +482,8 @@ function printScalarSummary(args: {
     minGas: bigint;
     avgGas: bigint;
     maxGas: bigint;
+    threshold?: string;
+    claim?: string;
 }) {
     console.log("============================================================");
     console.log(`Method             : ${args.method}`);
@@ -474,6 +491,14 @@ function printScalarSummary(args: {
     console.log(`Number of Tests    : ${args.tests}`);
     console.log(`Average Abs. Error : ${formatScaledInt(args.avgError)}`);
     console.log(`Max Abs. Error     : ${formatScaledInt(args.maxError)}`);
+    console.log(`Pass Threshold     : ${args.threshold ?? "abs error <= 1e-24 + 1e-28 * |reference|"}`);
+    printPrecisionMetadata({
+        classification: "binary128-aware comparison",
+        comparisonScale: "1e30 (direct bytes16 decoding; truncation toward zero)",
+        oraclePrecision: "exact BigInt rational arithmetic on the values actually encoded as binary128",
+        conversion: "binary128 bytes16 -> exact BigInt rational -> 1e30 integer",
+        claim: args.claim ?? "polynomial output agreement against exact rational references using 1e-24 absolute + 1e-28 relative tolerance",
+    });
     console.log(`Min Gas            : ${args.minGas.toString()}`);
     console.log(`Average Gas        : ${args.avgGas.toString()}`);
     console.log(`Max Gas            : ${args.maxGas.toString()}`);
@@ -489,6 +514,8 @@ function printVectorSummary(args: {
     minGas: bigint;
     avgGas: bigint;
     maxGas: bigint;
+    threshold?: string;
+    claim?: string;
 }) {
     console.log("============================================================");
     console.log(`Method                  : ${args.method}`);
@@ -496,6 +523,14 @@ function printVectorSummary(args: {
     console.log(`Number of Tests         : ${args.tests}`);
     console.log(`Average Error Norm (∞)  : ${formatScaledInt(args.avgError)}`);
     console.log(`Max Error Norm (∞)      : ${formatScaledInt(args.maxError)}`);
+    console.log(`Pass Threshold          : ${args.threshold ?? "infinity error <= 1e-24 + 1e-28 * ||reference||∞"}`);
+    printPrecisionMetadata({
+        classification: "binary128-aware comparison",
+        comparisonScale: "1e30 (direct bytes16 decoding; truncation toward zero)",
+        oraclePrecision: "exact BigInt rational arithmetic on the values actually encoded as binary128",
+        conversion: "binary128 bytes16 -> exact BigInt rational -> 1e30 integer",
+        claim: args.claim ?? "coefficient agreement against exact rational references using 1e-24 absolute + 1e-28 relative infinity-norm tolerance",
+    });
     console.log(`Min Gas                 : ${args.minGas.toString()}`);
     console.log(`Average Gas             : ${args.avgGas.toString()}`);
     console.log(`Max Gas                 : ${args.maxGas.toString()}`);
@@ -506,7 +541,7 @@ function printVectorSummary(args: {
 // Test suite
 // ------------------------------------------------------------
 
-describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
+describe("Polynomial Library - Binary128-Aware Exact-Oracle Benchmarks", function () {
     let harness: PolynomialHarness;
 
     before(async () => {
@@ -522,14 +557,6 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
 
         harness = (await HF.deploy()) as unknown as PolynomialHarness;
 
-        const [ok, oneScaledRaw] = await harness.toFloat(await harness.qFromInt(1n));
-        if (!ok) {
-            throw new Error("Failed to convert qFromInt(1) in harness.toFloat");
-        }
-
-        const oneScaled = asBigInt(oneScaledRaw);
-        SCALE = oneScaled;
-        SCALE_DECIMALS = inferScaleDecimals(oneScaled);
     });
 
     for (const degree of DEGREES) {
@@ -552,14 +579,14 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     const out = await harness.evaluateHorners(qCoeffs, qx);
                     const actual = await outScaled(harness, out);
 
-                    const expectedFrac = polyEval(coeffs, x);
+                    const expectedFrac = polyEval(exactEncodedVec(qCoeffs), exactEncodedFrac(qx));
                     const expected = fracToScaledTrunc(expectedFrac);
 
                     const err = scaledAbsError(actual, expected);
                     totalErr += err;
                     if (err > maxErr) maxErr = err;
 
-                    expect(err).to.be.lte(SCALAR_TOL);
+                    expect(err).to.be.lte(scalarTolerance(expected));
                 }
 
                 printScalarSummary({
@@ -595,7 +622,7 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     const actualPx = await outScaled(harness, px);
                     const actualDpx = await outScaled(harness, dpx);
 
-                    const ref = polyEvalWithDerivative(coeffs, x);
+                    const ref = polyEvalWithDerivative(exactEncodedVec(qCoeffs), exactEncodedFrac(qx));
                     const expectedPx = fracToScaledTrunc(ref.px);
                     const expectedDpx = fracToScaledTrunc(ref.dpx);
 
@@ -608,8 +635,8 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     if (errPx > maxErrPx) maxErrPx = errPx;
                     if (errDpx > maxErrDpx) maxErrDpx = errDpx;
 
-                    expect(errPx).to.be.lte(SCALAR_TOL);
-                    expect(errDpx).to.be.lte(SCALAR_TOL);
+                    expect(errPx).to.be.lte(scalarTolerance(expectedPx));
+                    expect(errDpx).to.be.lte(scalarTolerance(expectedDpx));
                 }
 
                 const avgGasValue = avgGas(gasStats);
@@ -655,14 +682,14 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     const out = await harness.evalHornerMonic(qLowerCoeffs, qx);
                     const actual = await outScaled(harness, out);
 
-                    const expectedFrac = polyEvalMonic(lowerCoeffs, x);
+                    const expectedFrac = polyEvalMonic(exactEncodedVec(qLowerCoeffs), exactEncodedFrac(qx));
                     const expected = fracToScaledTrunc(expectedFrac);
 
                     const err = scaledAbsError(actual, expected);
                     totalErr += err;
                     if (err > maxErr) maxErr = err;
 
-                    expect(err).to.be.lte(SCALAR_TOL);
+                    expect(err).to.be.lte(scalarTolerance(expected));
                 }
 
                 printScalarSummary({
@@ -695,14 +722,14 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     const out = await harness.add(qa, qb);
                     const actual = trimTrailingZerosBigInt(await scaledVec(harness, out));
 
-                    const expectedFrac = polyAdd(a, b);
+                    const expectedFrac = polyAdd(exactEncodedVec(qa), exactEncodedVec(qb));
                     const expected = trimTrailingZerosBigInt(fracVecToScaled(expectedFrac));
 
                     const err = vecInfNorm(subVec(actual, expected));
                     totalErr += err;
                     if (err > maxErr) maxErr = err;
 
-                    expect(err).to.be.lte(VECTOR_TOL);
+                    expect(err).to.be.lte(vectorTolerance(expected));
                 }
 
                 printVectorSummary({
@@ -735,14 +762,14 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     const out = await harness.sub(qa, qb);
                     const actual = trimTrailingZerosBigInt(await scaledVec(harness, out));
 
-                    const expectedFrac = polySub(a, b);
+                    const expectedFrac = polySub(exactEncodedVec(qa), exactEncodedVec(qb));
                     const expected = trimTrailingZerosBigInt(fracVecToScaled(expectedFrac));
 
                     const err = vecInfNorm(subVec(actual, expected));
                     totalErr += err;
                     if (err > maxErr) maxErr = err;
 
-                    expect(err).to.be.lte(VECTOR_TOL);
+                    expect(err).to.be.lte(vectorTolerance(expected));
                 }
 
                 printVectorSummary({
@@ -775,14 +802,14 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     const out = await harness.mulScalar(qCoeffs, qk);
                     const actual = trimTrailingZerosBigInt(await scaledVec(harness, out));
 
-                    const expectedFrac = polyMulScalar(coeffs, k);
+                    const expectedFrac = polyMulScalar(exactEncodedVec(qCoeffs), exactEncodedFrac(qk));
                     const expected = trimTrailingZerosBigInt(fracVecToScaled(expectedFrac));
 
                     const err = vecInfNorm(subVec(actual, expected));
                     totalErr += err;
                     if (err > maxErr) maxErr = err;
 
-                    expect(err).to.be.lte(VECTOR_TOL);
+                    expect(err).to.be.lte(vectorTolerance(expected));
                 }
 
                 printVectorSummary({
@@ -815,14 +842,14 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     const out = await harness.mul(qa, qb);
                     const actual = trimTrailingZerosBigInt(await scaledVec(harness, out));
 
-                    const expectedFrac = polyMul(a, b);
+                    const expectedFrac = polyMul(exactEncodedVec(qa), exactEncodedVec(qb));
                     const expected = trimTrailingZerosBigInt(fracVecToScaled(expectedFrac));
 
                     const err = vecInfNorm(subVec(actual, expected));
                     totalErr += err;
                     if (err > maxErr) maxErr = err;
 
-                    expect(err).to.be.lte(VECTOR_TOL);
+                    expect(err).to.be.lte(vectorTolerance(expected));
                 }
 
                 printVectorSummary({
@@ -861,7 +888,9 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     const actualQ = trimTrailingZerosBigInt(await scaledVec(harness, qOut));
                     const actualR = await outScaled(harness, rOut);
 
-                    const ref = polySyntheticDivideAscending(poly, root);
+                    const encodedPoly = exactEncodedVec(qPoly);
+                    const encodedRoot = exactEncodedFrac(qRoot);
+                    const ref = polySyntheticDivideAscending(encodedPoly, encodedRoot);
                     const expectedQ = trimTrailingZerosBigInt(fracVecToScaled(ref.q));
                     const expectedR = fracToScaledTrunc(ref.r);
 
@@ -874,8 +903,9 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     if (qErr > maxQErr) maxQErr = qErr;
                     if (rErr > maxRErr) maxRErr = rErr;
 
-                    expect(qErr).to.be.lte(VECTOR_TOL);
-                    expect(rErr).to.be.lte(SCALAR_TOL);
+                    const syntheticTolerance = syntheticOperationTolerance(encodedPoly, encodedRoot);
+                    expect(qErr).to.be.lte(syntheticTolerance);
+                    expect(rErr).to.be.lte(syntheticTolerance);
                 }
 
                 const avgGasValue = avgGas(gasStats);
@@ -889,6 +919,8 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     minGas: gasStats.min,
                     avgGas: avgGasValue,
                     maxGas: gasStats.max,
+                    threshold: "condition-scaled binary128 multiply-add bound (absolute Horner sum)",
+                    claim: "synthetic-division forward error against an exact rational oracle on encoded inputs",
                 });
 
                 printScalarSummary({
@@ -900,6 +932,8 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     minGas: gasStats.min,
                     avgGas: avgGasValue,
                     maxGas: gasStats.max,
+                    threshold: "condition-scaled binary128 cancellation bound (absolute Horner sum)",
+                    claim: "synthetic-division remainder error against an exact rational oracle on encoded inputs",
                 });
             });
 
@@ -919,14 +953,14 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     const out = await harness.derivative(qCoeffs);
                     const actual = trimTrailingZerosBigInt(await scaledVec(harness, out));
 
-                    const expectedFrac = polyDerivative(coeffs);
+                    const expectedFrac = polyDerivative(exactEncodedVec(qCoeffs));
                     const expected = trimTrailingZerosBigInt(fracVecToScaled(expectedFrac));
 
                     const err = vecInfNorm(subVec(actual, expected));
                     totalErr += err;
                     if (err > maxErr) maxErr = err;
 
-                    expect(err).to.be.lte(VECTOR_TOL);
+                    expect(err).to.be.lte(vectorTolerance(expected));
                 }
 
                 printVectorSummary({
@@ -959,14 +993,14 @@ describe("Polynomial Library - Multi-Case Accuracy Benchmarks", function () {
                     const out = await harness.integral(qCoeffs, qC);
                     const actual = trimTrailingZerosBigInt(await scaledVec(harness, out));
 
-                    const expectedFrac = polyIntegral(coeffs, C);
+                    const expectedFrac = polyIntegral(exactEncodedVec(qCoeffs), exactEncodedFrac(qC));
                     const expected = trimTrailingZerosBigInt(fracVecToScaled(expectedFrac));
 
                     const err = vecInfNorm(subVec(actual, expected));
                     totalErr += err;
                     if (err > maxErr) maxErr = err;
 
-                    expect(err).to.be.lte(VECTOR_TOL);
+                    expect(err).to.be.lte(vectorTolerance(expected));
                 }
 
                 printVectorSummary({

@@ -3,8 +3,9 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 import { classifyExecutionFailure, type ExecutionFailureKind } from "./test-utils";
+import { printPrecisionMetadata } from "./precision-utils";
 
-describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
+describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", function () {
     this.timeout(0); // Infinity minutes
 
     // ------------------------------------------------------------
@@ -535,6 +536,13 @@ describe("IntegrationHarness - Accuracy & Gas Benchmark Suite", function () {
     // Deploy
     // ------------------------------------------------------------
     before(async function () {
+        printPrecisionMetadata({
+            classification: "method-reference comparison",
+            comparisonScale: "1e12 Solidity toFloat output",
+            oraclePrecision: "JavaScript Number (~15-17 significant decimal digits)",
+            conversion: "binary128 -> truncating 1e12 fixed-point integer -> JavaScript Number",
+            claim: "lower-precision output agreement with the named quadrature rule; not binary128 accuracy",
+        });
         const LocalMathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );

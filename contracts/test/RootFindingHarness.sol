@@ -185,8 +185,10 @@ contract RootFindingHarness {
     /**
      * @notice Converts a quadruple-precision number into a scaled integer.
      *         The returned integer represents x * SCALE.
+     * @dev MathLib.toInt truncates toward zero. This helper is a 1e18
+     *      fixed-point view and does not preserve full binary128 precision.
      * @param x Quadruple-precision value.
-     * @return Integer representation of x scaled by SCALE.
+     * @return Integer representation of trunc(x * SCALE).
      */
     function toFloat(bytes16 x) external pure returns (int256) {
         bytes16 qScale = MathLib.fromUInt(SCALE);

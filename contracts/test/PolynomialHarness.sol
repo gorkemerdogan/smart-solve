@@ -208,8 +208,10 @@ contract PolynomialHarness {
     /**
      * @notice Converts a quadruple-precision number into a scaled integer safely.
      * @param x Quadruple-precision value.
+     * @dev MathLib.toInt truncates toward zero. This is a 1e18 fixed-point
+     *      reporting helper, not a binary128-precision conversion.
      * @return ok True if the scaled value fits into int256, false otherwise.
-     * @return value Integer representing x * SCALE when ok is true, otherwise 0.
+     * @return value Integer representing trunc(x * SCALE) when ok is true, otherwise 0.
      */
     function toFloat(bytes16 x) external pure returns (bool ok, int256 value) {
         bytes16 qScale = MathLib.fromUInt(SCALE);

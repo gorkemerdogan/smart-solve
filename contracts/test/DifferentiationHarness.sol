@@ -129,7 +129,9 @@ contract DifferentiationHarness {
     /**
      * @notice Converts a quadruple-precision number into a scaled integer (scaled by SCALE).
      * @param x Quadruple-precision value.
-     * @return Integer representing x * SCALE.
+     * @dev MathLib.toInt truncates toward zero. This helper is a 1e12
+     *      fixed-point view and must not be used to claim binary128 accuracy.
+     * @return Integer representing trunc(x * SCALE).
      */
     function toFloat(bytes16 x) external pure returns (int256) {
         bytes16 qScale = MathLib.fromUInt(SCALE);

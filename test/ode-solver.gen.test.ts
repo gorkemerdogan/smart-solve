@@ -3,6 +3,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 import { classifyExecutionFailure, printBlockRegular } from "./test-utils";
+import { printPrecisionMetadata } from "./precision-utils";
 
 // ------------------------------------------------------------
 // Types
@@ -371,7 +372,7 @@ async function runMethod(
 // Test Suite
 // ------------------------------------------------------------
 
-describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
+describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", function () {
     this.timeout(0);
 
     let harness: ODESolverHarness;
@@ -404,6 +405,13 @@ describe("ODESolver Library - Multi-Case Accuracy Tests", function () {
     const qFrac = async (num: number | bigint, den: number | bigint) => await harness.qFromFrac(num, den);
 
     before(async () => {
+        printPrecisionMetadata({
+            classification: "method-reference comparison",
+            comparisonScale: "1e12 Solidity toFloat output",
+            oraclePrecision: "JavaScript Number (~15-17 significant decimal digits)",
+            conversion: "binary128 -> truncating 1e12 fixed-point integer; JS Number method/exact references",
+            claim: "lower-precision agreement with Euler/RK discretizations; not binary128 accuracy",
+        });
         const MathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );
