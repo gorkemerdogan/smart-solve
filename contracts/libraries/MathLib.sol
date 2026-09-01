@@ -178,6 +178,10 @@ library MathLib {
         return ABDKMathQuad.isNaN(a);
     }
 
+    function isInfinity(bytes16 a) public pure returns (bool) {
+        return ABDKMathQuad.isInfinity(a);
+    }
+
     /**
     * @notice Returns true if 'x' is exactly zero in IEEE-754 quad format.
     *         Uses cmp(x, 0) to correctly treat +0 and -0 as zero.

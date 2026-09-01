@@ -5,6 +5,7 @@ import { deployFullSmartSolve } from "../scripts/deploy";
 import { binary128ToScaledInt } from "./precision-utils";
 
 const QZERO = "0x00000000000000000000000000000000";
+const QPOSITIVE_INFINITY = "0x7fff0000000000000000000000000000";
 const SCALE = 10n ** 33n;
 
 function abs(value: bigint): bigint {
@@ -92,6 +93,87 @@ describe("SmartSolve Diamond numeric configuration", function () {
     await expect(config.setDiffStep(negativeOne)).to.be.revertedWith(
       "NumericConfig: diffStep must be non-negative"
     );
+  });
+
+  it("rejects non-finite floating-point configuration values through the proxy", async function () {
+    const deployment = await deployFullSmartSolve();
+    const config: any = await ethers.getContractAt("NumericConfigFacet", deployment.diamondAddress);
+
+    await expect(config.setTol(QPOSITIVE_INFINITY)).to.be.revertedWith(
+      "NumericConfig: value must be finite"
+    );
+    await expect(config.setMinTol(QPOSITIVE_INFINITY)).to.be.revertedWith(
+      "NumericConfig: value must be finite"
+    );
+    await expect(config.setDiffStep(QPOSITIVE_INFINITY)).to.be.revertedWith(
+      "NumericConfig: value must be finite"
+    );
+  });
+
+  it("restricts the newly configurable values to the Diamond owner", async function () {
+    const deployment = await deployFullSmartSolve();
+    const [, nonOwner] = await ethers.getSigners();
+    const config: any = await ethers.getContractAt(
+      "NumericConfigFacet",
+      deployment.diamondAddress,
+      nonOwner
+    );
+
+    await expect(config.setMinTol(QZERO)).to.be.revertedWith(
+      "LibSmartSolve: Must be contract owner"
+    );
+    await expect(config.setDiffStep(QZERO)).to.be.revertedWith(
+      "LibSmartSolve: Must be contract owner"
+    );
+  });
+
+  it("consumes the unset effective root-finding configuration through RootFindingFacet", async function () {
+    const deployment = await deployFullSmartSolve();
+    const config: any = await ethers.getContractAt("NumericConfigFacet", deployment.diamondAddress);
+    const rootFinding = await ethers.getContractAt("RootFindingFacet", deployment.diamondAddress);
+    const Harness = await ethers.getContractFactory("RootFindingHarness", {
+      libraries: { MathLib: deployment.mathLibAddress },
+    });
+    const callback = await Harness.deploy();
+    await callback.waitForDeployment();
+
+    const defaultTol = await callback.qFromFrac(1n, 10n ** 12n);
+    const defaultMinTol = await callback.qFromFrac(1n, 10n ** 36n);
+    expect(await config.getRootFindingConfig()).to.deep.equal([defaultTol, defaultMinTol, 200n]);
+
+    const result = await rootFinding.rootFindingBisection(
+      await callback.getAddress(),
+      callback.interface.getFunction("f_x2_minus_4")!.selector,
+      await callback.qFromInt(1n),
+      await callback.qFromInt(4n)
+    );
+    expect(result.converged).to.equal(true);
+    expect(result.iterations).to.equal(42n);
+  });
+
+  it("applies the configured default differentiation step through the Diamond", async function () {
+    const deployment = await deployFullSmartSolve();
+    const config: any = await ethers.getContractAt("NumericConfigFacet", deployment.diamondAddress);
+    const differentiation = await ethers.getContractAt("DifferentiationFacet", deployment.diamondAddress);
+    const Harness = await ethers.getContractFactory("RootFindingHarness", {
+      libraries: { MathLib: deployment.mathLibAddress },
+    });
+    const callback = await Harness.deploy();
+    await callback.waitForDeployment();
+
+    const callbackAddress = await callback.getAddress();
+    const selector = callback.interface.getFunction("f_x2_minus_4")!.selector;
+    const x = await callback.qFromInt(2n);
+    const defaultStepResult = await differentiation.forwardDiff(callbackAddress, selector, x, QZERO);
+
+    // For f(x) = x^2 - 4 at x = 2, forward difference with h = 1 is exactly 5.
+    await (await config.setDiffStep(await callback.qFromInt(1n))).wait();
+    const configuredStepResult = await differentiation.forwardDiff(callbackAddress, selector, x, QZERO);
+    expect(binary128ToScaledInt(configuredStepResult, 33)).to.equal(5n * SCALE);
+    expect(configuredStepResult).to.not.equal(defaultStepResult);
+
+    await (await config.setDiffStep(QZERO)).wait();
+    expect(await differentiation.forwardDiff(callbackAddress, selector, x, QZERO)).to.equal(defaultStepResult);
   });
 
   it("uses the benchmark precision regime and enforces minTol through the Diamond root-finding path", async function () {

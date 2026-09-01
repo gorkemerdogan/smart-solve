@@ -19,7 +19,11 @@ import { MathLib } from "../../libraries/MathLib.sol";
  */
 contract NumericConfigFacet {
 
-    function _requireNonNegative(bytes16 value, string memory message) private pure {
+    function _requireFiniteNonNegative(bytes16 value, string memory message) private pure {
+        require(
+            !MathLib.isNaN(value) && !MathLib.isInfinity(value),
+            "NumericConfig: value must be finite"
+        );
         require(MathLib.cmp(value, MathLib.fromInt(0)) >= 0, message);
     }
     
@@ -30,7 +34,7 @@ contract NumericConfigFacet {
      */
     function setTol(bytes16 tol) external {
         LibSmartSolve.enforceIsContractOwner();
-        _requireNonNegative(tol, "NumericConfig: tol must be non-negative");
+        _requireFiniteNonNegative(tol, "NumericConfig: tol must be non-negative");
         LibNumericConfig.setTol(tol);
     }
 
@@ -40,7 +44,7 @@ contract NumericConfigFacet {
      */
     function setMinTol(bytes16 minTol) external {
         LibSmartSolve.enforceIsContractOwner();
-        _requireNonNegative(minTol, "NumericConfig: minTol must be non-negative");
+        _requireFiniteNonNegative(minTol, "NumericConfig: minTol must be non-negative");
         LibNumericConfig.setMinTol(minTol);
     }
 
@@ -60,7 +64,7 @@ contract NumericConfigFacet {
      */
     function setDiffStep(bytes16 h) external {
         LibSmartSolve.enforceIsContractOwner();
-        _requireNonNegative(h, "NumericConfig: diffStep must be non-negative");
+        _requireFiniteNonNegative(h, "NumericConfig: diffStep must be non-negative");
         LibNumericConfig.setDiffStep(h);
     }
 

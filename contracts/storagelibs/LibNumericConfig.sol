@@ -10,7 +10,6 @@ import { QuadConstants as QC } from "../libraries/QuadConstants.sol";
  */
 library LibNumericConfig {
 
-    uint256 private constant DEFAULT_MAX_ITER = 100;
     uint256 private constant ROOT_FINDING_DEFAULT_MAX_ITER = 200;
 
     // Fixed storage slot for numeric config (unique hash key)
@@ -105,7 +104,7 @@ library LibNumericConfig {
 
     /**
      * @notice Get the maximum number of iterations.
-     *         Returns DEFAULT_MAX_ITER if uninitialized.
+     *         Returns the shared default maximum iteration count if uninitialized.
      */
     function getMaxIter() internal view returns (uint256) {
         uint256 m = cfg().maxIter;
