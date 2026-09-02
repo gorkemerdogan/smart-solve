@@ -49,7 +49,11 @@ library MathLib {
 
     /**
      * @notice Divides two quadruple-precision numbers.
-     *         Reverts if 'b == 0'.
+     * @dev Follows ABDKMathQuad's IEEE-754-style special-value semantics:
+     *      a finite non-zero value divided by zero returns signed infinity,
+     *      while zero divided by zero returns NaN. This wrapper does not revert
+     *      solely because the denominator is zero; callers that require a
+     *      finite result must validate their inputs or output explicitly.
      * @param a Numerator
      * @param b Denominator
      * @return bytes16 a / b

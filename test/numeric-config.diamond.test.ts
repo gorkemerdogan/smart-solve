@@ -6,6 +6,7 @@ import { binary128ToScaledInt } from "./precision-utils";
 
 const QZERO = "0x00000000000000000000000000000000";
 const QPOSITIVE_INFINITY = "0x7fff0000000000000000000000000000";
+const QNAN = "0x7fff8000000000000000000000000000";
 const SCALE = 10n ** 33n;
 
 function abs(value: bigint): bigint {
@@ -106,6 +107,15 @@ describe("SmartSolve Diamond numeric configuration", function () {
       "NumericConfig: value must be finite"
     );
     await expect(config.setDiffStep(QPOSITIVE_INFINITY)).to.be.revertedWith(
+      "NumericConfig: value must be finite"
+    );
+    await expect(config.setTol(QNAN)).to.be.revertedWith(
+      "NumericConfig: value must be finite"
+    );
+    await expect(config.setMinTol(QNAN)).to.be.revertedWith(
+      "NumericConfig: value must be finite"
+    );
+    await expect(config.setDiffStep(QNAN)).to.be.revertedWith(
       "NumericConfig: value must be finite"
     );
   });

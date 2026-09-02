@@ -22,25 +22,27 @@ library Differentiation {
     /**
      * @notice Resolves the differentiation step size 'h' based on precedence rules.
      *          1. If 'hInput' != 0, use 'hInput'.
-     *          2. Else if 'LibNumericConfig.getDiffStep()' != 0, use that.
-     *          3. Else, use hardcoded default (1e-8).
+     *          2. Otherwise use LibNumericConfig.getDiffStep(), whose getter
+     *             supplies the default when the stored override is zero.
+     *          The resolved step must be finite and strictly positive.
      * @param  hInput The user-provided step size (can be 0).
      * @return step   The final resolved step size to be used in calculations.
      */
     function _getStep(bytes16 hInput) private view returns (bytes16 step) {
+        require(!MathLib.isNaN(hInput) && !MathLib.isInfinity(hInput), "Differentiation: step must be finite");
+
         // 1. User Override
         if (MathLib.cmp(hInput, QZERO) != 0) {
-            return hInput;
+            step = hInput;
+        } else {
+            // 2. Global Config (the getter supplies the established default
+            // when the stored value is the zero/reset sentinel).
+            step = LibNumericConfig.getDiffStep();
         }
 
-        // 2. Global Config
-        bytes16 hConfig = LibNumericConfig.getDiffStep();
-        if (MathLib.cmp(hConfig, QZERO) != 0) {
-            return hConfig;
-        }
-
-        // 3. Hardcoded Fallback: 1e-8
-        return MathLib.fromInt(1).div(MathLib.fromInt(100000000));
+        require(!MathLib.isNaN(step) && !MathLib.isInfinity(step), "Differentiation: step must be finite");
+        require(MathLib.cmp(step, QZERO) > 0, "Differentiation: step must be positive");
+        return step;
     }
 
 

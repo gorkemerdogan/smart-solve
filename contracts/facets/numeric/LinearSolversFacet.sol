@@ -54,6 +54,10 @@ contract LinearSolversFacet {
         uint256 maxIter,
         bytes16 tol
     ) external pure returns (bytes16[] memory x, uint256 iters) {
+        _requireMatrixLength(m, n, Adata.length);
+        _requireVectorLength(m, bdata.length);
+        _requireVectorLength(n, x0data.length);
+
         MatrixMaster.Matrix memory A =
             MatrixMaster.Matrix(m, n, _copy(Adata));
         MatrixMaster.Matrix memory b =
@@ -89,7 +93,8 @@ contract LinearSolversFacet {
      */
     function jacobi(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata, bytes16[] calldata x0data, uint256 maxIter, bytes16 tolDiff)
         external pure returns (bytes16[] memory x, uint256 iters) {
-        
+        _requireSquareSystemLengths(n, Adata.length, bdata.length, x0data.length);
+
         MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
         MatrixMaster.Matrix memory b = MatrixMaster.Matrix(n, 1, _copy(bdata));
         MatrixMaster.Matrix memory x0 = MatrixMaster.Matrix(n, 1, _copy(x0data));
@@ -102,6 +107,8 @@ contract LinearSolversFacet {
 
     function jacobiWithStatus(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata, bytes16[] calldata x0data, uint256 maxIter, bytes16 tolDiff)
         external pure returns (bytes16[] memory x, uint256 iters, bool converged) {
+        _requireSquareSystemLengths(n, Adata.length, bdata.length, x0data.length);
+
         MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
         MatrixMaster.Matrix memory b = MatrixMaster.Matrix(n, 1, _copy(bdata));
         MatrixMaster.Matrix memory x0 = MatrixMaster.Matrix(n, 1, _copy(x0data));
@@ -133,7 +140,8 @@ contract LinearSolversFacet {
      */
     function gaussSeidel(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata, bytes16[] calldata x0data, uint256 maxIter, bytes16 tolDiff)
         external pure returns (bytes16[] memory x, uint256 iters) {
-        
+        _requireSquareSystemLengths(n, Adata.length, bdata.length, x0data.length);
+
         MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
         MatrixMaster.Matrix memory b = MatrixMaster.Matrix(n, 1, _copy(bdata));
         MatrixMaster.Matrix memory x0 = MatrixMaster.Matrix(n, 1, _copy(x0data));
@@ -146,6 +154,8 @@ contract LinearSolversFacet {
 
     function gaussSeidelWithStatus(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata, bytes16[] calldata x0data, uint256 maxIter, bytes16 tolDiff)
         external pure returns (bytes16[] memory x, uint256 iters, bool converged) {
+        _requireSquareSystemLengths(n, Adata.length, bdata.length, x0data.length);
+
         MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
         MatrixMaster.Matrix memory b = MatrixMaster.Matrix(n, 1, _copy(bdata));
         MatrixMaster.Matrix memory x0 = MatrixMaster.Matrix(n, 1, _copy(x0data));
@@ -170,7 +180,9 @@ contract LinearSolversFacet {
      */
     function gaussianElimination(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata)
         external pure returns (bytes16[] memory x) {
-        
+        _requireMatrixLength(n, n, Adata.length);
+        _requireVectorLength(n, bdata.length);
+
         MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
         MatrixMaster.Matrix memory b = MatrixMaster.Matrix(n, 1, _copy(bdata));
 
@@ -195,7 +207,8 @@ contract LinearSolversFacet {
      */
     function luDecomposition(uint256 n, bytes16[] calldata Adata)
         external pure returns (bytes16[] memory L, bytes16[] memory U) {
-        
+        _requireMatrixLength(n, n, Adata.length);
+
         MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
 
         MatrixMaster.Matrix memory Lm;
@@ -208,6 +221,27 @@ contract LinearSolversFacet {
     // ------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------
+
+    function _requireMatrixLength(uint256 rows, uint256 cols, uint256 actualLength) internal pure {
+        require(rows > 0 && cols > 0, "LinearSolversFacet: dimensions must be > 0");
+        require(rows <= type(uint256).max / cols, "LinearSolversFacet: dimensions overflow");
+        require(actualLength == rows * cols, "LinearSolversFacet: matrix length mismatch");
+    }
+
+    function _requireVectorLength(uint256 expectedLength, uint256 actualLength) internal pure {
+        require(actualLength == expectedLength, "LinearSolversFacet: vector length mismatch");
+    }
+
+    function _requireSquareSystemLengths(
+        uint256 n,
+        uint256 matrixLength,
+        uint256 rhsLength,
+        uint256 initialLength
+    ) internal pure {
+        _requireMatrixLength(n, n, matrixLength);
+        _requireVectorLength(n, rhsLength);
+        _requireVectorLength(n, initialLength);
+    }
 
     function _copy(bytes16[] calldata src)
         internal pure returns (bytes16[] memory dst) {

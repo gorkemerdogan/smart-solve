@@ -117,7 +117,10 @@ library MatrixMaster {
      * @param  m Matrix to check
      */
     modifier isSquare(Matrix memory m) {
+        require(m.rows > 0 && m.cols > 0, "MatrixMaster: dims must be > 0");
         require(m.rows == m.cols, "MatrixMaster: matrix must be square");
+        require(m.rows <= type(uint256).max / m.cols, "MatrixMaster: dimensions overflow");
+        require(m.data.length == m.rows * m.cols, "MatrixMaster: data length mismatch");
         _;
     }
 
@@ -377,8 +380,10 @@ library MatrixMaster {
         uint256 nnz = values.length;
         uint256[] memory rowPtr = new uint256[](rows + 1);
         
-        // Count elements for rows
+        // Validate triplets and count elements for rows.
         for (uint256 k = 0; k < nnz; ++k) {
+            require(rowInd[k] < rows, "MatrixMaster: COO row out of bounds");
+            require(colInd[k] < cols, "MatrixMaster: COO column out of bounds");
             rowPtr[rowInd[k] + 1]++;
         }
         // Identify starting position
@@ -399,6 +404,25 @@ library MatrixMaster {
             sortedColInd[dest] = colInd[k];
             sortedValues[dest] = values[k];
             currentPos[r]++;
+        }
+
+        // Canonical CSR order: sort column indices within each row while
+        // keeping values paired with their original column entries.
+        for (uint256 r = 0; r < rows; ++r) {
+            uint256 rowStart = rowPtr[r];
+            uint256 rowEnd = rowPtr[r + 1];
+            for (uint256 pos = rowStart + 1; pos < rowEnd; ++pos) {
+                uint256 keyColumn = sortedColInd[pos];
+                bytes16 keyValue = sortedValues[pos];
+                uint256 cursor = pos;
+                while (cursor > rowStart && sortedColInd[cursor - 1] > keyColumn) {
+                    sortedColInd[cursor] = sortedColInd[cursor - 1];
+                    sortedValues[cursor] = sortedValues[cursor - 1];
+                    --cursor;
+                }
+                sortedColInd[cursor] = keyColumn;
+                sortedValues[cursor] = keyValue;
+            }
         }
 
         A = SparseMatrix({
@@ -672,6 +696,9 @@ library MatrixMaster {
     * @return y Dense column vector (m × 1)
     */
     function mulSparseMatrixVector(SparseMatrix memory A, Matrix memory x) internal pure returns (Matrix memory y) {
+        _validateCSR(A);
+        require(x.rows > 0 && x.cols == 1, "MatrixMaster: x must be a non-empty column vector");
+        require(x.data.length == x.rows, "MatrixMaster: vector length mismatch");
         require(A.cols == x.rows, "MatrixMaster: dimension mismatch");
 
         uint256 m = A.rows;
@@ -700,6 +727,25 @@ library MatrixMaster {
         }
 
         return Matrix({ rows: m, cols: 1, data: yData });
+    }
+
+    function _validateCSR(SparseMatrix memory A) private pure {
+        require(A.rows > 0 && A.cols > 0, "MatrixMaster: invalid sparse shape");
+        require(A.rows < type(uint256).max, "MatrixMaster: sparse dimensions overflow");
+        require(A.rowPtr.length == A.rows + 1, "MatrixMaster: invalid CSR row pointer length");
+        require(A.rowPtr[0] == 0, "MatrixMaster: CSR row pointer must start at zero");
+        require(A.colInd.length == A.values.length, "MatrixMaster: CSR nnz length mismatch");
+
+        uint256 nnz = A.values.length;
+        for (uint256 i = 1; i < A.rowPtr.length; ++i) {
+            require(A.rowPtr[i] >= A.rowPtr[i - 1], "MatrixMaster: CSR row pointer not monotonic");
+            require(A.rowPtr[i] <= nnz, "MatrixMaster: CSR row pointer exceeds nnz");
+        }
+        require(A.rowPtr[A.rows] == nnz, "MatrixMaster: CSR terminal pointer mismatch");
+
+        for (uint256 k = 0; k < nnz; ++k) {
+            require(A.colInd[k] < A.cols, "MatrixMaster: CSR column out of bounds");
+        }
     }
 
     // ------------------------------------------------------------

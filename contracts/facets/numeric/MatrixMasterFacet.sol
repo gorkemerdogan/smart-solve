@@ -665,6 +665,8 @@ contract MatrixMasterFacet {
      * @notice Build a Matrix from calldata.
      */ 
     function _buildMatrix(uint256 rows, uint256 cols, bytes16[] calldata data) internal pure returns (MatrixMaster.Matrix memory m) {
+        require(rows > 0 && cols > 0, "MatrixFacet: dimensions must be > 0");
+        require(rows <= type(uint256).max / cols, "MatrixFacet: dimensions overflow");
         require(rows * cols == data.length, "MatrixFacet: shape mismatch");
         m = MatrixMaster.Matrix({
             rows: rows,
