@@ -2,7 +2,13 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
-import { classifyExecutionFailure, type ExecutionFailureKind } from "./test-utils";
+import {
+    classifyExecutionFailure,
+    formatBenchmarkExecution,
+    HARNESS_TRANSACTION_PLUS_CALL,
+    type BenchmarkExecutionMetadata,
+    type ExecutionFailureKind,
+} from "./test-utils";
 import { printPrecisionMetadata } from "./precision-utils";
 
 describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", function () {
@@ -76,6 +82,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
         absTolerance: number;
         relTolerance: number;
         errorMessage: string | null;
+        execution: BenchmarkExecutionMetadata;
     }
 
     // ------------------------------------------------------------
@@ -247,6 +254,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
         console.log("OVERALL SUMMARY");
         console.log("============================================================");
         console.log(`Total Tests           : ${records.length}`);
+        console.log(`Execution Model       : ${formatBenchmarkExecution(HARNESS_TRANSACTION_PLUS_CALL)}`);
         console.log(`Successful Tests      : ${success.length}`);
         console.log(`Numerical Passes      : ${numericalPasses.length}`);
         console.log(`Numerical Failures    : ${numericalFailures.length}`);
@@ -290,6 +298,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
             console.log(`SUMMARY - ${method}`);
             console.log("============================================================");
             console.log(`Total Tests           : ${subset.length}`);
+            console.log(`Execution Model       : ${formatBenchmarkExecution(HARNESS_TRANSACTION_PLUS_CALL)}`);
             console.log(`Successful Tests      : ${success.length}`);
             console.log(`Numerical Passes      : ${numericalPasses.length}`);
             console.log(`Numerical Failures    : ${numericalFailures.length}`);
@@ -322,6 +331,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
         console.log(`Interval      : ${record.intervalLabel}`);
         console.log(`n             : ${record.n.toString()}`);
         console.log(`Status        : ${record.status}`);
+        console.log(`Execution Model: ${formatBenchmarkExecution(record.execution)}`);
 
         if (record.status === "success") {
             console.log(`Expected      : ${record.expected}`);
@@ -420,6 +430,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
                 absTolerance: tolerances.abs,
                 relTolerance: tolerances.rel,
                 errorMessage: null,
+                execution: HARNESS_TRANSACTION_PLUS_CALL,
             };
         } catch (err) {
             const tolerances = tolerancesFor(fn, method, aLabelNum, bLabelNum, n);
@@ -442,6 +453,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
                 absTolerance: tolerances.abs,
                 relTolerance: tolerances.rel,
                 errorMessage: extractErrorMessage(err),
+                execution: HARNESS_TRANSACTION_PLUS_CALL,
             };
         }
     }

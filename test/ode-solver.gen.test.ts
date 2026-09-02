@@ -2,7 +2,12 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
-import { classifyExecutionFailure, printBlockRegular } from "./test-utils";
+import {
+    classifyExecutionFailure,
+    formatBenchmarkExecution,
+    HARNESS_ESTIMATE_CALL,
+    printBlockRegular,
+} from "./test-utils";
 import { printPrecisionMetadata } from "./precision-utils";
 
 // ------------------------------------------------------------
@@ -803,7 +808,11 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
 
         const total = stepBudgets.length * METHODS.length;
         const failed = reverted + outOfGas + otherFailures;
-        console.log(`ODE FEASIBILITY SUMMARY | total=${total} | successful=${successful} | failed=${failed} | reverted=${reverted} | outOfGas=${outOfGas} | other=${otherFailures} | successRate=${((successful / total) * 100).toFixed(2)}%`);
+        console.log(
+            `ODE FEASIBILITY SUMMARY | execution=${formatBenchmarkExecution(HARNESS_ESTIMATE_CALL)} | ` +
+            `total=${total} | successful=${successful} | failed=${failed} | reverted=${reverted} | ` +
+            `outOfGas=${outOfGas} | other=${otherFailures} | successRate=${((successful / total) * 100).toFixed(2)}%`
+        );
 
         expect(successful + failed).to.equal(total);
         expect(successful, "at least one high-step ODE case should remain feasible").to.be.greaterThan(0);

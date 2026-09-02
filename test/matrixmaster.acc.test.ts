@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { formatBenchmarkExecution, HARNESS_ESTIMATE_CALL } from "./test-utils";
 import { printPrecisionMetadata } from "./precision-utils";
 
 // ------------------------------------------------------------
@@ -541,6 +542,7 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
     let SEED: string;
 
     before(async () => {
+        console.log(`Execution Model      : ${formatBenchmarkExecution(HARNESS_ESTIMATE_CALL)}`);
         printPrecisionMetadata({
             classification: "JavaScript-number-limited comparison",
             comparisonScale: "mixed: truncating 1e12 fixed-point and JavaScript Number",

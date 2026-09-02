@@ -1,7 +1,12 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
-import { classifyExecutionFailure, type ExecutionFailureKind } from "./test-utils";
+import {
+    classifyExecutionFailure,
+    formatBenchmarkExecution,
+    HARNESS_ESTIMATE_CALL,
+    type ExecutionFailureKind,
+} from "./test-utils";
 import { printPrecisionMetadata } from "./precision-utils";
 
 // ------------------------------------------------------------
@@ -84,6 +89,7 @@ let SCALE = 10n ** SCALE_DECIMALS;
 // runs without making the default generated suite impractical for CI or local
 // verification.
 const RUN_HEAVY_SCALABILITY = process.env.RUN_HEAVY_SCALABILITY === "1";
+const LINEAR_BENCHMARK_EXECUTION = formatBenchmarkExecution(HARNESS_ESTIMATE_CALL);
 
 // ------------------------------------------------------------
 // Basic Helpers
@@ -195,6 +201,7 @@ function printReliabilitySummary(args: {
     const numericalFailed = args.successful - args.numericalPassed;
     const passRate = args.total === 0 ? 0 : args.numericalPassed / args.total;
     console.log(`Reliability Summary  : ${args.label}`);
+    console.log(`Execution Model      : ${LINEAR_BENCHMARK_EXECUTION}`);
     console.log(`Total Cases          : ${args.total}`);
     console.log(`Successful Cases     : ${args.successful}`);
     console.log(`Numerical Failures   : ${numericalFailed}`);
@@ -219,6 +226,7 @@ function printExecutionReliabilitySummary(args: {
 }) {
     const passRate = args.total === 0 ? 0 : args.successful / args.total;
     console.log(`Reliability Summary  : ${args.label}`);
+    console.log(`Execution Model      : ${LINEAR_BENCHMARK_EXECUTION}`);
     console.log(`Total Cases          : ${args.total}`);
     console.log(`Successful Cases     : ${args.successful}`);
     console.log(`Execution Failures   : ${args.failures.failed}`);
@@ -823,6 +831,7 @@ function printTestExplanation(args: {
     console.log("************************************************************");
     console.log(`Method               : ${args.method}`);
     console.log(`Test Explanation     : ${args.testExplanation}`);
+    console.log(`Execution Model      : ${LINEAR_BENCHMARK_EXECUTION}`);
     console.log("************************************************************");
 }
 
@@ -837,6 +846,7 @@ function printCaseBlock(args: {
     console.log("------------------------------------------------------------");
     console.log(`Method               : ${args.method}`);
     console.log(`Test Explanation     : ${args.testExplanation}`);
+    console.log(`Execution Model      : ${LINEAR_BENCHMARK_EXECUTION}`);
     console.log(`Gas Usage            : ${args.gas.toString()}`);
     console.log(`Solution Error       : ${formatScaledInt(args.err)}`);
     console.log(`Residual             : ${formatScaledInt(args.res)}`);
@@ -855,6 +865,7 @@ function printLUCaseBlock(args: {
     console.log("------------------------------------------------------------");
     console.log(`Method               : ${args.method}`);
     console.log(`Test Explanation     : ${args.testExplanation}`);
+    console.log(`Execution Model      : ${LINEAR_BENCHMARK_EXECUTION}`);
     console.log(`Gas Usage            : ${args.gas.toString()}`);
     console.log(`Reconstruction Error : ${formatScaledInt(args.recon)}`);
     console.log("------------------------------------------------------------");
@@ -877,6 +888,7 @@ function printSummaryBlock(args: {
     console.log("============================================================");
     console.log(`Method               : ${args.method}`);
     console.log(`Test Explanation     : ${args.testExplanation}`);
+    console.log(`Execution Model      : ${LINEAR_BENCHMARK_EXECUTION}`);
     console.log(`Successful Cases     : ${args.count}`);
     console.log(`Average Abs. Error   : ${formatScaledInt(args.avgErr)} (successful cases only)`);
     console.log(`Average Residual     : ${formatScaledInt(args.avgRes)} (successful cases only)`);
@@ -904,6 +916,7 @@ function printLUSummaryBlock(args: {
     console.log("============================================================");
     console.log(`Method               : ${args.method}`);
     console.log(`Test Explanation     : ${args.testExplanation}`);
+    console.log(`Execution Model      : ${LINEAR_BENCHMARK_EXECUTION}`);
     console.log(`Successful Cases     : ${args.count}`);
     console.log(`Average Recon. Error : ${formatScaledInt(args.avgRecon)} (successful cases only)`);
     console.log(`Average Gas          : ${args.avgGas.toString()} (successful cases only)`);

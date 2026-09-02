@@ -2,6 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
+import { formatBenchmarkExecution, HARNESS_ESTIMATE_CALL } from "./test-utils";
 import {
     binary128ToScaledInt,
     decimalStringToScaledInt,
@@ -183,6 +184,7 @@ function printMethodSummary(
     console.log("============================================================");
     console.log(`Benchmark            : ${benchmarkName}`);
     console.log(`Method               : ${method}`);
+    console.log(`Execution Model      : ${formatBenchmarkExecution(HARNESS_ESTIMATE_CALL)}`);
     console.log(`Number of Tests      : ${totalTests}`);
     console.log(`Converged Tests      : ${s.convergedCount}`);
     console.log(`Numerical Passes     : ${numericalPasses}`);
@@ -235,6 +237,7 @@ function printCaseResult(args: {
     console.log(`Benchmark            : ${args.benchmarkName}`);
     console.log(`Case                 : ${args.caseNo}`);
     console.log(`Method               : ${args.method}`);
+    console.log(`Execution Model      : ${formatBenchmarkExecution(HARNESS_ESTIMATE_CALL)}`);
     console.log(`Initialization       : ${args.initText}`);
     console.log(`Converged            : ${args.converged ? "Yes" : "No"}`);
     console.log(`Iterations           : ${args.iterations.toString()}`);

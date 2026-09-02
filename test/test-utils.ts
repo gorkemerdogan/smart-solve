@@ -13,6 +13,46 @@ export interface Harness extends Contract {
 export type ExecutionFailureKind = "revert" | "out-of-gas" | "failure";
 
 /**
+ * Explicit benchmark execution metadata. Gas, returned data, and routing are
+ * deliberately recorded separately because a view result is normally an
+ * `eth_call`, even when gas is obtained from a transaction or estimate.
+ */
+export type BenchmarkExecutionMetadata = {
+    route: "harness_direct" | "diamond_routed";
+    gas: "estimateGas" | "transaction_receipt_gas";
+    result: "eth_call_result";
+    transactionPreflight?: boolean;
+};
+
+export const HARNESS_ESTIMATE_CALL: BenchmarkExecutionMetadata = {
+    route: "harness_direct",
+    gas: "estimateGas",
+    result: "eth_call_result",
+};
+
+export const HARNESS_TRANSACTION_PLUS_CALL: BenchmarkExecutionMetadata = {
+    route: "harness_direct",
+    gas: "transaction_receipt_gas",
+    result: "eth_call_result",
+};
+
+export const DIAMOND_ESTIMATE_CALL: BenchmarkExecutionMetadata = {
+    route: "diamond_routed",
+    gas: "estimateGas",
+    result: "eth_call_result",
+};
+
+export function formatBenchmarkExecution(metadata: BenchmarkExecutionMetadata): string {
+    const resultModel = metadata.gas === "transaction_receipt_gas"
+        ? "transaction_plus_call_result"
+        : metadata.result;
+    const preflight = metadata.transactionPreflight
+        ? " | transaction_preflight (receipt gas not reported)"
+        : "";
+    return `${metadata.route} | ${metadata.gas} | ${resultModel}${preflight}`;
+}
+
+/**
  * Classify an unexpected execution failure without hiding the original error.
  * The classification is intentionally conservative: only recognizable EVM
  * revert and gas-limit messages receive a specific label.
@@ -49,7 +89,9 @@ export function classifyExecutionFailure(error: unknown): ExecutionFailureKind {
 // ------------------------------------------------------------
 
 /**
- * @notify        Executes a transaction to touch the gas and confirms it. Failures are classified and propagated.
+ * @notify        Executes a transaction preflight and confirms it. Its receipt
+ *                gas is intentionally not returned; reports using this helper
+ *                must label their gas metric as estimateGas.
  * @param harness The contract harness instance.
  * @param method  The name of the contract method to call.
  * @param args    The arguments for the contract method.
@@ -130,6 +172,7 @@ interface PrintBlockMatrixData {
     withinTol?: string;
     exceededTol?: string;
     worstCase?: string;
+    execution?: BenchmarkExecutionMetadata;
 }
 
 /**
@@ -158,6 +201,7 @@ export function printBlockMatrix({
                                      withinTol = "-",
                                      exceededTol = "-",
                                      worstCase = "-",
+                                     execution = HARNESS_ESTIMATE_CALL,
                                  }: PrintBlockMatrixData): void {
 
     const sep: string = "-".repeat(60);
@@ -167,6 +211,7 @@ export function printBlockMatrix({
         `Test: ${t}`,
         `Method: ${method}`,
         `Explanation: ${explanation}`,
+        `Execution Model: ${formatBenchmarkExecution(execution)}`,
         `Gas Usage: ${gas}`,
         `Shape In: ${shapeIn}`,
         `Shape Out: ${shapeOut}`,
@@ -208,6 +253,7 @@ interface PrintBlockRegularData {
     exceededTol?: string;
     tolerance?: string;
     worstCase?: string;
+    execution?: BenchmarkExecutionMetadata;
 }
 
 /**
@@ -233,6 +279,7 @@ export function printBlockRegular({
                                       withinTol = "-",
                                       exceededTol = "-",
                                       worstCase = "-",
+                                      execution = HARNESS_ESTIMATE_CALL,
                                   }: PrintBlockRegularData): void {
 
     const sep: string = "-".repeat(60);
@@ -242,6 +289,7 @@ export function printBlockRegular({
         `Test: ${t}`,
         `Method: ${method}`,
         `Explanation: ${explanation}`,
+        `Execution Model: ${formatBenchmarkExecution(execution)}`,
         `Gas Usage: ${gas}`,
         `Input: ${inHex}`,
         `Expected Output (hex): ${expectedHex}`,
@@ -281,6 +329,7 @@ interface PrintBlockOptimizationData {
     exceededTol?: string;
     tolerance?: string;
     worstCase?: string;
+    execution?: BenchmarkExecutionMetadata;
 }
 
 export function printBlockOptimization({
@@ -302,6 +351,7 @@ export function printBlockOptimization({
                                            exceededTol = "-",
                                            tolerance = "-",
                                            worstCase = "-",
+                                           execution = HARNESS_ESTIMATE_CALL,
                                        }: PrintBlockOptimizationData): void {
     const sep = "-".repeat(60);
     const logLines = [
@@ -309,6 +359,7 @@ export function printBlockOptimization({
         `Test: ${t}`,
         `Method: ${method}`,
         `Explanation: ${explanation}`,
+        `Execution Model: ${formatBenchmarkExecution(execution)}`,
         `Gas Usage: ${gas}`,
         `Initial x: ${x0}`,
         `Final x: ${xFinal}`,

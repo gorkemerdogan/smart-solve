@@ -6,6 +6,7 @@ import {
   deployFullSmartSolve,
   type FullSmartSolveDeployment,
 } from "../scripts/deploy";
+import { DIAMOND_ESTIMATE_CALL, formatBenchmarkExecution } from "./test-utils";
 
 type FacetWithInterface = { interface: Interface };
 
@@ -38,7 +39,10 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
   }
 
   function report(category: string, method: string, gas: bigint): void {
-    console.log(`Diamond-routed production-path gas estimate | ${category} | ${method}: ${gas}`);
+    console.log(
+      `Diamond-routed production-path gas estimate | ${category} | ${method}: ${gas} | ` +
+      `execution=${formatBenchmarkExecution(DIAMOND_ESTIMATE_CALL)}`
+    );
   }
 
   before(async function () {

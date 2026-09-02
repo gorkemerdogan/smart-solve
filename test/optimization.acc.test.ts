@@ -2,7 +2,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
-import { classifyExecutionFailure } from "./test-utils";
+import { classifyExecutionFailure, formatBenchmarkExecution, HARNESS_ESTIMATE_CALL } from "./test-utils";
 import { printPrecisionMetadata } from "./precision-utils";
 
 // ------------------------------------------------------------
@@ -229,9 +229,8 @@ async function buildDeterministicInitialVector(
 }
 
 /**
- * @notice Executes the solver twice: once for the numerical result and once for gas measurement.
- * @dev    The eth_call result is used to obtain the returned values directly. The transaction run
- *         is used only to measure gas consumption under the same input configuration.
+ * @notice Obtains the numerical result by eth_call and gas by eth_estimateGas.
+ * @dev    No transaction receipt is used by this benchmark path.
  */
 async function solveWithGas(
     solver: SteepestDescentHarness,
@@ -268,6 +267,7 @@ function printBenchmarkSummary(summary: BenchmarkSummary): void {
 
     console.log("============================================================");
     console.log(`Benchmark                : ${summary.objectiveName}`);
+    console.log(`Execution Model          : ${formatBenchmarkExecution(HARNESS_ESTIMATE_CALL)}`);
     console.log(`Number of Tests          : ${summary.numberOfTests}`);
     console.log(`Successful Executions    : ${summary.executionSuccessCount}`);
     console.log(`Execution Failures       : ${summary.failedCount}`);

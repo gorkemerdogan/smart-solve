@@ -1,6 +1,11 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { classifyExecutionFailure, type ExecutionFailureKind } from "./test-utils";
+import {
+    classifyExecutionFailure,
+    formatBenchmarkExecution,
+    HARNESS_ESTIMATE_CALL,
+    type ExecutionFailureKind,
+} from "./test-utils";
 import { binary128ToScaledInt, printPrecisionMetadata } from "./precision-utils";
 
 describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests)", function () {
@@ -256,6 +261,7 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
         console.log("\n============================================================");
         console.log(title);
         console.log("============================================================");
+        console.log(`Execution Model       : ${formatBenchmarkExecution(HARNESS_ESTIMATE_CALL)}`);
         console.log(`Total Tests           : ${total}`);
         console.log(`Successful Executions : ${s.successfulCount}`);
         console.log(`Failed Cases          : ${s.failedCount + failures.length}`);
