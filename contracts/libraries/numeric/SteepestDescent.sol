@@ -46,7 +46,9 @@ library SteepestDescent {
      *         - Build quadratic interpolation terms h1, h2, h3
      *         - Compute alpha0 and compare g0 with g3
      *         - Update x using the better step
-     *         - Stop when |g_new - g_old| < tol
+     *         - Stop successfully only when ||grad g(x)||_2 <= tol
+     *         - Treat a tiny step or negligible objective improvement with a
+     *           non-small gradient as stagnation, never as convergence
      *
      * @param objective Objective contract implementing IObjectiveFunction
      * @param x0        Initial point in R^n
@@ -99,12 +101,12 @@ library SteepestDescent {
 
             z0 = _norm2(z);
 
-            // Near-zero gradient or objective => convergence
-            if (MathLib.cmp(z0, tolEff) <= 0 || MathLib.cmp(MathLib.abs(g1), tolEff) <= 0) {
+            // Stationarity, not objective magnitude, defines convergence.
+            if (MathLib.cmp(z0, tolEff) <= 0) {
                 r.x = x;
                 r.gx = g1;
                 r.iters = k - 1;
-                r.status = STATUS_SUCCESS;
+                r.status = STATUS_ZERO_GRADIENT;
                 return r;
             }
 
@@ -123,15 +125,6 @@ library SteepestDescent {
                 g3 = objective.g(trialX);
 
                 if (MathLib.cmp(alpha3, tolHalf) < 0) {
-
-                    // Near-zero convergence check
-                    if (MathLib.cmp(z0, tolEff) <= 0 || MathLib.cmp(MathLib.abs(g1), tolEff) <= 0) {
-                        r.x = x;
-                        r.gx = g1;
-                        r.iters = k - 1;
-                        r.status = STATUS_SUCCESS;
-                        return r;
-                    }
 
                     r.x = x;
                     r.gx = g1;
@@ -177,17 +170,24 @@ library SteepestDescent {
             // x = x - alpha z
             _subScaledInPlace(x, alpha, z);
 
-            // Stop if improvement is below tolerance
-            if (MathLib.cmp(MathLib.abs(MathLib.sub(gSelected, g1)), tolEff) < 0) {
+            // Step size and objective change are secondary stagnation guards.
+            // Neither can declare success: stationarity is checked explicitly.
+            if (MathLib.cmp(MathLib.abs(alpha), tolEff) <= 0 ||
+                MathLib.cmp(MathLib.abs(MathLib.sub(gSelected, g1)), tolEff) < 0) {
+                bytes16[] memory zSelected = objective.grad(x);
+                require(zSelected.length == x.length, "SteepestDescent: gradient dimension mismatch");
+
                 r.x = x;
                 r.gx = gSelected;
                 r.iters = k;
-                r.status = STATUS_SUCCESS;
+                r.status = MathLib.cmp(_norm2(zSelected), tolEff) <= 0
+                    ? STATUS_ZERO_GRADIENT
+                    : STATUS_NO_LIKELY_IMPROVEMENT;
                 return r;
             }
         }
 
-        // Stop if aximum iterations reached
+        // Stop if maximum iterations reached
         r.x = x;
         r.gx = objective.g(x);
         r.iters = maxIter;

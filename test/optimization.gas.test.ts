@@ -24,7 +24,6 @@ type ObjectiveHarness = Contract & {
     grad(x: string[]): Promise<string[]>;
 };
 
-const STATUS_SUCCESS = 0n;
 const STATUS_ZERO_GRADIENT = 1n;
 const STATUS_NO_LIKELY_IMPROVEMENT = 2n;
 const STATUS_MAX_ITER_EXCEEDED = 3n;
@@ -378,7 +377,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
                 const batch = await runBatch(solver, spherical, objectiveAddr, x0Batch, 10n, tolTight);
 
                 batch.statuses.forEach((s) => {
-                    expect([STATUS_SUCCESS, STATUS_MAX_ITER_EXCEEDED]).to.include(s);
+                    expect([STATUS_ZERO_GRADIENT, STATUS_MAX_ITER_EXCEEDED]).to.include(s);
                 });
 
                 const gasStats = summarizeBigint(batch.gasValues);
@@ -437,7 +436,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
 
                 batch.statuses.forEach((s) => {
                     expect([
-                        STATUS_SUCCESS,
+                        STATUS_ZERO_GRADIENT,
                         STATUS_MAX_ITER_EXCEEDED,
                         STATUS_NO_LIKELY_IMPROVEMENT,
                     ]).to.include(s);
@@ -599,7 +598,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
                 );
 
                 batch.statuses.forEach((s) => {
-                    expect(s).to.eq(STATUS_SUCCESS);
+                    expect(s).to.eq(STATUS_ZERO_GRADIENT);
                 });
 
                 const gasStats = summarizeBigint(batch.gasValues);
@@ -667,7 +666,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
             );
 
             batch.statuses.forEach((s) => {
-                expect(s).to.eq(STATUS_SUCCESS);
+                expect(s).to.eq(STATUS_ZERO_GRADIENT);
             });
 
             const gasStats = summarizeBigint(batch.gasValues);
@@ -734,7 +733,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
                 label: "spherical",
                 objective: () => spherical,
                 getAddress: async () => spherical.getAddress(),
-                expectedStatuses: [STATUS_SUCCESS],
+                expectedStatuses: [STATUS_ZERO_GRADIENT],
                 dim: 8,
                 maxIter: 30n
             },
@@ -743,7 +742,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
                 objective: () => semiWeighted,
                 getAddress: async () => semiWeighted.getAddress(),
                 expectedStatuses: [
-                    STATUS_SUCCESS,
+                    STATUS_ZERO_GRADIENT,
                     STATUS_MAX_ITER_EXCEEDED,
                     STATUS_NO_LIKELY_IMPROVEMENT
                 ],
@@ -879,7 +878,7 @@ describe("SteepestDescent - Gas Growth Tests", function () {
 
                     batch.statuses.forEach((s) => {
                         expect([
-                            STATUS_SUCCESS,
+                            STATUS_ZERO_GRADIENT,
                             STATUS_MAX_ITER_EXCEEDED,
                             STATUS_NO_LIKELY_IMPROVEMENT,
                         ]).to.include(s);

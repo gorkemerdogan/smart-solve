@@ -47,6 +47,8 @@ type BenchmarkSummary = {
     maxGas: bigint;
     executionSuccessCount: number;
     successCount: number;
+    noImprovementCount: number;
+    maxIterCount: number;
     numericalPassCount: number;
     failedCount: number;
     revertedCount: number;
@@ -274,6 +276,9 @@ function printBenchmarkSummary(summary: BenchmarkSummary): void {
     console.log(`Other Failures           : ${summary.otherFailureCount}`);
     console.log(`Numerical Passes         : ${summary.numericalPassCount}`);
     console.log(`Numerical Failures       : ${summary.executionSuccessCount - summary.numericalPassCount}`);
+    console.log(`Stationary Successes     : ${summary.successCount}`);
+    console.log(`Stagnation Statuses      : ${summary.noImprovementCount}`);
+    console.log(`Max-Iteration Statuses   : ${summary.maxIterCount}`);
     console.log(`Average Distance to Optimum : ${formatScaledInt(summary.averageDistance)}`);
     console.log(`Min Distance             : ${formatScaledInt(summary.minDistance)}`);
     console.log(`Max Distance             : ${formatScaledInt(summary.maxDistance)}`);
@@ -292,6 +297,8 @@ function printBenchmarkSummary(summary: BenchmarkSummary): void {
 // ------------------------------------------------------------
 
 describe("SteepestDescent Library - 1e12 Fixed-Point Accuracy & Gas Benchmarks", function () {
+    this.timeout(120000);
+
     let solver: SteepestDescentHarness & { toFloat(q: string): Promise<unknown> };
     let spherical: ObjectiveHarness;
     let weighted: ObjectiveHarness;
@@ -366,6 +373,8 @@ describe("SteepestDescent Library - 1e12 Fixed-Point Accuracy & Gas Benchmarks",
         objective: ObjectiveHarness;
         dimension: number;
         maxIter: bigint;
+        expectedSuccessCount: number;
+        expectedNoImprovementCount: number;
     }): Promise<BenchmarkSummary> {
         const zeroVector = new Array<bigint>(args.dimension).fill(0n);
 
@@ -375,6 +384,8 @@ describe("SteepestDescent Library - 1e12 Fixed-Point Accuracy & Gas Benchmarks",
         const gasValues: bigint[] = [];
         let executionSuccessCount = 0;
         let successCount = 0;
+        let noImprovementCount = 0;
+        let maxIterCount = 0;
         let numericalPassCount = 0;
         let failedCount = 0;
         let revertedCount = 0;
@@ -412,6 +423,8 @@ describe("SteepestDescent Library - 1e12 Fixed-Point Accuracy & Gas Benchmarks",
 
                 const successfulStatus = isSuccessfulStatus(result.status);
                 if (successfulStatus) successCount++;
+                if (result.status === STATUS_NO_LIKELY_IMPROVEMENT) noImprovementCount++;
+                if (result.status === STATUS_MAX_ITER_EXCEEDED) maxIterCount++;
                 if (
                     successfulStatus &&
                     distance <= DISTANCE_TOL_SCALED &&
@@ -446,6 +459,8 @@ describe("SteepestDescent Library - 1e12 Fixed-Point Accuracy & Gas Benchmarks",
             maxGas: maxBigInt(gasValues),
             executionSuccessCount,
             successCount,
+            noImprovementCount,
+            maxIterCount,
             numericalPassCount,
             failedCount,
             revertedCount,
@@ -455,11 +470,17 @@ describe("SteepestDescent Library - 1e12 Fixed-Point Accuracy & Gas Benchmarks",
 
         printBenchmarkSummary(summary);
         expect(summary.failedCount, `${args.objectiveName} had unexpected execution failures`).to.equal(0);
-        expect(summary.successCount, `${args.objectiveName} returned a non-success solver status`).to.equal(NUM_TESTS);
+        expect(summary.successCount, `${args.objectiveName}: stationary success count`).to.equal(
+            args.expectedSuccessCount
+        );
+        expect(summary.noImprovementCount, `${args.objectiveName}: stagnation status count`).to.equal(
+            args.expectedNoImprovementCount
+        );
+        expect(summary.maxIterCount, `${args.objectiveName}: max-iteration status count`).to.equal(0);
         expect(
             summary.numericalPassCount,
-            `${args.objectiveName} exceeded distance<=1e-4 or objective<=1e-8 in one or more cases`
-        ).to.equal(NUM_TESTS);
+            `${args.objectiveName}: only stationary-success cases may count as numerical passes`
+        ).to.equal(args.expectedSuccessCount);
         return summary;
     }
 
@@ -470,6 +491,8 @@ describe("SteepestDescent Library - 1e12 Fixed-Point Accuracy & Gas Benchmarks",
             objective: spherical,
             dimension: 4,
             maxIter: 1000n,
+            expectedSuccessCount: NUM_TESTS,
+            expectedNoImprovementCount: 0,
         });
 
         expect(summary.numberOfTests).to.equal(NUM_TESTS);
@@ -482,6 +505,8 @@ describe("SteepestDescent Library - 1e12 Fixed-Point Accuracy & Gas Benchmarks",
             objective: semiWeighted,
             dimension: 8,
             maxIter: 1000n,
+            expectedSuccessCount: 0,
+            expectedNoImprovementCount: NUM_TESTS,
         });
 
         expect(summary.numberOfTests).to.equal(NUM_TESTS);
@@ -494,6 +519,8 @@ describe("SteepestDescent Library - 1e12 Fixed-Point Accuracy & Gas Benchmarks",
             objective: weighted,
             dimension: 4,
             maxIter: 1000n,
+            expectedSuccessCount: 0,
+            expectedNoImprovementCount: NUM_TESTS,
         });
 
         expect(summary.numberOfTests).to.equal(NUM_TESTS);

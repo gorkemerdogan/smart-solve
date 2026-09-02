@@ -142,3 +142,21 @@ contract SemiWeightedQuadraticObjectiveHarness is IObjectiveFunction {
         }
     }
 }
+
+/**
+ * @title LinearObjectiveHarness
+ * @notice Non-minimizing objective g(x)=x_0 used to verify that an objective
+ *         zero crossing is not mistaken for optimizer convergence.
+ */
+contract LinearObjectiveHarness is IObjectiveFunction {
+    function g(bytes16[] memory x) external pure override returns (bytes16) {
+        require(x.length == 1, "LinearObjective: expected one dimension");
+        return x[0];
+    }
+
+    function grad(bytes16[] memory x) external pure override returns (bytes16[] memory z) {
+        require(x.length == 1, "LinearObjective: expected one dimension");
+        z = new bytes16[](1);
+        z[0] = MathLib.fromUInt(1);
+    }
+}

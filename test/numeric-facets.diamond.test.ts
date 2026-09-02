@@ -155,6 +155,21 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const secondComponent = BigInt(await scalarCallback.toFloat(solution[1]));
     expect(secondComponent >= 599_999_999_000_000_000n).to.equal(true);
     expect(secondComponent <= 600_000_001_000_000_000n).to.equal(true);
+
+    await assertRouted(linear, "jacobiWithStatus", "LinearSolversFacet");
+    const zero = await scalarCallback.qFromInt(0n);
+    const tolerance = await scalarCallback.qFromFrac(1n, 1_000_000_000_000_000n);
+    const [iterativeSolution, iterations, converged] = await linear.jacobiWithStatus(
+      2n,
+      [coefficients[0], zero, zero, coefficients[0]],
+      rhs,
+      [zero, zero],
+      3n,
+      tolerance
+    );
+    expect(iterativeSolution).to.have.lengthOf(2);
+    expect(iterations).to.equal(2n);
+    expect(converged).to.equal(true);
   });
 
   it("benchmarks steepest descent through the Diamond", async function () {
@@ -168,6 +183,6 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
 
     report("steepest descent / optimization", "spherical objective, dimension 2", gas);
     expect(result.x).to.have.lengthOf(2);
-    expect(result.status).to.be.at.most(3n);
+    expect(result.status).to.equal(1n);
   });
 });

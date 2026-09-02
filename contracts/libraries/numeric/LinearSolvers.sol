@@ -155,6 +155,27 @@ library LinearSolvers {
         uint256 maxIter,
         bytes16 tolDiff
     ) internal pure returns (MatrixMaster.Matrix memory x, uint256 iters) {
+        bool ignoredConverged;
+        (x, iters, ignoredConverged) = jacobiWithStatus(A, b, x0, maxIter, tolDiff);
+    }
+
+    /**
+     * @notice Jacobi iteration with an explicit convergence result.
+     * @dev Candidate convergence requires both:
+     *      ||x_k-x_{k-1}||^2 <= tolDiff, and
+     *      ||A*x_k-b||^2 <= tolDiff * max(1, ||b||^2).
+     *      The residual is evaluated only after the cheaper step test passes.
+     * @return x Approximate solution at termination.
+     * @return iters Number of completed iterations.
+     * @return converged True only when both convergence criteria are satisfied.
+     */
+    function jacobiWithStatus(
+        MatrixMaster.Matrix memory A,
+        MatrixMaster.Matrix memory b,
+        MatrixMaster.Matrix memory x0,
+        uint256 maxIter,
+        bytes16 tolDiff
+    ) internal pure returns (MatrixMaster.Matrix memory x, uint256 iters, bool converged) {
         _checkSystem(A, b);
         require(x0.rows == A.cols && x0.cols == 1, "LinearSolversMM: x0 dim mismatch");
         require(maxIter > 0, "LinearSolversMM: maxIter must be > 0");
@@ -207,12 +228,13 @@ library LinearSolvers {
             }
 
             bytes16 diff2 = _norm2Squared(diff);
-            if (MathLib.cmp(diff2, tolDiff) <= 0) {
-                return (x, iters + 1);
+            if (MathLib.cmp(diff2, tolDiff) <= 0 &&
+                _residualWithinTolerance(A, b, x, tolDiff)) {
+                return (x, iters + 1, true);
             }
         }
 
-        return (x, iters);
+        return (x, iters, false);
     }
 
     // ------------------------------------------------------------
@@ -241,6 +263,26 @@ library LinearSolvers {
         uint256 maxIter,
         bytes16 tolDiff
     ) internal pure returns (MatrixMaster.Matrix memory x, uint256 iters) {
+        bool ignoredConverged;
+        (x, iters, ignoredConverged) = gaussSeidelWithStatus(A, b, x0, maxIter, tolDiff);
+    }
+
+    /**
+     * @notice Gauss-Seidel iteration with an explicit convergence result.
+     * @dev Uses the same combined iterate-change and scaled-residual rule as
+     *      jacobiWithStatus. Residual evaluation is deferred until the step
+     *      criterion is satisfied.
+     * @return x Approximate solution at termination.
+     * @return iters Number of completed iterations.
+     * @return converged True only when both convergence criteria are satisfied.
+     */
+    function gaussSeidelWithStatus(
+        MatrixMaster.Matrix memory A,
+        MatrixMaster.Matrix memory b,
+        MatrixMaster.Matrix memory x0,
+        uint256 maxIter,
+        bytes16 tolDiff
+    ) internal pure returns (MatrixMaster.Matrix memory x, uint256 iters, bool converged) {
         _checkSystem(A, b);
         require(x0.rows == A.cols && x0.cols == 1, "LinearSolversMM: x0 dim mismatch");
         require(maxIter > 0, "LinearSolversMM: maxIter must be > 0");
@@ -292,12 +334,35 @@ library LinearSolvers {
             }
 
             bytes16 diff2 = _norm2Squared(diff);
-            if (MathLib.cmp(diff2, tolDiff) <= 0) {
-                return (x, iters + 1);
+            if (MathLib.cmp(diff2, tolDiff) <= 0 &&
+                _residualWithinTolerance(A, b, x, tolDiff)) {
+                return (x, iters + 1, true);
             }
         }
 
-        return (x, iters);
+        return (x, iters, false);
+    }
+
+    /**
+     * @dev Hybrid absolute/relative squared residual check used by stationary
+     *      iterative solvers. Scaling by max(1, ||b||^2) avoids accepting a
+     *      large residual merely because the iterates have stopped moving.
+     */
+    function _residualWithinTolerance(
+        MatrixMaster.Matrix memory A,
+        MatrixMaster.Matrix memory b,
+        MatrixMaster.Matrix memory x,
+        bytes16 tol
+    ) internal pure returns (bool) {
+        MatrixMaster.Matrix memory residual = MatrixMaster.subtractMatrices(
+            MatrixMaster.multiplyMatrices(A, x),
+            b
+        );
+        bytes16 residual2 = _norm2Squared(residual);
+        bytes16 b2 = _norm2Squared(b);
+        bytes16 one = MathLib.fromUInt(1);
+        bytes16 scale2 = MathLib.cmp(b2, one) > 0 ? b2 : one;
+        return MathLib.cmp(residual2, MathLib.mul(tol, scale2)) <= 0;
     }
 
     // ------------------------------------------------------------

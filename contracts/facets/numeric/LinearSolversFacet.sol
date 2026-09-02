@@ -100,6 +100,17 @@ contract LinearSolversFacet {
         return (out.data, iters);
     }
 
+    function jacobiWithStatus(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata, bytes16[] calldata x0data, uint256 maxIter, bytes16 tolDiff)
+        external pure returns (bytes16[] memory x, uint256 iters, bool converged) {
+        MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
+        MatrixMaster.Matrix memory b = MatrixMaster.Matrix(n, 1, _copy(bdata));
+        MatrixMaster.Matrix memory x0 = MatrixMaster.Matrix(n, 1, _copy(x0data));
+
+        MatrixMaster.Matrix memory out;
+        (out, iters, converged) = LinearSolvers.jacobiWithStatus(A, b, x0, maxIter, tolDiff);
+        return (out.data, iters, converged);
+    }
+
     // ------------------------------------------------------------
     // Gauss–Seidel Iteration
     // ------------------------------------------------------------
@@ -131,6 +142,17 @@ contract LinearSolversFacet {
         (out, iters) = LinearSolvers.gaussSeidel(A, b, x0, maxIter, tolDiff);
 
         return (out.data, iters);
+    }
+
+    function gaussSeidelWithStatus(uint256 n, bytes16[] calldata Adata, bytes16[] calldata bdata, bytes16[] calldata x0data, uint256 maxIter, bytes16 tolDiff)
+        external pure returns (bytes16[] memory x, uint256 iters, bool converged) {
+        MatrixMaster.Matrix memory A = MatrixMaster.Matrix(n, n, _copy(Adata));
+        MatrixMaster.Matrix memory b = MatrixMaster.Matrix(n, 1, _copy(bdata));
+        MatrixMaster.Matrix memory x0 = MatrixMaster.Matrix(n, 1, _copy(x0data));
+
+        MatrixMaster.Matrix memory out;
+        (out, iters, converged) = LinearSolvers.gaussSeidelWithStatus(A, b, x0, maxIter, tolDiff);
+        return (out.data, iters, converged);
     }
 
     // ------------------------------------------------------------

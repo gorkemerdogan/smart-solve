@@ -22,8 +22,8 @@ contract SteepestDescentFacet {
      * @return gx       Final objective value
      * @return iters    Iteration count completed
      * @return status   Solver status code:
-     *                  0 = success
-     *                  1 = zero gradient
+     *                  0 = legacy success (reserved)
+     *                  1 = stationary / effectively zero gradient
      *                  2 = no likely improvement
      *                  3 = maximum iterations exceeded
      */

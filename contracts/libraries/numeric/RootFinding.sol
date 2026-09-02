@@ -226,9 +226,12 @@ library RootFinding {
 
     /**
      * @notice Computes a root using the Newton–Raphson method with analytic derivative.
-     *         Requires non-zero derivative at each iterate. Convergence is based on:
-     *           - |f(xNext)| ≤ tol, or
-     *           - |xNext − x| ≤ tol.
+     *         Requires non-zero derivative at each iterate. Convergence requires
+     *         |f(xNext)| <= tol. A step with |xNext-x| <= tol and a larger
+     *         residual is classified as stagnation (`converged == false`).
+     * @dev The public API supplies one tolerance. It is used as an f-space
+     *      success tolerance and independently as an x-space stagnation guard;
+     *      the x-space check can never declare success by itself.
      * @param  target     Contract exposing f(bytes16) -> bytes16
      * @param  fSelector  Selector for f(bytes16)
      * @param  dfTarget   Contract exposing f'(bytes16)
@@ -267,8 +270,11 @@ library RootFinding {
             bytes16 errF = MathLib.abs(fxNext);          // |f(xNext)|
             bytes16 errX = MathLib.abs(xNext.sub(s.x));  // |xNext – x|
 
-            if (MathLib.cmp(errF, s.atTol) <= 0 || MathLib.cmp(errX, s.atTol) <= 0) {
+            if (MathLib.cmp(errF, s.atTol) <= 0) {
                 return RootResult(xNext, k + 1, true, fxNext);
+            }
+            if (MathLib.cmp(errX, s.atTol) <= 0) {
+                return RootResult(xNext, k + 1, false, fxNext);
             }
 
             s.x = xNext;
@@ -285,9 +291,11 @@ library RootFinding {
     /**
      * @notice Computes a root using the secant method (derivative-free).
      *         Uses two initial values and updates via the secant update formula.
-     *         Reverts if consecutive function values yield zero slope. Converges when:
-     *           - |f(xNext)| ≤ tol, or
-     *           - |xNext − x| ≤ tol.
+     *         Reverts if consecutive function values yield zero slope. Convergence
+     *         requires |f(xNext)| <= tol. A small step with a larger residual is
+     *         returned as non-converged stagnation.
+     * @dev The single public tolerance is an f-space success threshold and an
+     *      x-space stagnation guard; x-step size alone never declares success.
      * @param  target     Contract exposing f(bytes16) -> bytes16
      * @param  fSelector  Selector for f(bytes16)
      * @param  x0         First initial point
@@ -323,9 +331,11 @@ library RootFinding {
             bytes16 xNext = s.x.sub( s.fx.mul( s.x.sub(s.xPrev) ).div(denom) );
             bytes16 fxNext = _eval(target, fSelector, xNext);
 
-            if (MathLib.cmp(MathLib.abs(fxNext), s.atTol) <= 0 ||
-                MathLib.cmp(MathLib.abs(xNext.sub(s.x)), s.atTol) <= 0) {
+            if (MathLib.cmp(MathLib.abs(fxNext), s.atTol) <= 0) {
                 return RootResult(xNext, k + 1, true, fxNext);
+            }
+            if (MathLib.cmp(MathLib.abs(xNext.sub(s.x)), s.atTol) <= 0) {
+                return RootResult(xNext, k + 1, false, fxNext);
             }
 
             s.xPrev = s.x;

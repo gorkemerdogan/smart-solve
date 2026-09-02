@@ -146,6 +146,18 @@ contract RootFindingHarness {
         return MathLib.fromUInt(1);
     }
 
+    /// Constant non-zero residual used to exercise Newton stagnation handling.
+    function f_constant_one(bytes16 x) external pure returns (bytes16) {
+        x;
+        return MathLib.fromUInt(1);
+    }
+
+    /// Very large derivative makes the Newton step tiny while f remains one.
+    function df_very_large(bytes16 x) external pure returns (bytes16) {
+        x;
+        return MathLib.fromUInt(1_000_000_000_000_000_000_000_000_000_000);
+    }
+
     // ------------------------------------------------------------
     // Numerical Helpers
     // ------------------------------------------------------------

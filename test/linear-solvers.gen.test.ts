@@ -34,6 +34,14 @@ type LinearSolversHarness = Contract & {
         maxIter: bigint,
         tolDiff: string
     ): Promise<[string[], bigint]>;
+    jacobiWithStatus(
+        n: bigint,
+        Adata: string[],
+        bdata: string[],
+        x0data: string[],
+        maxIter: bigint,
+        tolDiff: string
+    ): Promise<[string[], bigint, boolean]>;
 
     gaussSeidel(
         n: bigint,
@@ -43,6 +51,14 @@ type LinearSolversHarness = Contract & {
         maxIter: bigint,
         tolDiff: string
     ): Promise<[string[], bigint]>;
+    gaussSeidelWithStatus(
+        n: bigint,
+        Adata: string[],
+        bdata: string[],
+        x0data: string[],
+        maxIter: bigint,
+        tolDiff: string
+    ): Promise<[string[], bigint, boolean]>;
 
     gaussianElimination(
         n: bigint,
@@ -456,7 +472,7 @@ async function estimateJacobiGas(
     maxIter: bigint,
     tol: string
 ): Promise<bigint> {
-    const gas = await (harness.jacobi as any).estimateGas(n, Adata, bdata, x0data, maxIter, tol);
+    const gas = await (harness.jacobiWithStatus as any).estimateGas(n, Adata, bdata, x0data, maxIter, tol);
     return asBigInt(gas);
 }
 
@@ -469,7 +485,7 @@ async function estimateGaussSeidelGas(
     maxIter: bigint,
     tol: string
 ): Promise<bigint> {
-    const gas = await (harness.gaussSeidel as any).estimateGas(n, Adata, bdata, x0data, maxIter, tol);
+    const gas = await (harness.gaussSeidelWithStatus as any).estimateGas(n, Adata, bdata, x0data, maxIter, tol);
     return asBigInt(gas);
 }
 
@@ -1256,7 +1272,8 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                     const x0data = await qVecFromScaledInts(harness, x0);
 
                     try {
-                        const [out, iters] = await harness.jacobi(BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15);
+                        const [out, iters, converged] = await harness.jacobiWithStatus(BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15);
+                        expect(converged, `${method} n=${n} case=${t + 1}: convergence status`).to.equal(true);
                         const xComp = await scaledVec(harness, out);
 
                         const err = vecInfNorm(subVec(xComp, xTrue));
@@ -1329,7 +1346,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                 const x0data = await qVecFromScaledInts(harness, x0);
 
                 try {
-                    const [out, iters] = await harness.jacobi(
+                    const [out, iters] = await harness.jacobiWithStatus(
                         BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15
                     );
                     const xComp = await scaledVec(harness, out);
@@ -1407,7 +1424,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                     const x0data = await qVecFromScaledInts(harness, x0);
 
                     try {
-                        const [out, iters] = await harness.gaussSeidel(
+                        const [out, iters, converged] = await harness.gaussSeidelWithStatus(
                             BigInt(n),
                             Adata,
                             bdata,
@@ -1415,6 +1432,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                             MAX_ITER,
                             TOL_1E_15
                         );
+                        expect(converged, `${method} n=${n} case=${t + 1}: convergence status`).to.equal(true);
 
                         const xComp = await scaledVec(harness, out);
                         const gas = await estimateGaussSeidelGas(
@@ -1645,7 +1663,8 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                     const bdata = await qVecFromScaledInts(harness, b);
                     const x0data = await qVecFromScaledInts(harness, x0);
 
-                    const [out, iters] = await harness.jacobi(BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15);
+                    const [out, iters, converged] = await harness.jacobiWithStatus(BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15);
+                    expect(converged, `${method} x0=${cfg.name} case=${t + 1}: convergence status`).to.equal(true);
                     const xComp = await scaledVec(harness, out);
 
                     const err = vecInfNorm(subVec(xComp, xTrue));
@@ -1715,7 +1734,8 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                     const bdata = await qVecFromScaledInts(harness, b);
                     const x0data = await qVecFromScaledInts(harness, x0);
 
-                    const [out, iters] = await harness.gaussSeidel(BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15);
+                    const [out, iters, converged] = await harness.gaussSeidelWithStatus(BigInt(n), Adata, bdata, x0data, MAX_ITER, TOL_1E_15);
+                    expect(converged, `${method} x0=${cfg.name} case=${t + 1}: convergence status`).to.equal(true);
                     const xComp = await scaledVec(harness, out);
 
                     const err = vecInfNorm(subVec(xComp, xTrue));
@@ -1939,7 +1959,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                 const residualArr: bigint[] = [];
 
                 for (let k = ITER_MIN; k <= ITER_MAX; k++) {
-                    const [out, iters] = await harness.jacobi(
+                    const [out, iters, converged] = await harness.jacobiWithStatus(
                         BigInt(n),
                         Adata,
                         bdata,
@@ -1978,7 +1998,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                     errArr.push(err);
                     residualArr.push(res);
 
-                    if (actualIters < BigInt(k)) {
+                    if (converged) {
                         console.log("------------------------------------------------------------");
                         console.log(`Method               : ${method}`);
                         console.log(`Test Explanation     : Early stop triggered because convergence was reached before maxIter.`);
@@ -2019,7 +2039,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                 const residualArr: bigint[] = [];
 
                 for (let k = ITER_MIN; k <= ITER_MAX; k++) {
-                    const [out, iters] = await harness.gaussSeidel(
+                    const [out, iters, converged] = await harness.gaussSeidelWithStatus(
                         BigInt(n),
                         Adata,
                         bdata,
@@ -2058,7 +2078,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                     errArr.push(err);
                     residualArr.push(res);
 
-                    if (actualIters < BigInt(k)) {
+                    if (converged) {
                         console.log("------------------------------------------------------------");
                         console.log(`Method               : ${method}`);
                         console.log(`Test Explanation     : Early stop triggered because convergence was reached before maxIter.`);
@@ -2364,7 +2384,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                     const x0data = await qVecFromScaledInts(harness, x0);
 
                     try {
-                        const [out, iters] = await harness.jacobi(
+                        const [out, iters, converged] = await harness.jacobiWithStatus(
                             BigInt(matrixCase.n),
                             Adata,
                             bdata,
@@ -2372,6 +2392,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                             MAX_ITER,
                             TOL_1E_15
                         );
+                        expect(converged, `${method} case=${matrixCase.caseName} run=${t + 1}: convergence status`).to.equal(true);
 
                         const xComp = await scaledVec(harness, out);
 
@@ -2485,7 +2506,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                         const bdata = await qVecFromScaledInts(harness, b);
                         const x0data = await qVecFromScaledInts(harness, x0);
 
-                        const [out, iters] = await harness.gaussSeidel(
+                        const [out, iters, converged] = await harness.gaussSeidelWithStatus(
                             BigInt(matrixCase.n),
                             Adata,
                             bdata,
@@ -2493,6 +2514,7 @@ describe("LinearSolvers Library - 1e12 Fixed-Point Accuracy, Iteration, and Gas 
                             MAX_ITER,
                             TOL_1E_15
                         );
+                        expect(converged, `${method} case=${matrixCase.caseName} run=${t + 1}: convergence status`).to.equal(true);
 
                         const xComp = await scaledVec(harness, out);
 

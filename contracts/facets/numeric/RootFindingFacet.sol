@@ -42,9 +42,9 @@ contract RootFindingFacet {
 
     /**
      * @notice Computes a root using the Newton–Raphson method with analytic derivative.
-     *         Requires non-zero derivative at each iterate. Convergence is based on:
-     *           - |f(xNext)| ≤ tol, or
-     *           - |xNext − x| ≤ tol.
+     *         Requires non-zero derivative at each iterate. Convergence requires
+     *         |f(xNext)| <= tol. A small step with a larger residual is returned
+     *         as non-converged stagnation.
      * @param  target     Contract exposing f(bytes16) -> bytes16
      * @param  fSelector  Selector for f(bytes16)
      * @param  dfTarget   Contract exposing f'(bytes16)
@@ -66,9 +66,8 @@ contract RootFindingFacet {
     /**
      * @notice Computes a root using the secant method (derivative-free).
      *         Uses two initial values and updates via the secant update formula.
-     *         Reverts if consecutive function values yield zero slope. Converges when:
-     *           - |f(xNext)| ≤ tol, or
-     *           - |xNext − x| ≤ tol.
+     *         Reverts if consecutive function values yield zero slope. Convergence
+     *         requires |f(xNext)| <= tol; step size alone cannot declare success.
      * @param  target     Contract exposing f(bytes16) -> bytes16
      * @param  fSelector  Selector for f(bytes16)
      * @param  x0         First initial point
