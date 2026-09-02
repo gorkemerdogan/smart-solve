@@ -571,7 +571,7 @@ contract MatrixMasterFacet {
      *       3. lambda ≈ x^T (A x)
      *     - A must be (nxn)
      *     - Uses cfg().maxIter from LibNumericConfig
-     *     - tol must be > 0
+     *     - a zero tol uses the effective global default
      *
      * @param  rows   Number of rows of matrix A
      * @param  cols   Number of columns of matrix A
@@ -593,6 +593,48 @@ contract MatrixMasterFacet {
 
         // Flatten results manually since return type is mixed (bytes16, Matrix)
         return (l, v.rows, v.cols, v.data);
+    }
+
+    /**
+     * @notice Approximate a dominant eigenpair and report convergence metadata.
+     * @dev A zero tolerance uses the effective global default. Invalid
+     *      tolerances revert; `converged == false` with `iterations ==
+     *      getMaxIter()` means the configured iteration cap was exhausted.
+     * @return lambda     Dominant eigenvalue approximation.
+     * @return vecRows    Eigenvector row count.
+     * @return vecCols    Eigenvector column count.
+     * @return vecData    Flattened eigenvector data.
+     * @return iterations Number of vector updates completed.
+     * @return converged  Whether the convergence test succeeded.
+     */
+    function powerIterationWithStatus(
+        uint256 rows,
+        uint256 cols,
+        bytes16[] calldata data,
+        bytes32 seed,
+        bytes16 tol
+    )
+        external
+        view
+        returns (
+            bytes16 lambda,
+            uint256 vecRows,
+            uint256 vecCols,
+            bytes16[] memory vecData,
+            uint256 iterations,
+            bool converged
+        )
+    {
+        MatrixMaster.Matrix memory A = _buildMatrix(rows, cols, data);
+        MatrixMaster.PowerIterationResult memory result = MatrixMaster.powerIterationWithStatus(A, seed, tol);
+        return (
+            result.lambda,
+            result.eigenvector.rows,
+            result.eigenvector.cols,
+            result.eigenvector.data,
+            result.iterations,
+            result.converged
+        );
     }
 
     // ------------------------------------------------------------

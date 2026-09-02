@@ -68,6 +68,14 @@ type MatrixMasterHarness = Contract & {
         tol: string,
         maxIter: bigint
     ): Promise<[string, bigint, bigint, string[], bigint]>;
+
+    powerIterationWithStatusHarness(
+        rows: bigint,
+        cols: bigint,
+        dataFlat: string[],
+        seed: string,
+        tol: string
+    ): Promise<[string, bigint, bigint, string[], bigint, boolean]>;
 };
 
 // ------------------------------------------------------------
@@ -891,7 +899,7 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
                     )
                 );
 
-                const gasUsed = await estimateMethodGas(harness, "powerIterationHarness", [
+                const gasUsed = await estimateMethodGas(harness, "powerIterationWithStatusHarness", [
                     BigInt(n),
                     BigInt(n),
                     aQ,
@@ -899,7 +907,7 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
                     tolQ
                 ]);
 
-                const result = await harness.powerIterationHarness(
+                const result = await harness.powerIterationWithStatusHarness(
                     BigInt(n),
                     BigInt(n),
                     aQ,
@@ -909,6 +917,8 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
 
                 const lambdaQ = result[0];
                 const xQ = result[3];
+                const iterations = result[4];
+                const converged = result[5];
 
                 const lambdaSol = await quadToNumber(harness, lambdaQ);
                 const xSol = await quadArrayToNumbers(harness, xQ);
@@ -931,6 +941,8 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
                 console.log(`  lambda_ref       = ${ref.lambda}`);
                 console.log(`  eigen abs error  = ${eigenAbsErr}`);
                 console.log(`  residual inf     = ${residualInf}`);
+                console.log(`  iterations       = ${iterations}`);
+                console.log(`  converged        = ${converged}`);
                 console.log(`  Gas Usage        = ${gasUsed}`);
                 console.log("------------------------------------------------------------");
             }

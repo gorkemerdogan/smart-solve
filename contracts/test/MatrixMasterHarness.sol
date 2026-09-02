@@ -728,8 +728,8 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for power iteration that also returns iteration count.
-     *         Re-implements the iteration loop in the harness
+     * @notice Backwards-compatible wrapper for bounded power iteration that
+     *         also returns the completed iteration count.
      * @param rows       Number of rows of A
      * @param cols       Number of cols of A
      * @param dataFlat   Flattened dense matrix data
@@ -751,50 +751,95 @@ contract MatrixMasterHarness {
         uint256 maxIter
     )
         external
-        pure
+        view
         returns (
             bytes16 lambda,
             uint256 xRows,
             uint256 xCols,
             bytes16[] memory xData,
             uint256 iterCount
-        )
+    )
     {
         require(rows == cols, "MatrixMasterHarness: matrix must be square");
         require(maxIter > 0, "MatrixMasterHarness: maxIter must be > 0");
-
         MatrixMaster.Matrix memory A = _toMatrix(rows, cols, dataFlat);
+        MatrixMaster.PowerIterationResult memory result = MatrixMaster
+            .powerIterationWithStatusAndMaxIter(A, seed, tol, maxIter);
+        return (
+            result.lambda,
+            result.eigenvector.rows,
+            result.eigenvector.cols,
+            result.eigenvector.data,
+            result.iterations
+        );
+    }
 
-        MatrixMaster.Matrix memory x = MatrixMaster.randomVector(rows, seed);
-        x = MatrixMaster.normalize(x);
+    /**
+     * @notice Wrapper for production-configured power iteration with status.
+     */
+    function powerIterationWithStatusHarness(
+        uint256 rows,
+        uint256 cols,
+        bytes16[] calldata dataFlat,
+        bytes32 seed,
+        bytes16 tol
+    )
+        external
+        view
+        returns (
+            bytes16 lambda,
+            uint256 xRows,
+            uint256 xCols,
+            bytes16[] memory xData,
+            uint256 iterCount,
+            bool converged
+        )
+    {
+        MatrixMaster.Matrix memory A = _toMatrix(rows, cols, dataFlat);
+        MatrixMaster.PowerIterationResult memory result = MatrixMaster.powerIterationWithStatus(A, seed, tol);
+        return (
+            result.lambda,
+            result.eigenvector.rows,
+            result.eigenvector.cols,
+            result.eigenvector.data,
+            result.iterations,
+            result.converged
+        );
+    }
 
-        bytes16 lam = MathLib.fromInt(0);
-        uint256 k = 0;
-
-        for (k = 0; k < maxIter; ++k) {
-            MatrixMaster.Matrix memory y = MatrixMaster.multiplyMatrixVector(
-                A,
-                x
-            );
-            MatrixMaster.Matrix memory xNext = MatrixMaster.normalize(y);
-
-            // Rayleigh quotient: lambda = xNext^T A xNext
-            MatrixMaster.Matrix memory Ax = MatrixMaster.multiplyMatrixVector(
-                A,
-                xNext
-            );
-            lam = MatrixMaster.dot(xNext, Ax);
-
-            if (MatrixMaster.hasConverged(x, xNext, tol)) {
-                x = xNext;
-                k = k + 1;
-                break;
-            }
-
-            x = xNext;
-        }
-
-        return (lam, x.rows, x.cols, x.data, k);
+    /**
+     * @notice Wrapper for bounded power iteration with convergence status.
+     */
+    function powerIterationWithStatusAndMaxIterHarness(
+        uint256 rows,
+        uint256 cols,
+        bytes16[] calldata dataFlat,
+        bytes32 seed,
+        bytes16 tol,
+        uint256 maxIter
+    )
+        external
+        view
+        returns (
+            bytes16 lambda,
+            uint256 xRows,
+            uint256 xCols,
+            bytes16[] memory xData,
+            uint256 iterCount,
+            bool converged
+        )
+    {
+        MatrixMaster.Matrix memory A = _toMatrix(rows, cols, dataFlat);
+        MatrixMaster.PowerIterationResult memory result = MatrixMaster
+            .powerIterationWithStatusAndMaxIter(A, seed, tol, maxIter);
+        return (
+            result.lambda,
+            result.eigenvector.rows,
+            result.eigenvector.cols,
+            result.eigenvector.data,
+            result.iterations,
+            result.converged
+        );
     }
 
     // ---------------------------------------------------------

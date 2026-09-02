@@ -49,14 +49,14 @@ type MatrixMasterHarness = Contract & {
         tol: string
     ): Promise<[string, bigint, bigint, string[]]>;
 
-    powerIterationWithIterHarness(
+    powerIterationWithStatusAndMaxIterHarness(
         rows: bigint,
         cols: bigint,
         dataFlat: string[],
         seed: string,
         tol: string,
         maxIter: bigint
-    ): Promise<[string, bigint, bigint, string[], bigint]>;
+    ): Promise<[string, bigint, bigint, string[], bigint, boolean]>;
 };
 
 // ------------------------------------------------------------
@@ -790,7 +790,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
                         const Aq = await qArrayFromNumbers(harness, flatten(A));
                         const tol = await harness.qFromFrac(1n, 1_000_000n); // 1e-6
 
-                        await touchGas(harness, "powerIterationWithIterHarness", [
+                        await touchGas(harness, "powerIterationWithStatusAndMaxIterHarness", [
                             BigInt(n),
                             BigInt(n),
                             Aq,
@@ -799,7 +799,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
                             POWER_MAX_ITER
                         ]);
 
-                        const gas = await estimateGas(harness, "powerIterationWithIterHarness", [
+                        const gas = await estimateGas(harness, "powerIterationWithStatusAndMaxIterHarness", [
                             BigInt(n),
                             BigInt(n),
                             Aq,
@@ -808,8 +808,8 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
                             POWER_MAX_ITER
                         ]);
 
-                        const [lambdaHex, xRows, xCols, xData, iterCount] =
-                            await harness.powerIterationWithIterHarness(
+                        const [lambdaHex, xRows, xCols, xData, iterCount, converged] =
+                            await harness.powerIterationWithStatusAndMaxIterHarness(
                                 BigInt(n),
                                 BigInt(n),
                                 Aq,
@@ -833,7 +833,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
                             gas,
                             shapeIn: `${n}x${n}`,
                             shapeOut: `${xRows}x${xCols}`,
-                            inHex: `pattern=diagDominant, matrixSeed=${POWER_MATRIX_SEED}, initSeed=fixed, tol=1e-6, case=${caseNo}, iter=${iterCount}`,
+                            inHex: `pattern=diagDominant, matrixSeed=${POWER_MATRIX_SEED}, initSeed=fixed, tol=1e-6, case=${caseNo}, iter=${iterCount}, converged=${converged}`,
                             outHex: `lambda=${lambdaHex}, eigenvector=${headTail(xData)}`,
                             expectedDec: headTail(lambdaXScaled.map(formatScaledInt)),
                             outDec: `lambda=${formatScaledInt(lambdaDec)} | x=${headTail(xDec.map(formatScaledInt))} | Ax=${headTail(axScaled.map(formatScaledInt))}`,
@@ -884,7 +884,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
                         const Aq = await qArrayFromNumbers(harness, flatten(A));
                         const tol = await harness.qFromFrac(1n, 1_000_000n); // 1e-6
 
-                        await touchGas(harness, "powerIterationWithIterHarness", [
+                        await touchGas(harness, "powerIterationWithStatusAndMaxIterHarness", [
                             BigInt(n),
                             BigInt(n),
                             Aq,
@@ -893,7 +893,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
                             POWER_MAX_ITER
                         ]);
 
-                        const gas = await estimateGas(harness, "powerIterationWithIterHarness", [
+                        const gas = await estimateGas(harness, "powerIterationWithStatusAndMaxIterHarness", [
                             BigInt(n),
                             BigInt(n),
                             Aq,
@@ -902,8 +902,8 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
                             POWER_MAX_ITER
                         ]);
 
-                        const [lambdaHex, xRows, xCols, xData, iterCount] =
-                            await harness.powerIterationWithIterHarness(
+                        const [lambdaHex, xRows, xCols, xData, iterCount, converged] =
+                            await harness.powerIterationWithStatusAndMaxIterHarness(
                                 BigInt(n),
                                 BigInt(n),
                                 Aq,
@@ -927,7 +927,7 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Advanced Ops + Power Ite
                             gas,
                             shapeIn: `${n}x${n}`,
                             shapeOut: `${xRows}x${xCols}`,
-                            inHex: `pattern=${pattern}, matrixSeed=${POWER_MATRIX_SEED}, initSeed=fixed, tol=1e-6, case=${caseNo}, iter=${iterCount}`,
+                            inHex: `pattern=${pattern}, matrixSeed=${POWER_MATRIX_SEED}, initSeed=fixed, tol=1e-6, case=${caseNo}, iter=${iterCount}, converged=${converged}`,
                             outHex: `lambda=${lambdaHex}, eigenvector=${headTail(xData)}`,
                             expectedDec: headTail(lambdaXScaled.map(formatScaledInt)),
                             outDec: `lambda=${formatScaledInt(lambdaDec)} | x=${headTail(xDec.map(formatScaledInt))} | Ax=${headTail(axScaled.map(formatScaledInt))}`,

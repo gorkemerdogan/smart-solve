@@ -62,6 +62,20 @@ library MatrixMaster {
     }
 
     /**
+     * @notice Result of a power-iteration run.
+     * @param lambda      Dominant eigenvalue approximation.
+     * @param eigenvector Dominant eigenvector approximation.
+     * @param iterations  Number of vector updates completed.
+     * @param converged   Whether the configured convergence test succeeded.
+     */
+    struct PowerIterationResult {
+        bytes16 lambda;
+        Matrix eigenvector;
+        uint256 iterations;
+        bool converged;
+    }
+
+    /**
     * @notice Sparse matrix stored in Compressed Sparse Row (CSR) format.
     *         Stores only non-zero elements to reduce memory usage and computation.
     *         Zero entries are implicit and are not stored.
@@ -998,7 +1012,7 @@ library MatrixMaster {
      *       3. lambda ≈ x^T (A x)
      *     - A must be (nxn)
      *     - Uses cfg().maxIter from LibNumericConfig
-     *     - tol must be > 0
+     *     - A zero tolerance selects the effective global default
      *
      * @param A     Input square matrix
      * @param seed  Seed for deterministic initial vector
@@ -1007,43 +1021,94 @@ library MatrixMaster {
      * @return lambda    Dominant eigenvalue approximation
      * @return x         Dominant eigenvector (nx1 unit vector)
      */
-    function powerIteration(Matrix memory A, bytes32 seed, bytes16 tol) internal view isSquare(A) returns (bytes16 lambda, Matrix memory x) {
-        uint256 n = A.rows;
-        require(MathLib.cmp(tol, QZERO) > 0, "MatrixMaster: tol must be > 0");
-        
-        // If user passed 0, use Global Default
-        if (MathLib.cmp(tol, QZERO) == 0) {
+    function powerIteration(Matrix memory A, bytes32 seed, bytes16 tol)
+        internal
+        view
+        isSquare(A)
+        returns (bytes16 lambda, Matrix memory x)
+    {
+        PowerIterationResult memory result = powerIterationWithStatus(A, seed, tol);
+        return (result.lambda, result.eigenvector);
+    }
+
+    /**
+     * @notice Approximate a dominant eigenpair and report convergence metadata.
+     * @dev A zero tolerance selects LibNumericConfig's effective tolerance and
+     *      the effective global max-iteration value bounds the run.
+     */
+    function powerIterationWithStatus(Matrix memory A, bytes32 seed, bytes16 tol)
+        internal
+        view
+        isSquare(A)
+        returns (PowerIterationResult memory result)
+    {
+        return _powerIteration(
+            A,
+            seed,
+            _effectivePowerIterationTolerance(tol),
+            LibNumericConfig.getMaxIter()
+        );
+    }
+
+    /**
+     * @notice Status-bearing power iteration with an explicit iteration cap.
+     * @dev Intended for bounded benchmarking while sharing the production
+     *      tolerance validation and convergence logic.
+     */
+    function powerIterationWithStatusAndMaxIter(
+        Matrix memory A,
+        bytes32 seed,
+        bytes16 tol,
+        uint256 maxIter
+    ) internal view isSquare(A) returns (PowerIterationResult memory result) {
+        require(maxIter > 0, "MatrixMaster: maxIter must be > 0");
+        return _powerIteration(A, seed, _effectivePowerIterationTolerance(tol), maxIter);
+    }
+
+    function _effectivePowerIterationTolerance(bytes16 tol) private view returns (bytes16) {
+        require(!MathLib.isNaN(tol) && !MathLib.isInfinity(tol), "MatrixMaster: tol must be finite");
+        require(MathLib.cmp(tol, QZERO) >= 0, "MatrixMaster: tol must be non-negative");
+
+        if (MathLib.isZero(tol)) {
             tol = LibNumericConfig.getTol();
         }
 
-        // Apply Safety Guardrail to ensure not goint below minTol (which would be too expensive)
         bytes16 minTol = LibNumericConfig.getMinTol();
         if (MathLib.cmp(tol, minTol) < 0) {
             tol = minTol;
         }
+        return tol;
+    }
 
-        uint256 maxIter = LibNumericConfig.getMaxIter();
-
-        x = randomVector(n, seed);
-        x = normalize(x);
+    function _powerIteration(
+        Matrix memory A,
+        bytes32 seed,
+        bytes16 tol,
+        uint256 maxIter
+    ) private pure returns (PowerIterationResult memory result) {
+        Matrix memory x = normalize(randomVector(A.rows, seed));
 
         for (uint256 iter = 0; iter < maxIter; ++iter) {
             Matrix memory y = multiplyMatrixVector(A, x);
-            
-            // Avoid division by zero if matrix is singular
-            if (MathLib.cmp(euclideanNorm(y), QZERO) == 0) { break; }
 
-            Matrix memory xNew = normalize(y);
-
-            if (hasConverged(xNew, x, tol)) {
-                x = xNew;
+            // Preserve the legacy zero-image behavior, while exposing it as a
+            // non-converged run with fewer than maxIter completed updates.
+            if (MathLib.isZero(euclideanNorm(y))) {
                 break;
             }
 
+            Matrix memory xNew = normalize(y);
+            result.iterations = iter + 1;
+            if (hasConverged(xNew, x, tol)) {
+                x = xNew;
+                result.converged = true;
+                break;
+            }
             x = xNew;
         }
-        
+
         Matrix memory Ax = multiplyMatrixVector(A, x);
-        lambda = dot(x, Ax);
+        result.lambda = dot(x, Ax);
+        result.eigenvector = x;
     }
 }
