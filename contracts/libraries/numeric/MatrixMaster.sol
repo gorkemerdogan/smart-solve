@@ -24,6 +24,24 @@ library MatrixMaster {
     bytes16 private constant QZERO = bytes16(0x00000000000000000000000000000000);
     bytes16 private constant QONE = bytes16(0x3fff0000000000000000000000000000);
 
+    /**
+     * @dev Relative pivot tolerance used by elimination-based matrix routines.
+     *      A pivot p is considered numerically unsafe when
+     *      |p| / max_ij(|A_ij|) <= 1e-30.
+     *
+     *      Unlike an absolute cutoff, this policy is invariant under uniform
+     *      scaling of A and therefore accepts small, well-scaled matrices. The
+     *      tolerance is a conservative guard roughly four decimal orders above
+     *      binary128 unit roundoff (~1e-34) for elimination roundoff.
+     */
+    function isUnsafePivot(bytes16 pivotMagnitude, bytes16 matrixScale) internal pure returns (bool) {
+        if (MathLib.isZero(matrixScale)) return true;
+        // Compare the dimensionless ratio instead of forming scale*tolerance;
+        // this avoids overflow/underflow at binary128's extreme exponents.
+        bytes16 relativePivot = pivotMagnitude.div(matrixScale);
+        return MathLib.cmp(relativePivot, QC.EPS_1e30()) <= 0;
+    }
+
     // ------------------------------------------------------------
     // Structs
     // ------------------------------------------------------------
@@ -798,10 +816,14 @@ library MatrixMaster {
     function det(Matrix memory a) internal pure isSquare(a) returns (bytes16 detA) {
         uint256 n = a.rows;
 
-        // Copy data into working array for LU in-place.
+        // Copy data into working array for LU in-place and retain the original
+        // matrix scale for scale-invariant pivot checks.
         bytes16[] memory lu = new bytes16[](n * n);
+        bytes16 matrixScale = QZERO;
         for (uint256 i = 0; i < n * n; ++i) {
             lu[i] = a.data[i];
+            bytes16 magnitude = MathLib.abs(a.data[i]);
+            if (MathLib.cmp(magnitude, matrixScale) > 0) matrixScale = magnitude;
         }
 
         int256 sign = 1;
@@ -820,8 +842,10 @@ library MatrixMaster {
                 }
             }
 
-            // If pivot is (near) zero -> determinant ≈ 0
-            if (MathLib.cmp(maxAbs, QC.EPS_1e30()) <= 0) {
+            // A pivot tiny relative to the original matrix scale is treated as
+            // numerically singular. This classification is invariant under
+            // uniform scaling of A.
+            if (isUnsafePivot(maxAbs, matrixScale)) {
                 return QZERO;
             }
 
@@ -871,7 +895,7 @@ library MatrixMaster {
 
     /**
      * @notice Compute A⁻¹ using Gauss–Jordan elimination on [A | I].
-     *         Reverts if matrix is singular (no pivot above a small threshold).
+     *         Reverts if a pivot is unsafe relative to the input matrix scale.
      *         This is O(n^3) and intended for small/moderate n in off-chain-style usage.
      * @param  a    Input square matrix A
      * @return invA Inverse matrix A⁻¹
@@ -883,11 +907,15 @@ library MatrixMaster {
         uint256 augCols = 2 * n;
         bytes16[] memory aug = new bytes16[](n * augCols);
         bytes16 one = MathLib.fromInt(1);
+        bytes16 matrixScale = QZERO;
 
         // Fill [A | I]
         for (uint256 i = 0; i < n; ++i) {
             for (uint256 j = 0; j < n; ++j) {
-                aug[_idx(augCols, i, j)] = a.data[_idx(n, i, j)];
+                bytes16 value = a.data[_idx(n, i, j)];
+                aug[_idx(augCols, i, j)] = value;
+                bytes16 magnitude = MathLib.abs(value);
+                if (MathLib.cmp(magnitude, matrixScale) > 0) matrixScale = magnitude;
             }
             for (uint256 j = 0; j < n; ++j) {
                 aug[_idx(augCols, i, n + j)] = (i == j) ? one : QZERO;
@@ -908,9 +936,8 @@ library MatrixMaster {
                 }
             }
 
-            // Check singularity
-            bytes16 pivotTol = QC.EPS_1e18();
-            require(MathLib.cmp(maxAbs, pivotTol) > 0, "MatrixMaster: singular matrix");
+            // Check numerical singularity relative to the original matrix.
+            require(!isUnsafePivot(maxAbs, matrixScale), "MatrixMaster: singular matrix");
 
             // Swap rows if pivot != k
             if (pivot != k) {

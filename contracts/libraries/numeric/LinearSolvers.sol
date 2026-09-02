@@ -321,7 +321,12 @@ library LinearSolvers {
         U.rows = n;
         U.cols = n;
         U.data = new bytes16[](A.data.length);
-        for (uint256 i = 0; i < A.data.length; ++i) U.data[i] = A.data[i];
+        bytes16 matrixScale = MathLib.fromUInt(0);
+        for (uint256 i = 0; i < A.data.length; ++i) {
+            U.data[i] = A.data[i];
+            bytes16 magnitude = MathLib.abs(A.data[i]);
+            if (MathLib.cmp(magnitude, matrixScale) > 0) matrixScale = magnitude;
+        }
 
         MatrixMaster.Matrix memory rhs;
         rhs.rows = n;
@@ -342,7 +347,10 @@ library LinearSolvers {
                 }
             }
             bytes16 pivot = _get(U, pivotRow, k);
-            require(MathLib.cmp(pivot, MathLib.fromUInt(0)) != 0, "LinearSolversMM: zero pivot");
+            require(
+                !MatrixMaster.isUnsafePivot(maxAbs, matrixScale),
+                "LinearSolversMM: unsafe pivot"
+            );
 
             // swap rows if needed
             if (pivotRow != k) {
@@ -382,7 +390,10 @@ library LinearSolvers {
             }
 
             bytes16 diag = _get(U, i, i);
-            require(MathLib.cmp(diag, MathLib.fromUInt(0)) != 0, "LinearSolversMM: zero diag backsub");
+            require(
+                !MatrixMaster.isUnsafePivot(MathLib.abs(diag), matrixScale),
+                "LinearSolversMM: unsafe diag backsub"
+            );
             x.data[i] = MathLib.div(sum, diag);
         }
     }
@@ -430,7 +441,8 @@ library LinearSolvers {
     /**
      * @notice Compute LU factorization A = L*U using Doolittle's method (no pivoting).
      *         This implementation does NOT perform pivoting.
-     *         Zero or near-zero pivots will cause failure even if A is invertible.
+     *         Pivots unsafe relative to the original matrix scale will cause
+     *         failure even if A is mathematically invertible.
      *
      * @param  A Matrix (nxn).
      * @return L Unit-lower-triangular factor (nxn).
@@ -448,11 +460,15 @@ library LinearSolvers {
         U.cols = n;
         U.data = new bytes16[](n * n);
 
+        bytes16 matrixScale = MathLib.fromUInt(0);
+
         // Initialize U = A, L = I
         for (uint256 i = 0; i < n; ++i) {
             for (uint256 j = 0; j < n; ++j) {
                 bytes16 aij = _get(A, i, j);
                 _set(U, i, j, aij);
+                bytes16 magnitude = MathLib.abs(aij);
+                if (MathLib.cmp(magnitude, matrixScale) > 0) matrixScale = magnitude;
 
                 if (i == j) {
                     _set(L, i, j, MathLib.fromUInt(1));
@@ -464,7 +480,10 @@ library LinearSolvers {
 
         for (uint256 k = 0; k < n; ++k) {
             bytes16 pivot = _get(U, k, k);
-            require(MathLib.cmp(pivot, MathLib.fromUInt(0)) != 0, "LinearSolversMM: zero pivot LU");
+            require(
+                !MatrixMaster.isUnsafePivot(MathLib.abs(pivot), matrixScale),
+                "LinearSolversMM: unsafe pivot LU"
+            );
 
             for (uint256 i = k + 1; i < n; ++i) {
                 bytes16 uik = _get(U, i, k);
