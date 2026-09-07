@@ -101,30 +101,43 @@ library LinearSolvers {
             x.data[i] = x0.data[i];
         }
 
-        MatrixMaster.Matrix memory r;      // residual (m x 1)
-        MatrixMaster.Matrix memory At;     // transpose (n x m)
-        MatrixMaster.Matrix memory grad;   // gradient (n x 1)
-        MatrixMaster.Matrix memory step;   // alpha * grad (n x 1)
-
-        // Precompute transpose A^T once
-        At = MatrixMaster.transpose(A);
+        uint256 m = A.rows;
+        uint256 n = A.cols;
+        bytes16[] memory residual = new bytes16[](m);
+        bytes16[] memory gradient = new bytes16[](n);
 
         for (iters = 0; iters < maxIter; ++iters) {
-            // r = A x - b: (m x n) * (n x 1) = (m x 1). Subtraction is valid.
-            r = MatrixMaster.subtractMatrices(MatrixMaster.multiplyMatrices(A, x), b);
+            // Reuse fixed buffers instead of allocating Ax, residual, gradient,
+            // step, and replacement-x arrays on every iteration.
+            for (uint256 i = 0; i < m; ++i) {
+                bytes16 sum = bytes16(0);
+                uint256 rowOffset = i * n;
+                for (uint256 j = 0; j < n; ++j) {
+                    sum = MathLib.add(sum, MathLib.mul(A.data[rowOffset + j], x.data[j]));
+                }
+                residual[i] = MathLib.sub(sum, b.data[i]);
+            }
 
-            // grad = A^T r: (n x m) * (m x 1) = (n x 1).
-            grad = MatrixMaster.multiplyMatrices(At, r);
+            bytes16 gNorm2 = bytes16(0);
+            for (uint256 j = 0; j < n; ++j) {
+                bytes16 sum = bytes16(0);
+                for (uint256 i = 0; i < m; ++i) {
+                    sum = MathLib.add(sum, MathLib.mul(A.data[i * n + j], residual[i]));
+                }
+                gradient[j] = sum;
+                gNorm2 = MathLib.add(gNorm2, MathLib.mul(sum, sum));
+            }
 
-            // Stopping condition: ||grad||^2 <= tol
-            bytes16 gNorm2 = _norm2Squared(grad);
+            // Stopping condition: ||gradient||^2 <= tol
             if (MathLib.cmp(gNorm2, tol) <= 0) {
                 return (x, iters);
             }
 
-            // x = x - alpha * grad. All are n x 1.
-            step = MatrixMaster.multiplyScalar(grad, alpha);
-            x = MatrixMaster.subtractMatrices(x, step);
+            // All gradient entries were computed from the same x, so updating
+            // x in place here preserves the simultaneous gradient-descent step.
+            for (uint256 j = 0; j < n; ++j) {
+                x.data[j] = MathLib.sub(x.data[j], MathLib.mul(gradient[j], alpha));
+            }
         }
 
         return (x, iters); // reached maxIter
