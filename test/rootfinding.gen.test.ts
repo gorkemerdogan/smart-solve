@@ -2,7 +2,11 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { Contract } from "ethers";
-import { formatBenchmarkExecution, HARNESS_ESTIMATE_CALL } from "./test-utils";
+import {
+    formatCallbackBenchmark,
+    formatBenchmarkExecution,
+    HARNESS_ESTIMATE_CALL,
+} from "./test-utils";
 import {
     binary128ToScaledInt,
     decimalStringToScaledInt,
@@ -146,6 +150,7 @@ type MethodSummary = {
     residualsConv: bigint[];
     iterationsAll: bigint[];
     gasesAll: bigint[];
+    functionEvaluationsAll: bigint[];
 };
 
 type BenchmarkConfig = {
@@ -171,7 +176,23 @@ function createSummary(): MethodSummary {
         residualsConv: [],
         iterationsAll: [],
         gasesAll: [],
+        functionEvaluationsAll: [],
     };
+}
+
+function rootFindingFunctionEvaluations(method: MethodName, iterations: bigint): bigint {
+    if (method === "Newton") {
+        // Initial f(x0), then one derivative and one f(xNext) per update.
+        return 1n + 2n * iterations;
+    }
+
+    // Bisection and secant each evaluate two initial points, then one point
+    // per completed update.
+    return 2n + iterations;
+}
+
+function rootFindingCallbackDetail(method: MethodName): string {
+    return method === "Newton" ? "f and analytic-derivative targets" : "f target";
 }
 
 function printMethodSummary(
@@ -185,6 +206,10 @@ function printMethodSummary(
     console.log(`Benchmark            : ${benchmarkName}`);
     console.log(`Method               : ${method}`);
     console.log(`Execution Model      : ${formatBenchmarkExecution(HARNESS_ESTIMATE_CALL)}`);
+    console.log(`Callback Model       : ${formatCallbackBenchmark({
+        staticCalls: `${method === "Newton" ? "1 + 2*iterations" : "2 + iterations"} average=${avgBigInt(s.functionEvaluationsAll)}`,
+        detail: rootFindingCallbackDetail(method),
+    })}`);
     console.log(`Number of Tests      : ${totalTests}`);
     console.log(`Converged Tests      : ${s.convergedCount}`);
     console.log(`Numerical Passes     : ${numericalPasses}`);
@@ -202,6 +227,8 @@ function printMethodSummary(
         claim: "root accuracy is measured to a 1e-28 threshold without JavaScript Number",
     });
     console.log(`Average Iterations   : ${avgBigInt(s.iterationsAll).toString()}`);
+    console.log(`Total Function Evaluations (all runs): ${s.functionEvaluationsAll.reduce((sum, count) => sum + count, 0n).toString()}`);
+    console.log(`Average Function Evaluations (all runs): ${avgBigInt(s.functionEvaluationsAll).toString()}`);
     console.log(`Min Gas              : ${minBigInt(s.gasesAll).toString()}`);
     console.log(`Average Gas          : ${avgBigInt(s.gasesAll).toString()}`);
     console.log(`Max Gas              : ${maxBigInt(s.gasesAll).toString()}`);
@@ -230,6 +257,7 @@ function printCaseResult(args: {
     rootScaled: bigint;
     expectedRootScaled: bigint;
     residualScaled: bigint;
+    functionEvaluations: bigint;
 }) {
     const absErr = scaledAbsError(args.rootScaled, args.expectedRootScaled);
     const relErr = scaledRelError(args.rootScaled, args.expectedRootScaled);
@@ -238,6 +266,10 @@ function printCaseResult(args: {
     console.log(`Case                 : ${args.caseNo}`);
     console.log(`Method               : ${args.method}`);
     console.log(`Execution Model      : ${formatBenchmarkExecution(HARNESS_ESTIMATE_CALL)}`);
+    console.log(`Callback Model       : ${formatCallbackBenchmark({
+        staticCalls: args.functionEvaluations,
+        detail: rootFindingCallbackDetail(args.method),
+    })}`);
     console.log(`Initialization       : ${args.initText}`);
     console.log(`Converged            : ${args.converged ? "Yes" : "No"}`);
     console.log(`Iterations           : ${args.iterations.toString()}`);
@@ -342,6 +374,9 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
 
                 summaries.Bisection.iterationsAll.push(iterations);
                 summaries.Bisection.gasesAll.push(asBigInt(gas));
+                summaries.Bisection.functionEvaluationsAll.push(
+                    rootFindingFunctionEvaluations("Bisection", iterations)
+                );
 
                 if (converged) {
                     summaries.Bisection.convergedCount++;
@@ -365,6 +400,7 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
                     rootScaled,
                     expectedRootScaled: cfg.expectedRootScaled,
                     residualScaled,
+                    functionEvaluations: rootFindingFunctionEvaluations("Bisection", iterations),
                 });
             }
 
@@ -404,6 +440,9 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
 
                 summaries.Newton.iterationsAll.push(iterations);
                 summaries.Newton.gasesAll.push(asBigInt(gas));
+                summaries.Newton.functionEvaluationsAll.push(
+                    rootFindingFunctionEvaluations("Newton", iterations)
+                );
 
                 if (converged) {
                     summaries.Newton.convergedCount++;
@@ -427,6 +466,7 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
                     rootScaled,
                     expectedRootScaled: cfg.expectedRootScaled,
                     residualScaled,
+                    functionEvaluations: rootFindingFunctionEvaluations("Newton", iterations),
                 });
             }
 
@@ -458,6 +498,9 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
 
                 summaries.Secant.iterationsAll.push(iterations);
                 summaries.Secant.gasesAll.push(asBigInt(gas));
+                summaries.Secant.functionEvaluationsAll.push(
+                    rootFindingFunctionEvaluations("Secant", iterations)
+                );
 
                 if (converged) {
                     summaries.Secant.convergedCount++;
@@ -481,6 +524,7 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
                     rootScaled,
                     expectedRootScaled: cfg.expectedRootScaled,
                     residualScaled,
+                    functionEvaluations: rootFindingFunctionEvaluations("Secant", iterations),
                 });
             }
         }

@@ -4,6 +4,7 @@ import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 import {
     classifyExecutionFailure,
+    formatCallbackBenchmark,
     formatBenchmarkExecution,
     HARNESS_ESTIMATE_CALL,
     printBlockRegular,
@@ -109,6 +110,7 @@ interface MethodStats {
     maxRelScaled: bigint;
     minRelScaled: bigint;
     gasSum: bigint;
+    callbackEvaluationsSum: bigint;
     minGas: bigint;
     maxGas: bigint;
 }
@@ -275,6 +277,7 @@ function initStats(): MethodStats {
         maxRelScaled: 0n,
         minRelScaled: -1n,
         gasSum: 0n,
+        callbackEvaluationsSum: 0n,
         minGas: -1n,
         maxGas: 0n,
     };
@@ -285,12 +288,14 @@ function updateStats(
     absErr: bigint,
     relErrScaled: bigint,
     estimatedGas: bigint,
+    callbackEvaluations: bigint,
     passed: boolean
 ): void {
     stats.count += 1;
     stats.absSum += absErr;
     stats.relSumScaled += relErrScaled;
     stats.gasSum += estimatedGas;
+    stats.callbackEvaluationsSum += callbackEvaluations;
 
     if (passed) {
         stats.withinTol += 1;
@@ -388,11 +393,11 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
     let selSquare: string;
     let selCubicPoly: string;
 
-    const METHODS: Array<{ key: ODEMethod; label: MethodLabel }> = [
-        { key: "eulerIter", label: "Euler" },
-        { key: "rk2MidpointIter", label: "RK2 Midpoint" },
-        { key: "rk2HeunIter", label: "RK2 Heun" },
-        { key: "rk4Iter", label: "RK4" },
+    const METHODS: Array<{ key: ODEMethod; label: MethodLabel; functionEvaluationsPerStep: bigint }> = [
+        { key: "eulerIter", label: "Euler", functionEvaluationsPerStep: 1n },
+        { key: "rk2MidpointIter", label: "RK2 Midpoint", functionEvaluationsPerStep: 2n },
+        { key: "rk2HeunIter", label: "RK2 Heun", functionEvaluationsPerStep: 2n },
+        { key: "rk4Iter", label: "RK4", functionEvaluationsPerStep: 4n },
     ];
 
     const Y0_VALUES = [0, 1, 2];
@@ -577,12 +582,14 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                         const relErrScaled = scaledRelErrorScaled(actualScaled, expectedScaled);
                         const tolerance = methodAwareToleranceScaled(method.label, benchmark, tc, expectedValue);
                         const passed = absErr <= tolerance;
+                        const callbackEvaluations = method.functionEvaluationsPerStep * BigInt(tc.steps);
 
                         updateStats(
                             statsByMethod.get(method.label)!,
                             absErr,
                             relErrScaled,
                             run.estimatedGas,
+                            callbackEvaluations,
                             passed
                         );
 
@@ -591,6 +598,7 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                             absErr,
                             relErrScaled,
                             run.estimatedGas,
+                            callbackEvaluations,
                             passed
                         );
 
@@ -602,6 +610,10 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                                 `h=${tc.hLabel}, steps=${tc.steps}, x_final=${tc.xFinal}, ` +
                                 `expectedHexStatus=${expectedHexStatus}`,
                             gas: run.estimatedGas.toString(),
+                            callback: {
+                                staticCalls: callbackEvaluations,
+                                detail: "derivative target",
+                            },
                             inHex: `x0=${x0} | y0=${y0Q} | h=${hQ} | steps=${tc.steps}`,
                             expectedHex,
                             outHex: run.output,
@@ -643,6 +655,10 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                                 `h=${tc.hLabel}, steps=${tc.steps}, x_final=${tc.xFinal}, ` +
                                 `expectedHexStatus=${expectedHexStatus}`,
                             gas: "FAILED",
+                            callback: {
+                                staticCalls: `unavailable (planned ${method.functionEvaluationsPerStep * BigInt(tc.steps)})`,
+                                detail: "derivative target",
+                            },
                             inHex: `x0=${x0} | y0=${y0Q} | h=${hQ} | steps=${tc.steps}`,
                             expectedHex,
                             outHex: "REVERTED / OUT_OF_GAS",
@@ -669,6 +685,7 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                 const avgAbs = averageScaled(stats.absSum, stats.count);
                 const avgRel = averageScaled(stats.relSumScaled, stats.count);
                 const avgGas = averageScaled(stats.gasSum, stats.count);
+                const avgCallbackEvaluations = averageScaled(stats.callbackEvaluationsSum, stats.count);
                 const totalCases = stats.count + stats.failed + stats.skipped;
                 const passRate = totalCases === 0 ? 0 : (stats.withinTol * 100) / totalCases;
 
@@ -680,6 +697,10 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                         `failed=${stats.failed} (revert=${stats.reverted}, outOfGas=${stats.outOfGas}, other=${stats.otherFailures}) | ` +
                         `skipped=${stats.skipped} | passRate=${passRate.toFixed(2)}% | averages=successful executions only`,
                     gas: stats.count > 0 ? avgGas.toString() : "N/A",
+                    callback: {
+                        staticCalls: stats.count > 0 ? `${avgCallbackEvaluations} average per successful run` : "unavailable",
+                        detail: `${method.functionEvaluationsPerStep} per step; derivative target`,
+                    },
                     inHex: "-",
                     expectedHex: "-",
                     outHex: "-",
@@ -721,6 +742,7 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
             const avgAbs = averageScaled(stats.absSum, stats.count);
             const avgRel = averageScaled(stats.relSumScaled, stats.count);
             const avgGas = averageScaled(stats.gasSum, stats.count);
+            const avgCallbackEvaluations = averageScaled(stats.callbackEvaluationsSum, stats.count);
             const totalCases = stats.count + stats.failed + stats.skipped;
             const passRate = totalCases === 0 ? 0 : (stats.withinTol * 100) / totalCases;
 
@@ -732,6 +754,10 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                     `failed=${stats.failed} (revert=${stats.reverted}, outOfGas=${stats.outOfGas}, other=${stats.otherFailures}) | ` +
                     `skipped=${stats.skipped} | passRate=${passRate.toFixed(2)}% | averages=successful executions only`,
                 gas: stats.count > 0 ? avgGas.toString() : "N/A",
+                callback: {
+                    staticCalls: stats.count > 0 ? `${avgCallbackEvaluations} average per successful run` : "unavailable",
+                    detail: `${method.functionEvaluationsPerStep} per step; derivative target`,
+                },
                 inHex: "-",
                 expectedHex: "-",
                 outHex: "-",
@@ -795,13 +821,25 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                         steps
                     );
                     successful++;
-                    console.log(`ODE FEASIBILITY | method=${method.label} | steps=${steps} | status=success | estimatedGas=${run.estimatedGas}`);
+                    console.log(
+                        `ODE FEASIBILITY | method=${method.label} | steps=${steps} | status=success | ` +
+                        `estimatedGas=${run.estimatedGas} | callback=${formatCallbackBenchmark({
+                            staticCalls: method.functionEvaluationsPerStep * BigInt(steps),
+                            detail: "derivative target",
+                        })}`
+                    );
                 } catch (error) {
                     const kind = classifyExecutionFailure(error);
                     if (kind === "revert") reverted++;
                     else if (kind === "out-of-gas") outOfGas++;
                     else otherFailures++;
-                    console.log(`ODE FEASIBILITY | method=${method.label} | steps=${steps} | status=${kind}`);
+                    console.log(
+                        `ODE FEASIBILITY | method=${method.label} | steps=${steps} | status=${kind} | ` +
+                        `callback=${formatCallbackBenchmark({
+                            staticCalls: `unavailable (planned ${method.functionEvaluationsPerStep * BigInt(steps)})`,
+                            detail: "derivative target",
+                        })}`
+                    );
                 }
             }
         }

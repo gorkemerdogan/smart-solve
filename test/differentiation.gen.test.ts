@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import {
     classifyExecutionFailure,
+    formatCallbackBenchmark,
     formatBenchmarkExecution,
     HARNESS_ESTIMATE_CALL,
     type ExecutionFailureKind,
@@ -43,9 +44,9 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
      * Three differentiation methods.
      */
     const methods = [
-        { name: "forwardDiff", fn: "forwardDiffHarness" },
-        { name: "backwardDiff", fn: "backwardDiffHarness" },
-        { name: "centeredDiff", fn: "centeredDiffHarness" },
+        { name: "forwardDiff", fn: "forwardDiffHarness", functionEvaluations: 2 },
+        { name: "backwardDiff", fn: "backwardDiffHarness", functionEvaluations: 2 },
+        { name: "centeredDiff", fn: "centeredDiffHarness", functionEvaluations: 2 },
     ];
 
     /**
@@ -82,6 +83,7 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
         toleranceScaled: bigint;
         toleranceUsageScaled: bigint;
         estimatedGas: bigint;
+        functionEvaluations: number;
         passed: boolean;
     };
 
@@ -262,6 +264,7 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
         console.log(title);
         console.log("============================================================");
         console.log(`Execution Model       : ${formatBenchmarkExecution(HARNESS_ESTIMATE_CALL)}`);
+        console.log(`Callback Model        : ${formatCallbackBenchmark({ staticCalls: 2, detail: "per successful differentiation run" })}`);
         console.log(`Total Tests           : ${total}`);
         console.log(`Successful Executions : ${s.successfulCount}`);
         console.log(`Failed Cases          : ${s.failedCount + failures.length}`);
@@ -287,6 +290,8 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
         console.log(`Average Gas           : ${s.avgGas.toString()} (successful executions only)`);
         console.log(`Min Gas               : ${s.minGas.toString()}`);
         console.log(`Max Gas               : ${s.maxGas.toString()}`);
+        console.log(`Total Function Evaluations (successful executions only): ${(s.count * 2).toString()}`);
+        console.log("Average Function Evaluations (successful executions only): 2");
     }
 
     function printCaseResult(result: TestResult) {
@@ -294,6 +299,7 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
         console.log(`Method             : ${result.method}`);
         console.log(`Function           : ${result.functionName}`);
         console.log(`Input              : x=${result.x}, h=${result.hNum}/${result.hDen}`);
+        console.log(`Callback Model     : ${formatCallbackBenchmark({ staticCalls: result.functionEvaluations, detail: "target function" })}`);
         console.log(`Expected Output    : ${formatScaled(result.exactScaled)}`);
         console.log(`Actual Output      : ${formatScaled(result.numericalScaled)}`);
         console.log(`Absolute Error     : ${formatScaled(result.absoluteErrorScaled)}`);
@@ -313,6 +319,7 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
         x: number;
         hNum: number;
         hDen: number;
+        functionEvaluations: number;
         exactScaled: bigint;
     }) {
         const xQuad = await qFromInt(params.x);
@@ -381,6 +388,7 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
             toleranceScaled,
             toleranceUsageScaled,
             estimatedGas,
+            functionEvaluations: params.functionEvaluations,
             passed,
         };
 
@@ -435,6 +443,7 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
                                 x,
                                 hNum: h.num,
                                 hDen: h.den,
+                                functionEvaluations: method.functionEvaluations,
                                 exactScaled: fnObj.exactDerivativeScaled(x),
                             });
                         });

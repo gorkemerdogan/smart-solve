@@ -42,6 +42,22 @@ export const DIAMOND_ESTIMATE_CALL: BenchmarkExecutionMetadata = {
     result: "eth_call_result",
 };
 
+/**
+ * Metadata for algorithms that invoke a user-supplied callback through EVM
+ * STATICCALL. The reported gas remains end-to-end: callback gas is not
+ * subtracted because this suite has no reliable callback-free measurement.
+ */
+export type CallbackBenchmarkMetadata = {
+    staticCalls: number | bigint | string;
+    detail?: string;
+};
+
+export function formatCallbackBenchmark(metadata: CallbackBenchmarkMetadata): string {
+    const detail = metadata.detail ? ` | ${metadata.detail}` : "";
+    return `target_staticcall | function_evaluations=${metadata.staticCalls.toString()}${detail} | ` +
+        "gas=algorithm_plus_callback_not_separated";
+}
+
 export function formatBenchmarkExecution(metadata: BenchmarkExecutionMetadata): string {
     const resultModel = metadata.gas === "transaction_receipt_gas"
         ? "transaction_plus_call_result"
@@ -254,6 +270,7 @@ interface PrintBlockRegularData {
     tolerance?: string;
     worstCase?: string;
     execution?: BenchmarkExecutionMetadata;
+    callback?: CallbackBenchmarkMetadata;
 }
 
 /**
@@ -280,6 +297,7 @@ export function printBlockRegular({
                                       exceededTol = "-",
                                       worstCase = "-",
                                       execution = HARNESS_ESTIMATE_CALL,
+                                      callback,
                                   }: PrintBlockRegularData): void {
 
     const sep: string = "-".repeat(60);
@@ -290,6 +308,7 @@ export function printBlockRegular({
         `Method: ${method}`,
         `Explanation: ${explanation}`,
         `Execution Model: ${formatBenchmarkExecution(execution)}`,
+        ...(callback ? [`Callback Model: ${formatCallbackBenchmark(callback)}`] : []),
         `Gas Usage: ${gas}`,
         `Input: ${inHex}`,
         `Expected Output (hex): ${expectedHex}`,

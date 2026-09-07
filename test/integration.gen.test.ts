@@ -4,6 +4,7 @@ import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 import {
     classifyExecutionFailure,
+    formatCallbackBenchmark,
     formatBenchmarkExecution,
     HARNESS_TRANSACTION_PLUS_CALL,
     type BenchmarkExecutionMetadata,
@@ -83,6 +84,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
         relTolerance: number;
         errorMessage: string | null;
         execution: BenchmarkExecutionMetadata;
+        functionEvaluations: bigint | null;
     }
 
     // ------------------------------------------------------------
@@ -221,6 +223,12 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
         return Math.max(...values);
     }
 
+    function integrandEvaluations(a: number, b: number, n: bigint): bigint {
+        // Each composite rule evaluates all n + 1 grid points. The library
+        // returns before callbacks when the interval has zero width.
+        return a === b ? 0n : n + 1n;
+    }
+
     function exactPiecewiseIntegral(a: number, b: number): number {
         if (a < 0 || b > 2 || a > b) {
             throw new Error(`Invalid piecewise interval: [${a}, ${b}]`);
@@ -249,12 +257,14 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
         const relErrors = success.map((r) => r.relError!).filter((v) => v !== null);
         const estimatedGases = success.map((r) => r.estimatedGas!).filter((v) => v !== null);
         const gasUsedValues = success.map((r) => r.gasUsed!).filter((v) => v !== null);
+        const evaluationCounts = success.map((r) => r.functionEvaluations!).filter((v) => v !== null);
 
         console.log("============================================================");
         console.log("OVERALL SUMMARY");
         console.log("============================================================");
         console.log(`Total Tests           : ${records.length}`);
         console.log(`Execution Model       : ${formatBenchmarkExecution(HARNESS_TRANSACTION_PLUS_CALL)}`);
+        console.log(`Callback Model        : ${formatCallbackBenchmark({ staticCalls: "n + 1 per non-zero-width run", detail: "integrand" })}`);
         console.log(`Successful Tests      : ${success.length}`);
         console.log(`Numerical Passes      : ${numericalPasses.length}`);
         console.log(`Numerical Failures    : ${numericalFailures.length}`);
@@ -274,6 +284,8 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
             console.log(`Max Estimated Gas     : ${maxBigInt(estimatedGases).toString()}`);
             console.log(`Min Gas Used          : ${minBigInt(gasUsedValues).toString()}`);
             console.log(`Max Gas Used          : ${maxBigInt(gasUsedValues).toString()}`);
+            console.log(`Total Integrand Evaluations (successful executions only): ${evaluationCounts.reduce((sum, count) => sum + count, 0n).toString()}`);
+            console.log(`Average Integrand Evaluations (successful executions only): ${meanBigInt(evaluationCounts).toString()}`);
         } else {
             console.log("No successful test case was recorded.");
         }
@@ -293,12 +305,14 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
             const relErrors = success.map((r) => r.relError!).filter((v) => v !== null);
             const estimatedGases = success.map((r) => r.estimatedGas!).filter((v) => v !== null);
             const gasUsedValues = success.map((r) => r.gasUsed!).filter((v) => v !== null);
+            const evaluationCounts = success.map((r) => r.functionEvaluations!).filter((v) => v !== null);
 
             console.log("============================================================");
             console.log(`SUMMARY - ${method}`);
             console.log("============================================================");
             console.log(`Total Tests           : ${subset.length}`);
             console.log(`Execution Model       : ${formatBenchmarkExecution(HARNESS_TRANSACTION_PLUS_CALL)}`);
+            console.log(`Callback Model        : ${formatCallbackBenchmark({ staticCalls: "n + 1 per non-zero-width run", detail: "integrand" })}`);
             console.log(`Successful Tests      : ${success.length}`);
             console.log(`Numerical Passes      : ${numericalPasses.length}`);
             console.log(`Numerical Failures    : ${numericalFailures.length}`);
@@ -318,6 +332,8 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
                 console.log(`Max Estimated Gas     : ${maxBigInt(estimatedGases).toString()}`);
                 console.log(`Min Gas Used          : ${minBigInt(gasUsedValues).toString()}`);
                 console.log(`Max Gas Used          : ${maxBigInt(gasUsedValues).toString()}`);
+                console.log(`Total Integrand Evaluations (successful executions only): ${evaluationCounts.reduce((sum, count) => sum + count, 0n).toString()}`);
+                console.log(`Average Integrand Evaluations (successful executions only): ${meanBigInt(evaluationCounts).toString()}`);
             } else {
                 console.log("No successful test case was recorded for this method.");
             }
@@ -332,6 +348,10 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
         console.log(`n             : ${record.n.toString()}`);
         console.log(`Status        : ${record.status}`);
         console.log(`Execution Model: ${formatBenchmarkExecution(record.execution)}`);
+        console.log(`Callback Model : ${formatCallbackBenchmark({
+            staticCalls: record.functionEvaluations ?? "unavailable",
+            detail: "integrand",
+        })}`);
 
         if (record.status === "success") {
             console.log(`Expected      : ${record.expected}`);
@@ -431,6 +451,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
                 relTolerance: tolerances.rel,
                 errorMessage: null,
                 execution: HARNESS_TRANSACTION_PLUS_CALL,
+                functionEvaluations: integrandEvaluations(aLabelNum, bLabelNum, n),
             };
         } catch (err) {
             const tolerances = tolerancesFor(fn, method, aLabelNum, bLabelNum, n);
@@ -454,6 +475,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
                 relTolerance: tolerances.rel,
                 errorMessage: extractErrorMessage(err),
                 execution: HARNESS_TRANSACTION_PLUS_CALL,
+                functionEvaluations: null,
             };
         }
     }

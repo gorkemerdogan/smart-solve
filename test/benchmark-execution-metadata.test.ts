@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import {
   DIAMOND_ESTIMATE_CALL,
+  formatCallbackBenchmark,
   formatBenchmarkExecution,
   HARNESS_ESTIMATE_CALL,
   HARNESS_TRANSACTION_PLUS_CALL,
@@ -22,6 +23,13 @@ describe("benchmark execution metadata", function () {
   it("retains the Diamond route in production-path labels", function () {
     expect(formatBenchmarkExecution(DIAMOND_ESTIMATE_CALL)).to.equal(
       "diamond_routed | estimateGas | eth_call_result"
+    );
+  });
+
+  it("labels callback-intertwined gas without implying subtraction", function () {
+    expect(formatCallbackBenchmark({ staticCalls: 4, detail: "per successful run" })).to.equal(
+      "target_staticcall | function_evaluations=4 | per successful run | " +
+      "gas=algorithm_plus_callback_not_separated"
     );
   });
 });

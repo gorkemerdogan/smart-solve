@@ -6,7 +6,11 @@ import {
   deployFullSmartSolve,
   type FullSmartSolveDeployment,
 } from "../scripts/deploy";
-import { DIAMOND_ESTIMATE_CALL, formatBenchmarkExecution } from "./test-utils";
+import {
+  DIAMOND_ESTIMATE_CALL,
+  formatCallbackBenchmark,
+  formatBenchmarkExecution,
+} from "./test-utils";
 
 type FacetWithInterface = { interface: Interface };
 
@@ -38,10 +42,13 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     expect(await loupe.facetAddress(selector)).to.equal(deployment.facetAddresses[facetName]);
   }
 
-  function report(category: string, method: string, gas: bigint): void {
+  function report(category: string, method: string, gas: bigint, callbackStaticCalls?: bigint): void {
     console.log(
       `Diamond-routed production-path gas estimate | ${category} | ${method}: ${gas} | ` +
-      `execution=${formatBenchmarkExecution(DIAMOND_ESTIMATE_CALL)}`
+      `execution=${formatBenchmarkExecution(DIAMOND_ESTIMATE_CALL)}` +
+      (callbackStaticCalls === undefined
+        ? ""
+        : ` | callback=${formatCallbackBenchmark({ staticCalls: callbackStaticCalls })}`)
     );
   }
 
@@ -85,7 +92,7 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const gas = await integration.getFunction("integrateSimpson13WithN").estimateGas(...args);
     const value = await integration.integrateSimpson13WithN(...args);
 
-    report("integration", "Simpson 1/3, n=2", gas);
+    report("integration", "Simpson 1/3, n=2", gas, 3n);
     expect(BigInt(await scalarCallback.toFloat(value))).to.be.lessThan(0n);
   });
 
@@ -100,7 +107,7 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const derivative = await differentiation.centeredDiff(...args);
     const scaled = BigInt(await scalarCallback.toFloat(derivative));
 
-    report("differentiation", "centered difference", gas);
+    report("differentiation", "centered difference", gas, 2n);
     expect(scaled >= 3_999_999_000_000_000_000n).to.equal(true);
     expect(scaled <= 4_000_001_000_000_000_000n).to.equal(true);
   });
@@ -115,7 +122,7 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const gas = await ode.getFunction("eulerIter").estimateGas(...args);
     const yFinal = await ode.eulerIter(...args);
 
-    report("ODE solving", "Euler, 3 steps", gas);
+    report("ODE solving", "Euler, 3 steps", gas, 3n);
     expect(BigInt(await scalarCallback.toFloat(yFinal))).to.equal(15_000_000_000_000_000_000n);
   });
 

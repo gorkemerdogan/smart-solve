@@ -2,7 +2,11 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { deployFullSmartSolve } from "../scripts/deploy";
-import { DIAMOND_ESTIMATE_CALL, formatBenchmarkExecution } from "./test-utils";
+import {
+  DIAMOND_ESTIMATE_CALL,
+  formatCallbackBenchmark,
+  formatBenchmarkExecution,
+} from "./test-utils";
 
 /**
  * Production-path benchmark: calls enter SmartSolve through its fallback,
@@ -58,6 +62,10 @@ describe("SmartSolve Diamond RootFinding production-path benchmark", function ()
     console.log("  full deployment + installation gas:", deployment.deploymentGasUsed.toString());
     console.log("  Diamond fallback bisection gas:", gas.toString());
     console.log("  iterations:", result.iterations.toString());
+    console.log(
+      "  callback model:",
+      formatCallbackBenchmark({ staticCalls: 2n + result.iterations, detail: "f target" })
+    );
 
     expect(result.converged).to.equal(true);
     expect(rootScaled >= 1_999_999_000_000_000_000n).to.equal(true);
