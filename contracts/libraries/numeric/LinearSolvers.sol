@@ -202,6 +202,8 @@ library LinearSolvers {
                 xOld.data[i] = x.data[i];
             }
 
+            bytes16 diff2 = bytes16(0);
+
             // For each i: x_i^{k+1} = (b_i - Σ_{j!=i} a_ij x_j^{k}) / a_ii
             for (uint256 i = 0; i < n; ++i) {
                 bytes16 sum = b.data[i]; // start from b_i
@@ -216,18 +218,12 @@ library LinearSolvers {
                 }
 
                 x.data[i] = MathLib.div(sum, aii);
+                bytes16 delta = MathLib.sub(x.data[i], xOld.data[i]);
+                diff2 = MathLib.add(diff2, MathLib.mul(delta, delta));
             }
 
-            // Check ||x - xOld||^2 <= tolDiff
-            MatrixMaster.Matrix memory diff;
-            diff.rows = n;
-            diff.cols = 1;
-            diff.data = new bytes16[](n);
-            for (uint256 i = 0; i < n; ++i) {
-                diff.data[i] = MathLib.sub(x.data[i], xOld.data[i]);
-            }
-
-            bytes16 diff2 = _norm2Squared(diff);
+            // Candidate convergence first checks ||x - xOld||^2 without
+            // allocating a temporary difference vector.
             if (MathLib.cmp(diff2, tolDiff) <= 0 &&
                 _residualWithinTolerance(A, b, x, tolDiff)) {
                 return (x, iters + 1, true);
@@ -309,6 +305,8 @@ library LinearSolvers {
                 xOld.data[i] = x.data[i];
             }
 
+            bytes16 diff2 = bytes16(0);
+
             for (uint256 i = 0; i < n; ++i) {
                 bytes16 sum = b.data[i];
                 bytes16 aii = _get(A, i, i);
@@ -322,18 +320,12 @@ library LinearSolvers {
                 }
 
                 x.data[i] = MathLib.div(sum, aii);
+                bytes16 delta = MathLib.sub(x.data[i], xOld.data[i]);
+                diff2 = MathLib.add(diff2, MathLib.mul(delta, delta));
             }
 
-            // Check ||x - xOld||^2 <= tolDiff
-            MatrixMaster.Matrix memory diff;
-            diff.rows = n;
-            diff.cols = 1;
-            diff.data = new bytes16[](n);
-            for (uint256 i = 0; i < n; ++i) {
-                diff.data[i] = MathLib.sub(x.data[i], xOld.data[i]);
-            }
-
-            bytes16 diff2 = _norm2Squared(diff);
+            // Candidate convergence first checks ||x - xOld||^2 without
+            // allocating a temporary difference vector.
             if (MathLib.cmp(diff2, tolDiff) <= 0 &&
                 _residualWithinTolerance(A, b, x, tolDiff)) {
                 return (x, iters + 1, true);
