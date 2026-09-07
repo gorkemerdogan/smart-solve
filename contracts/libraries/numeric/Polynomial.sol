@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { MathLib } from "../MathLib.sol";
+import { ABDKMathQuad } from "abdk-libraries-solidity/ABDKMathQuad.sol";
 
 /**
  * @title Polynomial
@@ -127,7 +128,9 @@ library Polynomial {
         // Loop down from the second highest degree (n-1) to the constant term (0)
         for (uint256 i = coeffs.length - 1; i > 0; i--) {
             // y = (y * x) + coeffs[i-1]
-            y = y.mul(x).add(coeffs[i - 1]);
+            // This hot loop intentionally uses ABDK directly. Keeping the
+            // multiply-then-add order preserves the linked MathLib result.
+            y = ABDKMathQuad.add(ABDKMathQuad.mul(y, x), coeffs[i - 1]);
         }
     }
 

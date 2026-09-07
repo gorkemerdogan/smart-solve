@@ -18,8 +18,10 @@ type Measurement = {
   arithmeticCalls: number;
   directLinkedGas: bigint;
   directInlinedGas: bigint;
+  directProductionGas: bigint;
   routedLinkedGas: bigint;
   routedInlinedGas: bigint;
+  routedProductionGas: bigint;
 };
 
 function byteLength(bytecode: string): number {
@@ -69,12 +71,14 @@ describe("Polynomial Horner MathLib-linkage algorithm A/B benchmark", function (
   let productionFacet: BaseContract;
   let linkedRouted: BaseContract;
   let inlinedRouted: BaseContract;
+  let productionRouted: BaseContract;
   let mathLibFactory: ContractFactory;
   let linkedFactory: ContractFactory;
   let inlinedFactory: ContractFactory;
   let productionFactory: ContractFactory;
   let linkedInstallationGas: bigint;
   let inlinedInstallationGas: bigint;
+  let productionInstallationGas: bigint;
   const measurements: Measurement[] = [];
 
   before(async function () {
@@ -107,12 +111,14 @@ describe("Polynomial Horner MathLib-linkage algorithm A/B benchmark", function (
     const selector = linkedFacet.interface.getFunction("polyEvaluate")!.selector;
     expect(inlinedFacet.interface.getFunction("polyEvaluate")!.selector).to.equal(selector);
 
-    const [linkedDiamond, inlinedDiamond] = await Promise.all([
+    const [linkedDiamond, inlinedDiamond, productionDiamond] = await Promise.all([
       installSingleFacet(diamondCutFacet, linkedFacet, selector),
       installSingleFacet(diamondCutFacet, inlinedFacet, selector),
+      installSingleFacet(diamondCutFacet, productionFacet, selector),
     ]);
     linkedInstallationGas = linkedDiamond.installationGas;
     inlinedInstallationGas = inlinedDiamond.installationGas;
+    productionInstallationGas = productionDiamond.installationGas;
     linkedRouted = await ethers.getContractAt(
       "PolynomialLinkedHornerBenchmarkFacet",
       await linkedDiamond.diamond.getAddress()
@@ -121,11 +127,16 @@ describe("Polynomial Horner MathLib-linkage algorithm A/B benchmark", function (
       "PolynomialInlinedHornerBenchmarkFacet",
       await inlinedDiamond.diamond.getAddress()
     );
+    productionRouted = await ethers.getContractAt(
+      "PolynomialFacet",
+      await productionDiamond.diamond.getAddress()
+    );
 
     console.log("============================================================");
     console.log("POLYNOMIAL HORNER LINKAGE A/B — TEST-ONLY ALGORITHM BENCHMARK");
-    console.log("Linked variant: existing Polynomial.evaluateHorners -> public linked MathLib");
-    console.log("Inlined variant: equivalent Horner loop -> internal ABDK add/mul");
+    console.log("Linked baseline: pre-change Horner loop -> public linked MathLib");
+    console.log("Inlined control: equivalent Horner loop -> internal ABDK add/mul");
+    console.log("Production: PolynomialFacet.polyEvaluate after the targeted production change");
     console.log("Execution model: paired direct-facet and minimal-Diamond estimateGas calls");
     console.log("============================================================");
   });
@@ -145,26 +156,36 @@ describe("Polynomial Horner MathLib-linkage algorithm A/B benchmark", function (
       const [
         directLinkedResult,
         directInlinedResult,
+        directProductionResult,
         routedLinkedResult,
         routedInlinedResult,
+        routedProductionResult,
         directLinkedGas,
         directInlinedGas,
+        directProductionGas,
         routedLinkedGas,
         routedInlinedGas,
+        routedProductionGas,
       ] = await Promise.all([
         linkedDirectMethod.staticCall(...args),
         inlinedDirectMethod.staticCall(...args),
+        productionFacet.getFunction("polyEvaluate").staticCall(...args),
         linkedRoutedMethod.staticCall(...args),
         inlinedRoutedMethod.staticCall(...args),
+        productionRouted.getFunction("polyEvaluate").staticCall(...args),
         linkedDirectMethod.estimateGas(...args),
         inlinedDirectMethod.estimateGas(...args),
+        productionFacet.getFunction("polyEvaluate").estimateGas(...args),
         linkedRoutedMethod.estimateGas(...args),
         inlinedRoutedMethod.estimateGas(...args),
+        productionRouted.getFunction("polyEvaluate").estimateGas(...args),
       ]);
 
       expect(directLinkedResult).to.equal(directInlinedResult);
+      expect(directProductionResult).to.equal(directLinkedResult);
       expect(routedLinkedResult).to.equal(directLinkedResult);
       expect(routedInlinedResult).to.equal(directLinkedResult);
+      expect(routedProductionResult).to.equal(directLinkedResult);
 
       const arithmeticCalls = degree * 2;
       measurements.push({
@@ -172,18 +193,24 @@ describe("Polynomial Horner MathLib-linkage algorithm A/B benchmark", function (
         arithmeticCalls,
         directLinkedGas,
         directInlinedGas,
+        directProductionGas,
         routedLinkedGas,
         routedInlinedGas,
+        routedProductionGas,
       });
 
       console.log(
         `POLYNOMIAL_HORNER_AB | degree=${degree} | arithmeticCalls=${arithmeticCalls} | ` +
         `directLinkedGas=${directLinkedGas} | directInlinedGas=${directInlinedGas} | ` +
         `directDelta=${directLinkedGas - directInlinedGas} | ` +
-        `directRatio=${formatRatio(directLinkedGas, directInlinedGas)} | ` +
+        `directProductionGas=${directProductionGas} | ` +
+        `directProductionDelta=${directLinkedGas - directProductionGas} | ` +
+        `directRatio=${formatRatio(directLinkedGas, directProductionGas)} | ` +
         `routedLinkedGas=${routedLinkedGas} | routedInlinedGas=${routedInlinedGas} | ` +
         `routedDelta=${routedLinkedGas - routedInlinedGas} | ` +
-        `routedRatio=${formatRatio(routedLinkedGas, routedInlinedGas)}`
+        `routedProductionGas=${routedProductionGas} | ` +
+        `routedProductionDelta=${routedLinkedGas - routedProductionGas} | ` +
+        `routedRatio=${formatRatio(routedLinkedGas, routedProductionGas)}`
       );
     });
   }
@@ -215,14 +242,13 @@ describe("Polynomial Horner MathLib-linkage algorithm A/B benchmark", function (
     console.log(`Current full PolynomialFacet creationBytes=${byteLength(productionFactory.bytecode)} | runtimeBytes=${byteLength(productionCode)} | deploymentGas=${productionReceipt.gasUsed} | EIP170Headroom=${EIP170_RUNTIME_LIMIT - byteLength(productionCode)}`);
     console.log(`Linked first-consumer deploymentGas=${mathLibReceipt.gasUsed + linkedReceipt.gasUsed} (MathLib + Horner facet)`);
     console.log(`Linked incremental-consumer deploymentGas=${linkedReceipt.gasUsed} (shared MathLib already deployed)`);
-    console.log(`Diamond selector installationGas: linked=${linkedInstallationGas} | inlined=${inlinedInstallationGas}`);
-
     const directLinkedTotal = measurements.reduce((sum, item) => sum + item.directLinkedGas, 0n);
-    const directInlinedTotal = measurements.reduce((sum, item) => sum + item.directInlinedGas, 0n);
+    const directProductionTotal = measurements.reduce((sum, item) => sum + item.directProductionGas, 0n);
     const routedLinkedTotal = measurements.reduce((sum, item) => sum + item.routedLinkedGas, 0n);
-    const routedInlinedTotal = measurements.reduce((sum, item) => sum + item.routedInlinedGas, 0n);
-    console.log(`Direct aggregate: linkedGas=${directLinkedTotal} | inlinedGas=${directInlinedTotal} | delta=${directLinkedTotal - directInlinedTotal} | ratio=${formatRatio(directLinkedTotal, directInlinedTotal)}`);
-    console.log(`Diamond aggregate: linkedGas=${routedLinkedTotal} | inlinedGas=${routedInlinedTotal} | delta=${routedLinkedTotal - routedInlinedTotal} | ratio=${formatRatio(routedLinkedTotal, routedInlinedTotal)}`);
+    const routedProductionTotal = measurements.reduce((sum, item) => sum + item.routedProductionGas, 0n);
+    console.log(`Diamond selector installationGas: linked=${linkedInstallationGas} | inlined=${inlinedInstallationGas} | production=${productionInstallationGas}`);
+    console.log(`Direct aggregate: linkedGas=${directLinkedTotal} | productionGas=${directProductionTotal} | delta=${directLinkedTotal - directProductionTotal} | ratio=${formatRatio(directLinkedTotal, directProductionTotal)}`);
+    console.log(`Diamond aggregate: linkedGas=${routedLinkedTotal} | productionGas=${routedProductionTotal} | delta=${routedLinkedTotal - routedProductionTotal} | ratio=${formatRatio(routedLinkedTotal, routedProductionTotal)}`);
     console.log("============================================================");
   });
 });
