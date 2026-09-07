@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import { MathLib } from "../MathLib.sol";
 import { QuadConstants as QC } from "../QuadConstants.sol";
+import { ABDKMathQuad } from "abdk-libraries-solidity/ABDKMathQuad.sol";
 
 /**
  * @title ODESolver
@@ -191,10 +192,22 @@ library ODESolver {
     // ------------------------------------------------------------
 
     /**
+     * @notice Return the fixed-grid coordinate for iteration i.
+     * @dev    Deriving x_i from x0 avoids accumulating a separate rounding
+     *         error from repeated coordinate updates. The i=0 fast path also
+     *         preserves the exact input coordinate for the first callback.
+     */
+    function _gridX(bytes16 x0, bytes16 h, uint256 i) private pure returns (bytes16) {
+        if (i == 0) return x0;
+        // Keep the grid calculation internal: repeated external MathLib calls
+        // would materially reduce the feasible step count.
+        return ABDKMathQuad.add(x0, ABDKMathQuad.mul(h, ABDKMathQuad.fromUInt(i)));
+    }
+
+    /**
      * @notice Perform multiple Euler steps and return the final y value.
-     *.        Repeatedly applies:
-     *            y <- euler(target, selectorF, x, y, h)
-     *            x <- x + h
+     *.        Repeatedly applies y <- euler(target, selectorF, x_i, y, h),
+     *         where x_i = x0 + i*h.
      *
      * @param target Address implementing f(x,y)
      * @param selectorF Selector for f(x,y)
@@ -207,20 +220,16 @@ library ODESolver {
     function eulerIter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) internal view returns (bytes16 y) {
         require(steps > 0, "ODESolver: steps must be > 0");
 
-        bytes16 x = x0;
         y = y0;
 
         for (uint256 i = 0; i < steps; ++i) {
-            y = euler(target, selectorF, x, y, h);
-            x = x.add(h);
+            y = euler(target, selectorF, _gridX(x0, h, i), y, h);
         }
     }
 
     /**
      * @notice Perform multiple RK2 Midpoint steps and return the final y value.
-     *         Repeatedly applies:
-     *            y <- rk2Midpoint(target, selectorF, x, y, h)
-     *            x <- x + h
+     *         Repeatedly applies rk2Midpoint at x_i = x0 + i*h.
      *
      * @param target Address implementing f(x,y)
      * @param selectorF Selector for f(x,y)
@@ -233,20 +242,16 @@ library ODESolver {
     function rk2MidpointIter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) internal view returns (bytes16 y) {
         require(steps > 0, "ODESolver: steps must be > 0");
 
-        bytes16 x = x0;
         y = y0;
 
         for (uint256 i = 0; i < steps; ++i) {
-            y = rk2Midpoint(target, selectorF, x, y, h);
-            x = x.add(h);
+            y = rk2Midpoint(target, selectorF, _gridX(x0, h, i), y, h);
         }
     }
 
     /**
      * @notice Perform multiple RK2 Heun steps and return the final y value.
-     *         Repeatedly applies:
-     *            y <- rk2Heun(target, selectorF, x, y, h)
-     *            x <- x + h
+     *         Repeatedly applies rk2Heun at x_i = x0 + i*h.
      *
      * @param target Address implementing f(x,y)
      * @param selectorF Selector for f(x,y)
@@ -259,20 +264,16 @@ library ODESolver {
     function rk2HeunIter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) internal view returns (bytes16 y) {
         require(steps > 0, "ODESolver: steps must be > 0");
 
-        bytes16 x = x0;
         y = y0;
 
         for (uint256 i = 0; i < steps; ++i) {
-            y = rk2Heun(target, selectorF, x, y, h);
-            x = x.add(h);
+            y = rk2Heun(target, selectorF, _gridX(x0, h, i), y, h);
         }
     }
 
     /**
      * @notice Perform multiple RK4 steps and return the final y value.
-     *         Repeatedly applies:
-     *           y <- rk4(target, selectorF, x, y, h)
-     *           x <- x + h
+     *         Repeatedly applies rk4 at x_i = x0 + i*h.
      *
      * @param target Address implementing f(x,y)
      * @param selectorF Selector for f(x,y)
@@ -285,12 +286,10 @@ library ODESolver {
     function rk4Iter(address target, bytes4 selectorF, bytes16 x0, bytes16 y0, bytes16 h, uint256 steps) internal view returns (bytes16 y) {
         require(steps > 0, "ODESolver: steps must be > 0");
 
-        bytes16 x = x0;
         y = y0;
 
         for (uint256 i = 0; i < steps; ++i) {
-            y = rk4(target, selectorF, x, y, h);
-            x = x.add(h);
+            y = rk4(target, selectorF, _gridX(x0, h, i), y, h);
         }
     }
 }

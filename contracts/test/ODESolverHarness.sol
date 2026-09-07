@@ -39,6 +39,24 @@ contract ODESolverHarness {
         return ODESolver.eulerIter(target, selector, x, y, h, steps);
     }
 
+    /// @dev Test-only pre-change coordinate-update baseline for drift comparisons.
+    function eulerIterCumulative(
+        address target,
+        bytes4 selector,
+        bytes16 x0,
+        bytes16 y0,
+        bytes16 h,
+        uint256 steps
+    ) external view returns (bytes16 y) {
+        require(steps > 0, "ODESolver: steps must be > 0");
+        bytes16 x = x0;
+        y = y0;
+        for (uint256 i = 0; i < steps; ++i) {
+            y = ODESolver.euler(target, selector, x, y, h);
+            x = x.add(h);
+        }
+    }
+
     function rk2MidpointIter(address target, bytes4 selector, bytes16 x, bytes16 y, bytes16 h, uint256 steps) external view returns (bytes16) {
         return ODESolver.rk2MidpointIter(target, selector, x, y, h, steps);
     }
@@ -70,6 +88,11 @@ contract ODESolverHarness {
      */
     function f_linear(bytes16 /* x */, bytes16 y) external pure returns (bytes16) {
         return y; 
+    }
+
+    /// @notice Coordinate probe used to verify multi-step fixed-grid sampling.
+    function f_x(bytes16 x, bytes16 /* y */) external pure returns (bytes16) {
+        return x;
     }
 
     /**
