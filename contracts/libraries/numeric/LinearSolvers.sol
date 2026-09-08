@@ -350,8 +350,13 @@ library LinearSolvers {
 
     /**
      * @dev Hybrid absolute/relative squared residual check used by stationary
-     *      iterative solvers. Scaling by max(1, ||b||^2) avoids accepting a
-     *      large residual merely because the iterates have stopped moving.
+     *      iterative solvers. This function is reached only after the cheap
+     *      iterate-change criterion passes. A compensated matrix-vector product
+     *      prevents cancellation from turning a large true residual into a
+     *      false convergence decision. The squared norms remain naive because
+     *      their terms are non-negative and do not suffer subtractive cancellation.
+     *      Scaling by max(1, ||b||^2) avoids accepting a large residual merely
+     *      because the iterates have stopped moving.
      */
     function _residualWithinTolerance(
         MatrixMaster.Matrix memory A,
@@ -360,8 +365,7 @@ library LinearSolvers {
         bytes16 tol
     ) internal pure returns (bool) {
         MatrixMaster.Matrix memory residual = MatrixMaster.subtractMatrices(
-            MatrixMaster.multiplyMatrices(A, x),
-            b
+            MatrixMaster.multiplyMatrixVectorCompensated(A, x), b
         );
         bytes16 residual2 = _norm2Squared(residual);
         bytes16 b2 = _norm2Squared(b);

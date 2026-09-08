@@ -9,6 +9,7 @@ const SEED = ethers.keccak256(ethers.toUtf8Bytes("power-iteration-status-seed"))
 
 describe("MatrixMaster power iteration status", function () {
   let harness: any;
+  let focusedHarness: any;
 
   before(async function () {
     const MathLib = await ethers.getContractFactory("contracts/libraries/MathLib.sol:MathLib");
@@ -19,7 +20,11 @@ describe("MatrixMaster power iteration status", function () {
       libraries: { MathLib: await mathLib.getAddress() },
     });
     harness = await Harness.deploy();
-    await harness.waitForDeployment();
+    const FocusedHarness = await ethers.getContractFactory("PowerIterationDecisionHarness", {
+      libraries: { MathLib: await mathLib.getAddress() },
+    });
+    focusedHarness = await FocusedHarness.deploy();
+    await Promise.all([harness.waitForDeployment(), focusedHarness.waitForDeployment()]);
   });
 
   async function diagonalTwoOne(contract: any): Promise<string[]> {
@@ -97,13 +102,11 @@ describe("MatrixMaster power iteration status", function () {
     const A = await diagonalTwoOne(harness);
     const tol = await harness.qFromFrac(1n, 1_000_000n);
 
-    const legacy = await harness.powerIterationHarness(2n, 2n, A, SEED, tol);
+    const legacy = await focusedHarness.powerIteration(2n, A, SEED, tol);
     const withStatus = await harness.powerIterationWithStatusHarness(2n, 2n, A, SEED, tol);
 
     expect(legacy[0]).to.equal(withStatus[0]);
-    expect(legacy[1]).to.equal(withStatus[1]);
-    expect(legacy[2]).to.equal(withStatus[2]);
-    expect(legacy[3]).to.deep.equal(withStatus[3]);
+    expect(legacy[1]).to.deep.equal(withStatus[3]);
   });
 
   it("routes status-bearing production calls through the Diamond and reports configured exhaustion", async function () {

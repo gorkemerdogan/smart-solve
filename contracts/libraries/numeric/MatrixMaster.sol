@@ -683,6 +683,48 @@ library MatrixMaster {
         y = Matrix({ rows: m, cols: 1, data: out });
     }
 
+    /**
+     * @notice Multiply A by x using Neumaier-compensated row accumulation.
+     * @dev This is an internal decision-verification helper, not the default
+     *      matrix-vector implementation. Callers should use it selectively
+     *      where a cancellation-corrupted result could change a status or
+     *      termination decision.
+     */
+    function multiplyMatrixVectorCompensated(Matrix memory A, Matrix memory x)
+        internal
+        pure
+        returns (Matrix memory y)
+    {
+        require(A.cols == x.rows, "MatrixMaster: A.cols != x.rows");
+        require(x.cols == 1, "MatrixMaster: x must be column vector");
+
+        bytes16[] memory out = new bytes16[](A.rows);
+        for (uint256 i = 0; i < A.rows; ++i) {
+            bytes16 sum = QZERO;
+            bytes16 correction = QZERO;
+            for (uint256 j = 0; j < A.cols; ++j) {
+                bytes16 term = A.data[_idx(A.cols, i, j)].mul(x.data[j]);
+                (sum, correction) = _neumaierAdd(sum, correction, term);
+            }
+            out[i] = sum.add(correction);
+        }
+
+        y = Matrix({ rows: A.rows, cols: 1, data: out });
+    }
+
+    function _neumaierAdd(bytes16 sum, bytes16 correction, bytes16 term)
+        private
+        pure
+        returns (bytes16 nextSum, bytes16 nextCorrection)
+    {
+        nextSum = sum.add(term);
+        if (MathLib.cmp(sum.abs(), term.abs()) >= 0) {
+            nextCorrection = correction.add(sum.sub(nextSum).add(term));
+        } else {
+            nextCorrection = correction.add(term.sub(nextSum).add(sum));
+        }
+    }
+
     // ------------------------------------------------------------
     // Sparse Matrix x Vector multiplication
     // ------------------------------------------------------------
@@ -1137,10 +1179,17 @@ library MatrixMaster {
         for (uint256 iter = 0; iter < maxIter; ++iter) {
             Matrix memory y = multiplyMatrixVector(A, x);
 
-            // Preserve the legacy zero-image behavior, while exposing it as a
-            // non-converged run with fewer than maxIter completed updates.
+            // A zero produced by naive accumulation may be cancellation rather
+            // than a true zero image. Pay for compensated recomputation only at
+            // this termination boundary; ordinary iterations keep the existing
+            // naive matvec cost.
             if (MathLib.isZero(euclideanNorm(y))) {
-                break;
+                y = multiplyMatrixVectorCompensated(A, x);
+                if (MathLib.isZero(euclideanNorm(y))) {
+                    // Preserve the legacy true-zero-image behavior, exposing it
+                    // as a non-converged run with fewer than maxIter updates.
+                    break;
+                }
             }
 
             Matrix memory xNew = normalize(y);

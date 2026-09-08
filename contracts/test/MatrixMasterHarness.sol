@@ -160,30 +160,6 @@ contract MatrixMasterHarness {
     }
 
     /**
-     * @notice Wrapper for ones.
-     */
-    function onesHarness(
-        uint256 rows,
-        uint256 cols
-    ) external pure returns (uint256, uint256, bytes16[] memory) {
-        MatrixMaster.Matrix memory m = MatrixMaster.createOnesMatrix(
-            rows,
-            cols
-        );
-        return _fromMatrix(m);
-    }
-
-    /**
-     * @notice Wrapper for createIdentityMatrix.
-     */
-    function createIdentityMatrixHarness(
-        uint256 n
-    ) external pure returns (uint256, uint256, bytes16[] memory) {
-        MatrixMaster.Matrix memory m = MatrixMaster.createIdentityMatrix(n);
-        return _fromMatrix(m);
-    }
-
-    /**
      * @notice Wrapper for fromDiagonal.
      */
     function fromDiagonalHarness(
@@ -697,82 +673,6 @@ contract MatrixMasterHarness {
     // ---------------------------------------------------------
     // Power Iteration Wrapper
     // ---------------------------------------------------------
-
-    /**
-     * @notice Wrapper for powerIteration.
-     */
-    function powerIterationHarness(
-        uint256 rows,
-        uint256 cols,
-        bytes16[] calldata dataFlat,
-        bytes32 seed,
-        bytes16 tol
-    )
-        external
-        view
-        returns (
-            bytes16 lambda,
-            uint256 xRows,
-            uint256 xCols,
-            bytes16[] memory xData
-        )
-    {
-        // Build matrix
-        MatrixMaster.Matrix memory A = _toMatrix(rows, cols, dataFlat);
-
-        // Compute dominant eigenpair
-        (bytes16 lam, MatrixMaster.Matrix memory x) = MatrixMaster
-            .powerIteration(A, seed, tol);
-
-        return (lam, x.rows, x.cols, x.data);
-    }
-
-    /**
-     * @notice Backwards-compatible wrapper for bounded power iteration that
-     *         also returns the completed iteration count.
-     * @param rows       Number of rows of A
-     * @param cols       Number of cols of A
-     * @param dataFlat   Flattened dense matrix data
-     * @param seed       Seed used for initial random vector
-     * @param tol        Convergence tolerance
-     * @param maxIter    Maximum number of iterations allowed
-     * @return lambda    Dominant eigenvalue approximation
-     * @return xRows     Eigenvector row count
-     * @return xCols     Eigenvector col count
-     * @return xData     Dominant eigenvector data
-     * @return iterCount Number of iterations actually performed
-     */
-    function powerIterationWithIterHarness(
-        uint256 rows,
-        uint256 cols,
-        bytes16[] calldata dataFlat,
-        bytes32 seed,
-        bytes16 tol,
-        uint256 maxIter
-    )
-        external
-        view
-        returns (
-            bytes16 lambda,
-            uint256 xRows,
-            uint256 xCols,
-            bytes16[] memory xData,
-            uint256 iterCount
-    )
-    {
-        require(rows == cols, "MatrixMasterHarness: matrix must be square");
-        require(maxIter > 0, "MatrixMasterHarness: maxIter must be > 0");
-        MatrixMaster.Matrix memory A = _toMatrix(rows, cols, dataFlat);
-        MatrixMaster.PowerIterationResult memory result = MatrixMaster
-            .powerIterationWithStatusAndMaxIter(A, seed, tol, maxIter);
-        return (
-            result.lambda,
-            result.eigenvector.rows,
-            result.eigenvector.cols,
-            result.eigenvector.data,
-            result.iterations
-        );
-    }
 
     /**
      * @notice Wrapper for production-configured power iteration with status.
