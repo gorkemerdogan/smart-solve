@@ -11,6 +11,7 @@ import {
     type ExecutionFailureKind,
 } from "./test-utils";
 import { printPrecisionMetadata } from "./precision-utils";
+import { BenchmarkResultWriter, benchmarkExecutionRecord } from "./benchmark-results";
 
 describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", function () {
     this.timeout(0); // Infinity minutes
@@ -93,6 +94,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
 
     let harness: IntegrationHarness;
     let target: string;
+    let resultWriter: BenchmarkResultWriter;
 
     const SCALE = 1_000_000_000_000n; // 1e12
     const ACCURACY_N_VALUES = [12n, 24n, 48n, 96n, 192n];
@@ -368,6 +370,47 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
         }
     }
 
+    function exportRecords(records: TestRecord[], benchmark: string): void {
+        for (const record of records) {
+            const succeeded = record.status === "success" && record.passed;
+            resultWriter.record({
+                benchmark,
+                category: "integration",
+                operation: record.method,
+                execution: benchmarkExecutionRecord(record.execution),
+                input: {
+                    function: record.func,
+                    interval: record.intervalLabel,
+                    a: record.a,
+                    b: record.b,
+                    n: record.n.toString(),
+                },
+                ...(record.functionEvaluations === null ? {} : {
+                    callback: {
+                        model: "target_staticcall",
+                        functionEvaluations: record.functionEvaluations.toString(),
+                        detail: "integrand",
+                        gasIncludesCallback: true,
+                    },
+                }),
+                ...(record.gasUsed === null ? {} : { gas: record.gasUsed.toString() }),
+                status: succeeded ? "success" : "failure",
+                ...(record.status === "success" ? {} : { failureKind: record.status }),
+                errorMetrics: {
+                    passed: record.passed,
+                    expected: record.expected,
+                    actual: record.actual,
+                    absError: record.absError,
+                    relError: record.relError,
+                    absTolerance: record.absTolerance,
+                    relTolerance: record.relTolerance,
+                    estimatedGas: record.estimatedGas?.toString() ?? null,
+                    ...(record.errorMessage === null ? {} : { error: record.errorMessage }),
+                },
+            });
+        }
+    }
+
     async function runSingleCase(params: {
         method: MethodName;
         fn: BenchmarkFunction;
@@ -570,6 +613,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
     // Deploy
     // ------------------------------------------------------------
     before(async function () {
+        resultWriter = await BenchmarkResultWriter.create({ suite: "integration.harness" });
         printPrecisionMetadata({
             classification: "method-reference comparison",
             comparisonScale: "1e12 Solidity toFloat output",
@@ -623,6 +667,10 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
             { label: "[-pi,pi]", a: minusPi, b: pi, aNum: -Math.PI, bNum: Math.PI },
             { label: "[pi/4,5pi/4]", a: quarterPi, b: fivePiOverFour, aNum: Math.PI / 4, bNum: 5 * Math.PI / 4 },
         ];
+    });
+
+    after(async function () {
+        await resultWriter.flush();
     });
 
     // ------------------------------------------------------------
@@ -693,6 +741,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
 
         printOverallSummary(records);
         printMethodSummaries(records);
+        exportRecords(records, "bounded deterministic accuracy and gas benchmark");
 
         const executionFailures = records.filter((r) => r.status !== "success");
         const numericalFailures = records.filter((r) => r.status === "success" && !r.passed);
@@ -738,6 +787,7 @@ describe("IntegrationHarness - 1e12/JS-Number Method-Reference Accuracy & Gas", 
         }
 
         printOverallSummary(records);
+        exportRecords(records, "high-subdivision feasibility benchmark");
         const successful = records.filter(record => record.status === "success").length;
         const reverted = records.filter(record => record.status === "revert").length;
         const outOfGas = records.filter(record => record.status === "out-of-gas").length;

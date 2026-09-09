@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { BenchmarkResultWriter, benchmarkExecutionRecord } from "./benchmark-results";
+import { HARNESS_ESTIMATE_CALL } from "./test-utils";
 import type { Contract } from "ethers";
 import { binary128ToRational, binary128ToScaledInt, printPrecisionMetadata } from "./precision-utils";
 
@@ -543,8 +545,10 @@ function printVectorSummary(args: {
 
 describe("Polynomial Library - Binary128-Aware Exact-Oracle Benchmarks", function () {
     let harness: PolynomialHarness;
+    let resultWriter: BenchmarkResultWriter;
 
     before(async () => {
+        resultWriter = await BenchmarkResultWriter.create({ suite: "polynomial.harness" });
         const MathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );
@@ -557,6 +561,10 @@ describe("Polynomial Library - Binary128-Aware Exact-Oracle Benchmarks", functio
 
         harness = (await HF.deploy()) as unknown as PolynomialHarness;
 
+    });
+
+    after(async () => {
+        await resultWriter.flush();
     });
 
     for (const degree of DEGREES) {
@@ -598,6 +606,21 @@ describe("Polynomial Library - Binary128-Aware Exact-Oracle Benchmarks", functio
                     minGas: gasStats.min,
                     avgGas: avgGas(gasStats),
                     maxGas: gasStats.max,
+                });
+                resultWriter.record({
+                    benchmark: "exact-oracle polynomial accuracy",
+                    category: "polynomial",
+                    operation: "evaluateHorners",
+                    execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+                    input: { degree, tests: T },
+                    gas: avgGas(gasStats).toString(),
+                    status: "success",
+                    errorMetrics: {
+                        averageAbsoluteErrorScaled: (totalErr / BigInt(T)).toString(),
+                        maxAbsoluteErrorScaled: maxErr.toString(),
+                        gasMin: gasStats.min.toString(),
+                        gasMax: gasStats.max.toString(),
+                    },
                 });
             });
 

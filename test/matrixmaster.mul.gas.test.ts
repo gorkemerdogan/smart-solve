@@ -9,7 +9,9 @@ import {
     printBlockMatrix,
     printExecutionFeasibilitySummary,
     touchGas,
+    HARNESS_ESTIMATE_CALL,
 } from "./test-utils";
+import { BenchmarkResultWriter, benchmarkExecutionRecord } from "./benchmark-results";
 
 // ------------------------------------------------------------
 // Types
@@ -324,8 +326,31 @@ function computeErrorStats(actual: bigint[], expected: bigint[]) {
 describe("MatrixMasterHarness - Gas Growth Tests (Multiplication)", function () {
     let harness: MatrixMasterHarness;
     let t = 0;
+    let resultWriter: BenchmarkResultWriter;
+
+    function recordMatrixCase(args: {
+        benchmark: string;
+        operation: string;
+        input: Record<string, string | number>;
+        gas?: bigint;
+        failureKind?: "revert" | "out-of-gas" | "failure";
+        metrics?: Record<string, string>;
+    }): void {
+        resultWriter.record({
+            benchmark: args.benchmark,
+            category: "matrix operations",
+            operation: args.operation,
+            execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+            input: args.input,
+            ...(args.gas === undefined ? {} : { gas: args.gas.toString() }),
+            status: args.failureKind === undefined ? "success" : "failure",
+            ...(args.failureKind === undefined ? {} : { failureKind: args.failureKind }),
+            ...(args.metrics === undefined ? {} : { errorMetrics: args.metrics }),
+        });
+    }
 
     before(async function () {
+        resultWriter = await BenchmarkResultWriter.create({ suite: "matrixmaster.multiplication.harness" });
         const MathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );
@@ -338,6 +363,10 @@ describe("MatrixMasterHarness - Gas Growth Tests (Multiplication)", function () 
 
         harness = (await Factory.deploy()) as unknown as MatrixMasterHarness;
         await harness.waitForDeployment();
+    });
+
+    after(async function () {
+        await resultWriter.flush();
     });
 
     // ------------------------------------------------------------
@@ -389,6 +418,12 @@ describe("MatrixMasterHarness - Gas Growth Tests (Multiplication)", function () 
                             avgRelError: "-",
                             residual: "-",
                         });
+                        recordMatrixCase({
+                            benchmark: "dense matrix-matrix gas growth",
+                            operation: "matrix-matrix multiplication",
+                            input: { n, case: caseNo, pattern: "dense_random_keccak" },
+                            failureKind: "revert",
+                        });
                         return;
                     }
 
@@ -424,6 +459,16 @@ describe("MatrixMasterHarness - Gas Growth Tests (Multiplication)", function () 
                         maxRelError: formatRelativeScaled(maxRelErrorScaled),
                         avgRelError: formatRelativeScaled(avgRelErrorScaled),
                         residual: formatScaledInt(residual),
+                    });
+                    recordMatrixCase({
+                        benchmark: "dense matrix-matrix gas growth",
+                        operation: "matrix-matrix multiplication",
+                        input: { n, case: caseNo, pattern: "dense_random_keccak" },
+                        gas: toGasBigInt(gas),
+                        metrics: {
+                            maxAbsError: maxAbsError.toString(), avgAbsError: avgAbsError.toString(),
+                            maxRelErrorScaled: maxRelErrorScaled.toString(), avgRelErrorScaled: avgRelErrorScaled.toString(), residual: residual.toString(),
+                        },
                     });
 
                     expect(actualScaled12.length).to.equal(expectedScaled12.length);
@@ -520,6 +565,16 @@ describe("MatrixMasterHarness - Gas Growth Tests (Multiplication)", function () 
                             avgRelError: formatRelativeScaled(avgRelErrorScaled),
                             residual: formatScaledInt(residual),
                         });
+                        recordMatrixCase({
+                            benchmark: "sparse matrix-vector gas growth",
+                            operation: "sparse matrix-vector multiplication",
+                            input: { n, bandwidth, nnz: sparse.colInd.length, case: caseNo },
+                            gas: toGasBigInt(gas),
+                            metrics: {
+                                maxAbsError: maxAbsError.toString(), avgAbsError: avgAbsError.toString(),
+                                maxRelErrorScaled: maxRelErrorScaled.toString(), avgRelErrorScaled: avgRelErrorScaled.toString(), residual: residual.toString(),
+                            },
+                        });
 
                         expect(actualScaled12.length).to.equal(expectedScaled12.length);
                         expect(toGasBigInt(gas) > 0n).to.equal(true);
@@ -527,6 +582,13 @@ describe("MatrixMasterHarness - Gas Growth Tests (Multiplication)", function () 
                         } catch (error) {
                             if (!isFeasibilityCase) throw error;
                             const kind = countExecutionFailure(failures, error);
+                            recordMatrixCase({
+                                benchmark: "sparse matrix-vector feasibility boundary",
+                                operation: "sparse matrix-vector multiplication",
+                                input: { n, bandwidth, case: caseNo },
+                                failureKind: kind,
+                                metrics: { error: error instanceof Error ? error.message : String(error) },
+                            });
                             console.log(
                                 `Feasibility case | sparse matvec n=${n}, bw=${bandwidth}, case=${caseNo} | status=${kind}`,
                             );
@@ -608,6 +670,12 @@ describe("MatrixMasterHarness - Gas Growth Tests (Multiplication)", function () 
                             avgRelError: "-",
                             residual: "-",
                         });
+                        recordMatrixCase({
+                            benchmark: "dense matrix-vector gas growth",
+                            operation: "dense matrix-vector multiplication",
+                            input: { n, case: caseNo, pattern: "dense_random_keccak" },
+                            failureKind: "revert",
+                        });
                         return;
                     }
 
@@ -645,6 +713,16 @@ describe("MatrixMasterHarness - Gas Growth Tests (Multiplication)", function () 
                         maxRelError: formatRelativeScaled(maxRelErrorScaled),
                         avgRelError: formatRelativeScaled(avgRelErrorScaled),
                         residual: formatScaledInt(residual),
+                    });
+                    recordMatrixCase({
+                        benchmark: "dense matrix-vector gas growth",
+                        operation: "dense matrix-vector multiplication",
+                        input: { n, case: caseNo, pattern: "dense_random_keccak" },
+                        gas: toGasBigInt(gas),
+                        metrics: {
+                            maxAbsError: maxAbsError.toString(), avgAbsError: avgAbsError.toString(),
+                            maxRelErrorScaled: maxRelErrorScaled.toString(), avgRelErrorScaled: avgRelErrorScaled.toString(), residual: residual.toString(),
+                        },
                     });
 
                     expect(actualScaled12.length).to.equal(expectedScaled12.length);

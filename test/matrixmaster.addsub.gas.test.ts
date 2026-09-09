@@ -10,7 +10,9 @@ import {
     printBlockRegular,
     printExecutionFeasibilitySummary,
     touchGas,
+    HARNESS_ESTIMATE_CALL,
 } from "./test-utils";
+import { BenchmarkResultWriter, benchmarkExecutionRecord } from "./benchmark-results";
 
 // ------------------------------------------------------------
 // Types
@@ -360,8 +362,10 @@ function buildPairCases(
 describe("MatrixMasterHarness - Gas and Accuracy Tests (Add/Sub)", function () {
     let harness: MatrixMasterHarness;
     let t = 0;
+    let resultWriter: BenchmarkResultWriter;
 
     before(async function () {
+        resultWriter = await BenchmarkResultWriter.create({ suite: "matrixmaster.addsub.harness" });
         const MathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );
@@ -376,6 +380,10 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Add/Sub)", function () {
 
         harness = (await Factory.deploy()) as unknown as MatrixMasterHarness;
         await harness.waitForDeployment();
+    });
+
+    after(async function () {
+        await resultWriter.flush();
     });
 
     describe("Section 1: Matrix Add/Sub", function () {
@@ -469,6 +477,20 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Add/Sub)", function () {
                         avgRelError: formatRelativeScaled(avgRelErrorScaled),
                     });
 
+                    resultWriter.record({
+                        benchmark: "matrix add/sub gas and accuracy",
+                        category: "matrix operations",
+                        operation: "matrix addition",
+                        execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+                        input: { n: c.n, patternA: c.patternA, patternB: c.patternB, caseId: c.caseId },
+                        gas: toGasBigInt(gas).toString(),
+                        status: "success",
+                        errorMetrics: {
+                            maxAbsError: maxAbsError.toString(), avgAbsError: avgAbsError.toString(),
+                            maxRelErrorScaled: maxRelErrorScaled.toString(), avgRelErrorScaled: avgRelErrorScaled.toString(),
+                        },
+                    });
+
                     expect(actualScaled12.length).to.equal(expectedScaled12.length);
                     expect(toGasBigInt(gas) > 0n).to.equal(true);
                 } else {
@@ -514,6 +536,21 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Add/Sub)", function () {
                         avgRelError: formatRelativeScaled(avgRelErrorScaled),
                     });
 
+                    resultWriter.record({
+                        benchmark: "matrix add/sub gas and accuracy",
+                        category: "matrix operations",
+                        operation: "matrix subtraction",
+                        execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+                        input: { n: c.n, patternA: c.patternA, patternB: c.patternB, caseId: c.caseId },
+                        gas: toGasBigInt(gas).toString(),
+                        status: "success",
+                        errorMetrics: {
+                            maxAbsError: maxAbsError.toString(), avgAbsError: avgAbsError.toString(),
+                            maxRelErrorScaled: maxRelErrorScaled.toString(), avgRelErrorScaled: avgRelErrorScaled.toString(),
+                            residual: residual.toString(),
+                        },
+                    });
+
                     expect(actualScaled12.length).to.equal(expectedScaled12.length);
                     expect(toGasBigInt(gas) > 0n).to.equal(true);
                 }
@@ -522,6 +559,16 @@ describe("MatrixMasterHarness - Gas and Accuracy Tests (Add/Sub)", function () {
                 } catch (error) {
                     if (!isFeasibilityCase) throw error;
                     const kind = countExecutionFailure(failures, error);
+                    resultWriter.record({
+                        benchmark: "matrix add/sub feasibility boundary",
+                        category: "matrix operations",
+                        operation: "matrix subtraction",
+                        execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+                        input: { n: c.n, patternA: c.patternA, patternB: c.patternB, caseId: c.caseId },
+                        status: "failure",
+                        failureKind: kind,
+                        errorMetrics: { error: error instanceof Error ? error.message : String(error) },
+                    });
                     console.log(`Feasibility case | matrix subtraction n=92 | status=${kind}`);
                 }
 

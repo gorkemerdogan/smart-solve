@@ -10,6 +10,7 @@ import {
     printBlockRegular,
 } from "./test-utils";
 import { printPrecisionMetadata } from "./precision-utils";
+import { BenchmarkResultWriter, benchmarkExecutionRecord } from "./benchmark-results";
 
 // ------------------------------------------------------------
 // Types
@@ -387,6 +388,7 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
 
     let harness: ODESolverHarness;
     let target: string;
+    let resultWriter: BenchmarkResultWriter;
 
     let selConst5: string;
     let selLinear: string;
@@ -415,6 +417,7 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
     const qFrac = async (num: number | bigint, den: number | bigint) => await harness.qFromFrac(num, den);
 
     before(async () => {
+        resultWriter = await BenchmarkResultWriter.create({ suite: "ode-solver.harness" });
         printPrecisionMetadata({
             classification: "method-reference comparison",
             comparisonScale: "1e12 Solidity toFloat output",
@@ -447,6 +450,10 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
 
         SCALE = oneScaled;
         SCALE_DECIMALS = inferScaleDecimals(oneScaled);
+    });
+
+    after(async () => {
+        await resultWriter.flush();
     });
 
     it("evaluates bounded ODE accuracy at paired step refinements", async function () {
@@ -532,6 +539,27 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                     for (const method of METHODS) {
                         statsByMethod.get(method.label)!.skipped += 1;
                         overallStatsByMethod.get(method.label)!.skipped += 1;
+                        resultWriter.record({
+                            benchmark: benchmark.label,
+                            category: "ODE solving",
+                            operation: method.label,
+                            execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+                            input: {
+                                case: tc.caseNo,
+                                y0: tc.y0,
+                                step: tc.hLabel,
+                                stepCount: tc.steps,
+                                xFinal: tc.xFinal,
+                            },
+                            callback: {
+                                model: "target_staticcall",
+                                functionEvaluations: (method.functionEvaluationsPerStep * BigInt(tc.steps)).toString(),
+                                detail: "derivative target (planned)",
+                                gasIncludesCallback: true,
+                            },
+                            status: "skipped",
+                            errorMetrics: { reason: "exponential benchmark skipped for x_final > 15" },
+                        });
                     }
 
                     console.log("------------------------------------------------------------");
@@ -602,6 +630,33 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                             passed
                         );
 
+                        resultWriter.record({
+                            benchmark: benchmark.label,
+                            category: "ODE solving",
+                            operation: method.label,
+                            execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+                            input: {
+                                case: tc.caseNo,
+                                y0: tc.y0,
+                                step: tc.hLabel,
+                                stepCount: tc.steps,
+                                xFinal: tc.xFinal,
+                            },
+                            callback: {
+                                model: "target_staticcall",
+                                functionEvaluations: callbackEvaluations.toString(),
+                                detail: "derivative target",
+                                gasIncludesCallback: true,
+                            },
+                            gas: run.estimatedGas.toString(),
+                            status: passed ? "success" : "failure",
+                            errorMetrics: {
+                                absoluteErrorScaled: absErr.toString(),
+                                relativeErrorScaled: relErrScaled.toString(),
+                                toleranceScaled: tolerance.toString(),
+                            },
+                        });
+
                         printBlockRegular({
                             t: `${benchmark.key}-${tc.caseNo}`,
                             method: method.label,
@@ -646,6 +701,29 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                             statsByMethod.get(method.label)!.otherFailures += 1;
                             overallStatsByMethod.get(method.label)!.otherFailures += 1;
                         }
+
+                        resultWriter.record({
+                            benchmark: benchmark.label,
+                            category: "ODE solving",
+                            operation: method.label,
+                            execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+                            input: {
+                                case: tc.caseNo,
+                                y0: tc.y0,
+                                step: tc.hLabel,
+                                stepCount: tc.steps,
+                                xFinal: tc.xFinal,
+                            },
+                            callback: {
+                                model: "target_staticcall",
+                                functionEvaluations: (method.functionEvaluationsPerStep * BigInt(tc.steps)).toString(),
+                                detail: "derivative target (planned)",
+                                gasIncludesCallback: true,
+                            },
+                            status: "failure",
+                            failureKind,
+                            errorMetrics: { error: message },
+                        });
 
                         printBlockRegular({
                             t: `${benchmark.key}-${tc.caseNo}`,
@@ -821,6 +899,21 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                         steps
                     );
                     successful++;
+                    resultWriter.record({
+                        benchmark: "ODE iteration-count feasibility",
+                        category: "ODE solving",
+                        operation: method.label,
+                        execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+                        input: { stepCount: steps, step: "0.1" },
+                        callback: {
+                            model: "target_staticcall",
+                            functionEvaluations: (method.functionEvaluationsPerStep * BigInt(steps)).toString(),
+                            detail: "derivative target",
+                            gasIncludesCallback: true,
+                        },
+                        gas: run.estimatedGas.toString(),
+                        status: "success",
+                    });
                     console.log(
                         `ODE FEASIBILITY | method=${method.label} | steps=${steps} | status=success | ` +
                         `estimatedGas=${run.estimatedGas} | callback=${formatCallbackBenchmark({
@@ -833,6 +926,22 @@ describe("ODESolver Library - 1e12/JS-Number Method-Reference Accuracy", functio
                     if (kind === "revert") reverted++;
                     else if (kind === "out-of-gas") outOfGas++;
                     else otherFailures++;
+                    resultWriter.record({
+                        benchmark: "ODE iteration-count feasibility",
+                        category: "ODE solving",
+                        operation: method.label,
+                        execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+                        input: { stepCount: steps, step: "0.1" },
+                        callback: {
+                            model: "target_staticcall",
+                            functionEvaluations: (method.functionEvaluationsPerStep * BigInt(steps)).toString(),
+                            detail: "derivative target (planned)",
+                            gasIncludesCallback: true,
+                        },
+                        status: "failure",
+                        failureKind: kind,
+                        errorMetrics: { error: errorToString(error) },
+                    });
                     console.log(
                         `ODE FEASIBILITY | method=${method.label} | steps=${steps} | status=${kind} | ` +
                         `callback=${formatCallbackBenchmark({

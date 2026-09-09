@@ -11,6 +11,7 @@
     "test:heavy": "RUN_HEAVY_SCALABILITY=1 hardhat test test/linear-solvers.gen.test.ts",
     "test:heavy:matrix": "RUN_HEAVY_MATRIX_SCALABILITY=1 hardhat test test/matrixmaster.addsub.gas.test.ts test/matrixmaster.adv.gas.test.ts test/matrixmaster.mul.gas.test.ts",
     "benchmark:export:representative": "EXPORT_BENCHMARK_RESULTS=1 hardhat test test/rootfinding.diamond.test.ts test/numeric-facets.diamond.test.ts test/mathlib-link-overhead.bench.test.ts",
+    "benchmark:export:harness:full": "EXPORT_BENCHMARK_RESULTS=1 hardhat test test/integration.gen.test.ts test/ode-solver.gen.test.ts test/rootfinding.gen.test.ts test/matrixmaster.addsub.gas.test.ts",
     "deploy": "hardhat run scripts/deploy.ts",
     "deploy:local": "hardhat run scripts/deploy-and-verify.ts",
     "verify:deployment": "hardhat run scripts/verify-deployment.ts",

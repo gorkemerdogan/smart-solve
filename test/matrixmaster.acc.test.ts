@@ -4,6 +4,7 @@ import { ethers } from "hardhat";
 import type { Contract } from "ethers";
 import { formatBenchmarkExecution, HARNESS_ESTIMATE_CALL } from "./test-utils";
 import { printPrecisionMetadata } from "./precision-utils";
+import { BenchmarkResultWriter, benchmarkExecutionRecord } from "./benchmark-results";
 
 // ------------------------------------------------------------
 // Types
@@ -540,8 +541,10 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
     let harness: MatrixMasterHarness;
     let TOL_1E_18: string;
     let SEED: string;
+    let resultWriter: BenchmarkResultWriter;
 
     before(async () => {
+        resultWriter = await BenchmarkResultWriter.create({ suite: "matrixmaster.accuracy.harness" });
         console.log(`Execution Model      : ${formatBenchmarkExecution(HARNESS_ESTIMATE_CALL)}`);
         printPrecisionMetadata({
             classification: "JavaScript-number-limited comparison",
@@ -571,6 +574,10 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
         const oneScaled = asBigInt(await harness.toFloat(await harness.qFromInt(1)));
         SCALE = oneScaled;
         SCALE_DECIMALS = inferScaleDecimals(oneScaled);
+    });
+
+    after(async () => {
+        await resultWriter.flush();
     });
 
     // ---------------------------------------------------------------------------
@@ -785,6 +792,21 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
         const avgGas = gasSum / BigInt(TEST_COUNT);
 
         results.push({ n, avgAbsError, avgRelError, avgGas, failedCases });
+        resultWriter.record({
+            benchmark: "diagonal-dominant determinant accuracy",
+            category: "matrix operations",
+            operation: "determinant",
+            execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+            input: { n, tests: TEST_COUNT, pattern: "diagonal-dominant" },
+            gas: avgGas.toString(),
+            status: failedCases === 0 ? "success" : "failure",
+            errorMetrics: {
+                averageAbsoluteError: avgAbsError,
+                averageRelativeError: avgRelError,
+                numericalFailures: failedCases,
+                relativeTolerance: REL_TOL_DET,
+            },
+        });
 
         console.log(`Average for n=${n}`);
         console.log(`  avg abs error = ${avgAbsError}`);

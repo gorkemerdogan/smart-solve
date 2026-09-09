@@ -8,10 +8,12 @@ import {
     type ExecutionFailureKind,
 } from "./test-utils";
 import { binary128ToScaledInt, printPrecisionMetadata } from "./precision-utils";
+import { BenchmarkResultWriter, benchmarkExecutionRecord } from "./benchmark-results";
 
 describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests)", function () {
     let harness: any;
     let mathLib: any;
+    let resultWriter: BenchmarkResultWriter;
 
     /**
      * Decimal reporting scale applied after directly decoding bytes16.
@@ -99,6 +101,7 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
     }[] = [];
 
     before(async function () {
+        resultWriter = await BenchmarkResultWriter.create({ suite: "differentiation.harness" });
         const MathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );
@@ -113,6 +116,10 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
 
         harness = await HarnessFactory.deploy();
         await harness.waitForDeployment();
+    });
+
+    after(async function () {
+        await resultWriter.flush();
     });
 
     async function qFromInt(x: number) {
@@ -354,6 +361,27 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
                 kind,
                 reason,
             });
+            resultWriter.record({
+                benchmark: "binary128-aware differentiation accuracy",
+                category: "differentiation",
+                operation: params.methodName,
+                execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+                input: {
+                    function: params.functionDisplayName,
+                    x: params.x,
+                    hNumerator: params.hNum,
+                    hDenominator: params.hDen,
+                },
+                callback: {
+                    model: "target_staticcall",
+                    functionEvaluations: params.functionEvaluations.toString(),
+                    detail: "target function",
+                    gasIncludesCallback: true,
+                },
+                status: "failure",
+                failureKind: kind,
+                errorMetrics: { error: reason },
+            });
             expect.fail(
                 `${params.methodName} ${kind} for ${params.functionDisplayName} at ` +
                 `x=${params.x}, h=${params.hNum}/${params.hDen}: ${reason}`
@@ -393,6 +421,32 @@ describe("DifferentiationHarness - Binary128-Aware Method-Error Tests (324 tests
         };
 
         allResults.push(result);
+        resultWriter.record({
+            benchmark: "binary128-aware differentiation accuracy",
+            category: "differentiation",
+            operation: result.method,
+            execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+            input: {
+                function: result.functionName,
+                x: result.x,
+                hNumerator: result.hNum,
+                hDenominator: result.hDen,
+            },
+            callback: {
+                model: "target_staticcall",
+                functionEvaluations: result.functionEvaluations.toString(),
+                detail: "target function",
+                gasIncludesCallback: true,
+            },
+            gas: result.estimatedGas.toString(),
+            status: result.passed ? "success" : "failure",
+            errorMetrics: {
+                absoluteErrorScaled: result.absoluteErrorScaled.toString(),
+                relativeErrorScaled: result.relativeErrorScaled.toString(),
+                toleranceScaled: result.toleranceScaled.toString(),
+                toleranceUsageScaled: result.toleranceUsageScaled.toString(),
+            },
+        });
         printCaseResult(result);
 
         expect(

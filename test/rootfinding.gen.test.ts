@@ -12,6 +12,7 @@ import {
     decimalStringToScaledInt,
     printPrecisionMetadata,
 } from "./precision-utils";
+import { BenchmarkResultWriter, benchmarkExecutionRecord } from "./benchmark-results";
 
 // ------------------------------------------------------------
 // Types
@@ -290,6 +291,7 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
     this.timeout(0); // Infinity minutes
     let harness: RootFindingHarness;
     let target: string;
+    let resultWriter: BenchmarkResultWriter;
 
     let TOL_1E_30: string;
 
@@ -307,7 +309,54 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
         return decimalStringToScaledInt(value, Number(SCALE_DECIMALS));
     }
 
+    function exportRootRecord(args: {
+        benchmark: string;
+        caseNo: number;
+        method: MethodName;
+        initialization: string;
+        maxIter: bigint;
+        converged: boolean;
+        iterations: bigint;
+        gas: bigint;
+        rootScaled: bigint;
+        expectedRootScaled: bigint;
+        residualScaled: bigint;
+    }): void {
+        const absError = scaledAbsError(args.rootScaled, args.expectedRootScaled);
+        resultWriter.record({
+            benchmark: args.benchmark,
+            category: "root-finding",
+            operation: args.method,
+            execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+            input: {
+                case: args.caseNo,
+                initialization: args.initialization,
+                tolerance: "1e-30",
+                iterationCap: args.maxIter.toString(),
+            },
+            callback: {
+                model: "target_staticcall",
+                functionEvaluations: rootFindingFunctionEvaluations(args.method, args.iterations).toString(),
+                detail: rootFindingCallbackDetail(args.method),
+                gasIncludesCallback: true,
+            },
+            gas: args.gas.toString(),
+            status: args.converged && absError <= ROOT_ERROR_TOL_SCALED ? "success" : "failure",
+            errorMetrics: {
+                absoluteErrorScaled: absError.toString(),
+                relativeErrorScaled: scaledRelError(args.rootScaled, args.expectedRootScaled).toString(),
+                residualScaled: args.residualScaled.toString(),
+                thresholdScaled: ROOT_ERROR_TOL_SCALED.toString(),
+            },
+            convergence: {
+                converged: args.converged,
+                iterations: args.iterations.toString(),
+            },
+        });
+    }
+
     before(async () => {
+        resultWriter = await BenchmarkResultWriter.create({ suite: "rootfinding.harness" });
         const MathLibFactory = await ethers.getContractFactory(
             "contracts/libraries/MathLib.sol:MathLib"
         );
@@ -332,6 +381,10 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
         selDfQuartic = harness.interface.getFunction("df_quartic")!.selector;
 
         TOL_1E_30 = await qFrac(1n, 10n ** 30n);
+    });
+
+    after(async () => {
+        await resultWriter.flush();
     });
 
     async function runBenchmark(cfg: BenchmarkConfig) {
@@ -402,6 +455,19 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
                     residualScaled,
                     functionEvaluations: rootFindingFunctionEvaluations("Bisection", iterations),
                 });
+                exportRootRecord({
+                    benchmark: cfg.name,
+                    caseNo: i,
+                    method: "Bisection",
+                    initialization: `a=${formatScaledInt(aScaled)}, b=${formatScaledInt(bScaled)}`,
+                    maxIter: cfg.maxIterBisection,
+                    converged,
+                    iterations,
+                    gas: asBigInt(gas),
+                    rootScaled,
+                    expectedRootScaled: cfg.expectedRootScaled,
+                    residualScaled,
+                });
             }
 
             // --------------------------------------------------------
@@ -468,6 +534,19 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
                     residualScaled,
                     functionEvaluations: rootFindingFunctionEvaluations("Newton", iterations),
                 });
+                exportRootRecord({
+                    benchmark: cfg.name,
+                    caseNo: i,
+                    method: "Newton",
+                    initialization: `x0=${formatScaledInt(x0Scaled)}`,
+                    maxIter: cfg.maxIterNewton,
+                    converged,
+                    iterations,
+                    gas: asBigInt(gas),
+                    rootScaled,
+                    expectedRootScaled: cfg.expectedRootScaled,
+                    residualScaled,
+                });
             }
 
             // --------------------------------------------------------
@@ -525,6 +604,19 @@ describe("RootFinding Library/Harness - Binary128-Aware Accuracy & Gas", functio
                     expectedRootScaled: cfg.expectedRootScaled,
                     residualScaled,
                     functionEvaluations: rootFindingFunctionEvaluations("Secant", iterations),
+                });
+                exportRootRecord({
+                    benchmark: cfg.name,
+                    caseNo: i,
+                    method: "Secant",
+                    initialization: `x0=${formatScaledInt(x0Scaled)}, x1=${formatScaledInt(x1Scaled)}`,
+                    maxIter: cfg.maxIterSecant,
+                    converged,
+                    iterations,
+                    gas: asBigInt(gas),
+                    rootScaled,
+                    expectedRootScaled: cfg.expectedRootScaled,
+                    residualScaled,
                 });
             }
         }
