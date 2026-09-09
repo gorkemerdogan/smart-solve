@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import {
   BenchmarkResultWriter,
   benchmarkExecutionRecord,
+  collectBenchmarkRunMetadata,
   type BenchmarkRunMetadata,
 } from "./benchmark-results";
 import { HARNESS_ESTIMATE_CALL } from "./test-utils";
@@ -135,5 +136,31 @@ describe("benchmark result writer", function () {
         failureKind: "out-of-gas",
       },
     ]);
+  });
+
+  it("collects self-describing, serializable reproducibility metadata", async function () {
+    const metadata = await collectBenchmarkRunMetadata("metadata-test-suite");
+
+    expect(metadata.project).to.include({
+      packageName: "smart-solve",
+      packageVersion: "1.0.0",
+    });
+    expect(metadata.project?.lockfile).to.deep.include({ file: "package-lock.json" });
+    expect(metadata.project?.lockfile?.sha256).to.match(/^[0-9a-f]{64}$/);
+    expect(metadata.toolchain?.hardhatVersion).to.be.a("string");
+    expect(metadata.toolchain?.ethersVersion).to.be.a("string");
+    expect(metadata.toolchain?.typescriptVersion).to.be.a("string");
+    expect(metadata.toolchain?.platform).to.be.a("string");
+    expect(metadata.toolchain?.architecture).to.be.a("string");
+    expect(metadata.invocation?.suiteLabel).to.equal("metadata-test-suite");
+    expect(metadata.invocation?.environment).to.have.all.keys(
+      "EXPORT_BENCHMARK_RESULTS",
+      "RUN_HEAVY_SCALABILITY",
+      "RUN_HEAVY_MATRIX_SCALABILITY",
+    );
+    expect(metadata.solidity).to.include({ version: "0.8.28", evmVersion: "paris" });
+    expect(metadata.network).to.deep.include({ name: "hardhat", chainId: "31337" });
+    expect(metadata.blockGasLimit).to.equal("30000000");
+    expect(() => JSON.stringify(metadata)).not.to.throw();
   });
 });

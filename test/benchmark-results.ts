@@ -1,7 +1,10 @@
 import { artifacts, ethers, network } from "hardhat";
 import { execFileSync } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { release as osRelease } from "node:os";
 import { join } from "node:path";
+import packageJson from "../package.json";
 import type { BenchmarkExecutionMetadata, ExecutionFailureKind } from "./test-utils";
 
 type JsonPrimitive = string | number | boolean | null;
@@ -38,8 +41,30 @@ export type BenchmarkResultRecord = {
 export type BenchmarkRunMetadata = {
   timestamp: string;
   git: { commit?: string; branch?: string; dirty?: boolean };
+  project?: {
+    packageName: string;
+    packageVersion: string;
+    lockfile?: { file: string; sha256: string };
+  };
   nodeVersion: string;
   hardhatVersion?: string;
+  toolchain?: {
+    hardhatVersion?: string;
+    ethersVersion?: string;
+    typescriptVersion?: string;
+    platform: string;
+    architecture: string;
+    osRelease: string;
+  };
+  invocation?: {
+    suiteLabel: string;
+    command?: string;
+    environment: {
+      EXPORT_BENCHMARK_RESULTS: string | null;
+      RUN_HEAVY_SCALABILITY: string | null;
+      RUN_HEAVY_MATRIX_SCALABILITY: string | null;
+    };
+  };
   solidity?: {
     version: string;
     longVersion: string;
@@ -85,6 +110,24 @@ function hardhatVersion(): string | undefined {
   }
 }
 
+function typescriptVersion(): string | undefined {
+  try {
+    return require("typescript").version as string;
+  } catch {
+    return undefined;
+  }
+}
+
+async function lockfileMetadata(): Promise<{ file: string; sha256: string } | undefined> {
+  const file = "package-lock.json";
+  try {
+    const contents = await readFile(file);
+    return { file, sha256: createHash("sha256").update(contents).digest("hex") };
+  } catch {
+    return undefined;
+  }
+}
+
 function fileSafe(value: string): string {
   return value.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase();
 }
@@ -101,12 +144,14 @@ export function benchmarkExecutionRecord(metadata: BenchmarkExecutionMetadata): 
   };
 }
 
-export async function collectBenchmarkRunMetadata(): Promise<BenchmarkRunMetadata> {
-  const [chain, latestBlock] = await Promise.all([
+export async function collectBenchmarkRunMetadata(suiteLabel = "unspecified"): Promise<BenchmarkRunMetadata> {
+  const [chain, latestBlock, lockfile] = await Promise.all([
     ethers.provider.getNetwork(),
     ethers.provider.getBlock("latest"),
+    lockfileMetadata(),
   ]);
   const buildInfo = await artifacts.getBuildInfo("contracts/SmartSolve.sol:SmartSolve");
+  const hardhat = hardhatVersion();
 
   return {
     timestamp: new Date().toISOString(),
@@ -115,8 +160,30 @@ export async function collectBenchmarkRunMetadata(): Promise<BenchmarkRunMetadat
       branch: gitValue(["branch", "--show-current"]),
       dirty: gitValue(["status", "--porcelain"]) !== undefined,
     },
+    project: {
+      packageName: packageJson.name,
+      packageVersion: packageJson.version,
+      ...(lockfile ? { lockfile } : {}),
+    },
     nodeVersion: process.version,
-    hardhatVersion: hardhatVersion(),
+    hardhatVersion: hardhat,
+    toolchain: {
+      hardhatVersion: hardhat,
+      ethersVersion: ethers.version,
+      typescriptVersion: typescriptVersion(),
+      platform: process.platform,
+      architecture: process.arch,
+      osRelease: osRelease(),
+    },
+    invocation: {
+      suiteLabel,
+      command: process.env.BENCHMARK_COMMAND ?? process.argv.join(" "),
+      environment: {
+        EXPORT_BENCHMARK_RESULTS: process.env.EXPORT_BENCHMARK_RESULTS ?? null,
+        RUN_HEAVY_SCALABILITY: process.env.RUN_HEAVY_SCALABILITY ?? null,
+        RUN_HEAVY_MATRIX_SCALABILITY: process.env.RUN_HEAVY_MATRIX_SCALABILITY ?? null,
+      },
+    },
     ...(buildInfo ? {
       solidity: {
         version: buildInfo.solcVersion,
@@ -156,7 +223,7 @@ export class BenchmarkResultWriter {
       nodeVersion: process.version,
     };
     const runMetadata = options.runMetadata ?? (enabled
-      ? await collectBenchmarkRunMetadata()
+      ? await collectBenchmarkRunMetadata(options.suite)
       : fallbackMetadata);
 
     return new BenchmarkResultWriter({
