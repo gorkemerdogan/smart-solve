@@ -7,6 +7,7 @@ import {
   formatCallbackBenchmark,
   formatBenchmarkExecution,
 } from "./test-utils";
+import { BenchmarkResultWriter, benchmarkExecutionRecord } from "./benchmark-results";
 
 /**
  * Production-path benchmark: calls enter SmartSolve through its fallback,
@@ -15,6 +16,18 @@ import {
  * callback target and quadruple-precision value converter.
  */
 describe("SmartSolve Diamond RootFinding production-path benchmark", function () {
+  let resultWriter: BenchmarkResultWriter;
+
+  before(async function () {
+    resultWriter = await BenchmarkResultWriter.create({
+      suite: "rootfinding.diamond",
+    });
+  });
+
+  after(async function () {
+    await resultWriter.flush();
+  });
+
   it("measures bisection through the fully deployed Diamond", async function () {
     const deployment = await deployFullSmartSolve();
 
@@ -70,5 +83,31 @@ describe("SmartSolve Diamond RootFinding production-path benchmark", function ()
     expect(result.converged).to.equal(true);
     expect(rootScaled >= 1_999_999_000_000_000_000n).to.equal(true);
     expect(rootScaled <= 2_000_001_000_000_000_000n).to.equal(true);
+
+    resultWriter.record({
+      benchmark: "bisection x^2 - 4 on [1, 4]",
+      category: "root-finding",
+      operation: "rootFindingBisection",
+      execution: benchmarkExecutionRecord(DIAMOND_ESTIMATE_CALL),
+      callback: {
+        model: "target_staticcall",
+        functionEvaluations: (2n + result.iterations).toString(),
+        detail: "f target",
+        gasIncludesCallback: true,
+      },
+      input: {
+        intervalStart: 1,
+        intervalEnd: 4,
+        tolerance: "1e-12",
+        iterationCap: 100,
+      },
+      gas: gas.toString(),
+      status: "success",
+      errorMetrics: { rootScaled: rootScaled.toString() },
+      convergence: {
+        converged: result.converged,
+        iterations: result.iterations.toString(),
+      },
+    });
   });
 });

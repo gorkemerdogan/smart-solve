@@ -11,6 +11,11 @@ import {
   formatCallbackBenchmark,
   formatBenchmarkExecution,
 } from "./test-utils";
+import {
+  BenchmarkResultWriter,
+  benchmarkExecutionRecord,
+  type JsonValue,
+} from "./benchmark-results";
 
 type FacetWithInterface = { interface: Interface };
 
@@ -32,6 +37,7 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
   let scalarCallback: any;
   let odeCallback: any;
   let objective: any;
+  let resultWriter: BenchmarkResultWriter;
 
   async function assertRouted(
     facet: FacetWithInterface,
@@ -42,7 +48,14 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     expect(await loupe.facetAddress(selector)).to.equal(deployment.facetAddresses[facetName]);
   }
 
-  function report(category: string, method: string, gas: bigint, callbackStaticCalls?: bigint): void {
+  function report(
+    category: string,
+    method: string,
+    gas: bigint,
+    callbackStaticCalls?: bigint,
+    input?: Record<string, JsonValue>,
+    convergence?: Record<string, JsonValue>,
+  ): void {
     console.log(
       `Diamond-routed production-path gas estimate | ${category} | ${method}: ${gas} | ` +
       `execution=${formatBenchmarkExecution(DIAMOND_ESTIMATE_CALL)}` +
@@ -50,9 +63,29 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
         ? ""
         : ` | callback=${formatCallbackBenchmark({ staticCalls: callbackStaticCalls })}`)
     );
+    resultWriter.record({
+      benchmark: method,
+      category,
+      operation: method,
+      execution: benchmarkExecutionRecord(DIAMOND_ESTIMATE_CALL),
+      ...(input ? { input } : {}),
+      ...(callbackStaticCalls === undefined ? {} : {
+        callback: {
+          model: "target_staticcall",
+          functionEvaluations: callbackStaticCalls.toString(),
+          gasIncludesCallback: true,
+        },
+      }),
+      gas: gas.toString(),
+      status: "success",
+      ...(convergence ? { convergence } : {}),
+    });
   }
 
   before(async function () {
+    resultWriter = await BenchmarkResultWriter.create({
+      suite: "numeric-facets.diamond",
+    });
     deployment = await deployFullSmartSolve();
     loupe = await ethers.getContractAt("IDiamondLoupe", deployment.diamondAddress);
     integration = await ethers.getContractAt("IntegrationFacet", deployment.diamondAddress);
@@ -82,6 +115,10 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     await objective.waitForDeployment();
   });
 
+  after(async function () {
+    await resultWriter.flush();
+  });
+
   it("benchmarks integration through the Diamond", async function () {
     await assertRouted(integration, "integrateSimpson13WithN", "IntegrationFacet");
     const selector = scalarCallback.interface.getFunction("f_x2_minus_4")!.selector;
@@ -92,8 +129,8 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const gas = await integration.getFunction("integrateSimpson13WithN").estimateGas(...args);
     const value = await integration.integrateSimpson13WithN(...args);
 
-    report("integration", "Simpson 1/3, n=2", gas, 3n);
     expect(BigInt(await scalarCallback.toFloat(value))).to.be.lessThan(0n);
+    report("integration", "Simpson 1/3, n=2", gas, 3n, { subintervals: 2 });
   });
 
   it("benchmarks differentiation through the Diamond", async function () {
@@ -107,9 +144,9 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const derivative = await differentiation.centeredDiff(...args);
     const scaled = BigInt(await scalarCallback.toFloat(derivative));
 
-    report("differentiation", "centered difference", gas, 2n);
     expect(scaled >= 3_999_999_000_000_000_000n).to.equal(true);
     expect(scaled <= 4_000_001_000_000_000_000n).to.equal(true);
+    report("differentiation", "centered difference", gas, 2n, { step: "0.01" });
   });
 
   it("benchmarks ODE solving through the Diamond", async function () {
@@ -122,8 +159,8 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const gas = await ode.getFunction("eulerIter").estimateGas(...args);
     const yFinal = await ode.eulerIter(...args);
 
-    report("ODE solving", "Euler, 3 steps", gas, 3n);
     expect(BigInt(await scalarCallback.toFloat(yFinal))).to.equal(15_000_000_000_000_000_000n);
+    report("ODE solving", "Euler, 3 steps", gas, 3n, { stepCount: 3 });
   });
 
   it("benchmarks polynomial evaluation through the Diamond", async function () {
@@ -134,8 +171,8 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const gas = await polynomial.getFunction("polyEvaluate").estimateGas(coeffs, x);
     const value = await polynomial.polyEvaluate(coeffs, x);
 
-    report("polynomial", "Horner evaluation of 3x^2 + 2x + 5", gas);
     expect(BigInt(await scalarCallback.toFloat(value))).to.equal(21_000_000_000_000_000_000n);
+    report("polynomial", "Horner evaluation of 3x^2 + 2x + 5", gas, undefined, { degree: 2 });
   });
 
   it("benchmarks matrix multiplication through the Diamond", async function () {
@@ -147,10 +184,10 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const gas = await matrix.getFunction("multiplyMatrices").estimateGas(...args);
     const [rows, cols, data] = await matrix.multiplyMatrices(...args);
 
-    report("matrix operations", "2x2 matrix multiplication", gas);
     expect(rows).to.equal(2n);
     expect(cols).to.equal(2n);
     expect(BigInt(await scalarCallback.toFloat(data[3]))).to.equal(50_000_000_000_000_000_000n);
+    report("matrix operations", "2x2 matrix multiplication", gas, undefined, { rows: 2, columns: 2 });
   });
 
   it("benchmarks linear solving through the Diamond", async function () {
@@ -161,7 +198,6 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const gas = await linear.getFunction("gaussianElimination").estimateGas(2n, coefficients, rhs);
     const solution = await linear.gaussianElimination(2n, coefficients, rhs);
 
-    report("linear solvers", "2x2 Gaussian elimination", gas);
     expect(BigInt(await scalarCallback.toFloat(solution[0]))).to.equal(200_000_000_000_000_000n);
     const secondComponent = BigInt(await scalarCallback.toFloat(solution[1]));
     expect(secondComponent >= 599_999_999_000_000_000n).to.equal(true);
@@ -181,6 +217,14 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     expect(iterativeSolution).to.have.lengthOf(2);
     expect(iterations).to.equal(2n);
     expect(converged).to.equal(true);
+    report(
+      "linear solvers",
+      "2x2 Gaussian elimination",
+      gas,
+      undefined,
+      { n: 2, iterationCap: 3 },
+      { jacobiIterations: iterations.toString(), jacobiConverged: converged },
+    );
   });
 
   it("benchmarks steepest descent through the Diamond", async function () {
@@ -192,8 +236,15 @@ describe("SmartSolve Diamond numerical-facet production-path gas estimates", fun
     const gas = await optimization.getFunction("steepestDescent").estimateGas(...args);
     const result = await optimization.steepestDescent(...args);
 
-    report("steepest descent / optimization", "spherical objective, dimension 2", gas);
     expect(result.x).to.have.lengthOf(2);
     expect(result.status).to.equal(1n);
+    report(
+      "steepest descent / optimization",
+      "spherical objective, dimension 2",
+      gas,
+      undefined,
+      { dimension: 2, iterationCap: 3 },
+      { status: result.status.toString() },
+    );
   });
 });

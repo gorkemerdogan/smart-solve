@@ -2,6 +2,8 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import type { BaseContract, ContractFactory, ContractTransactionResponse } from "ethers";
+import { BenchmarkResultWriter, benchmarkExecutionRecord } from "./benchmark-results";
+import { HARNESS_ESTIMATE_CALL } from "./test-utils";
 
 const QONE = "0x3fff0000000000000000000000000000";
 const QTWO = "0x40000000000000000000000000000000";
@@ -39,9 +41,13 @@ describe("MathLib linking overhead microbenchmark", function () {
   let mathLibFactory: ContractFactory;
   let linkedFactory: ContractFactory;
   let inlinedFactory: ContractFactory;
+  let resultWriter: BenchmarkResultWriter;
   const rows: GasRow[] = [];
 
   before(async function () {
+    resultWriter = await BenchmarkResultWriter.create({
+      suite: "mathlib-link-overhead.microbenchmark",
+    });
     mathLibFactory = await ethers.getContractFactory("contracts/libraries/MathLib.sol:MathLib");
     mathLib = await mathLibFactory.deploy();
     await mathLib.waitForDeployment();
@@ -79,6 +85,18 @@ describe("MathLib linking overhead microbenchmark", function () {
 
     expect(linkedResult, `${workload}: implementations returned different values`).to.equal(inlinedResult);
     rows.push({ workload, linkedCalls, linkedGas, inlinedGas });
+    for (const [variant, gas] of [["linked", linkedGas], ["inlined", inlinedGas]] as const) {
+      resultWriter.record({
+        benchmark: workload,
+        category: "MathLib linkage microbenchmark",
+        operation: method,
+        variant,
+        execution: benchmarkExecutionRecord(HARNESS_ESTIMATE_CALL),
+        input: { linkedCalls },
+        gas: gas.toString(),
+        status: "success",
+      });
+    }
     console.log(
       `MATHLIB_MICROBENCH | workload=${workload} | linkedCalls=${linkedCalls} | ` +
       `linkedGas=${linkedGas} | inlinedGas=${inlinedGas} | delta=${linkedGas - inlinedGas} | ` +
@@ -144,5 +162,6 @@ describe("MathLib linking overhead microbenchmark", function () {
     const totalInlinedGas = rows.reduce((sum, row) => sum + row.inlinedGas, 0n);
     console.log(`Aggregate across ${rows.length} measured calls: linkedGas=${totalLinkedGas} | inlinedGas=${totalInlinedGas} | delta=${totalLinkedGas - totalInlinedGas} | linked/inlined=${formatRatio(totalLinkedGas, totalInlinedGas)}`);
     console.log("============================================================");
+    await resultWriter.flush();
   });
 });
