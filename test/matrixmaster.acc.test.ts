@@ -88,13 +88,7 @@ let SCALE_DECIMALS = 32n;
 let SCALE = 10n ** SCALE_DECIMALS;
 
 const TEST_COUNT = 20;
-const SPARSITY_LEVELS = [5, 15, 25];
-
-const DENSE_SIZES = [2, 3, 4, 5, 8];
-const SPARSE_SIZES = [4, 8, 16, 32, 64];
 const DET_SIZES = [2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24];
-const INV_SIZES = [2, 3, 4, 5, 8];
-const POWER_SIZES = [2, 3, 4, 5, 6];
 
 const TOL_EIGEN_NUM = 1e-10;
 
@@ -584,10 +578,12 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
     // Accuracy tests
     // ---------------------------------------------------------------------------
 
-    it.skip("measures average dense matrix-matrix multiplication accuracy", async function () {
+    it("checks bounded dense matrix-matrix multiplication accuracy", async function () {
+        const boundedSizes = [2, 3];
+        const casesPerSize = 3;
         const avgErrors: { n: number; avgError: number; avgGas: bigint }[] = [];
 
-        for (const n of DENSE_SIZES) {
+        for (const n of boundedSizes) {
             let errSum = 0;
             let gasSum = 0n;
 
@@ -595,7 +591,7 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
             console.log(`Dense Matrix-Matrix Multiplication Accuracy Results for n=${n}`);
             console.log("============================================================");
 
-            for (let caseId = 0; caseId < TEST_COUNT; caseId++) {
+            for (let caseId = 0; caseId < casesPerSize; caseId++) {
                 const A = denseRandomMatrix(n, caseId);
                 const B = denseRandomMatrixB(n, caseId);
 
@@ -632,14 +628,16 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
                 errSum += err;
                 gasSum += gasUsed;
 
-                console.log(`Case ${caseId + 1}/${TEST_COUNT}`);
+                expect(err, `n=${n}, case=${caseId}: dense multiplication infinity-norm error`).to.be.lessThan(1e-8);
+
+                console.log(`Case ${caseId + 1}/${casesPerSize}`);
                 console.log(`  E_inf     = ${err}`);
                 console.log(`  Gas Usage = ${gasUsed}`);
                 console.log("------------------------------------------------------------");
             }
 
-            const avgError = errSum / TEST_COUNT;
-            const avgGas = gasSum / BigInt(TEST_COUNT);
+            const avgError = errSum / casesPerSize;
+            const avgGas = gasSum / BigInt(casesPerSize);
             avgErrors.push({ n, avgError, avgGas });
 
             console.log(`Average for n=${n}`);
@@ -656,11 +654,14 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
         console.log("####################################################################");
     });
 
-    it.skip("measures average sparse matrix-vector multiplication accuracy across density levels", async function () {
+    it("checks bounded sparse matrix-vector multiplication accuracy", async function () {
+        const boundedSizes = [4, 8];
+        const boundedDensities = [5, 25];
+        const casesPerSize = 3;
         const results: { n: number; density: number; avgError: number; avgGas: bigint }[] = [];
 
-        for (const n of SPARSE_SIZES) {
-            for (const density of SPARSITY_LEVELS) {
+        for (const n of boundedSizes) {
+            for (const density of boundedDensities) {
                 let errSum = 0;
                 let gasSum = 0n;
 
@@ -668,7 +669,7 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
                 console.log(`Sparse Matrix-Vector Multiplication Accuracy Results for n=${n}, density=${density}%`);
                 console.log("============================================================");
 
-                for (let caseId = 0; caseId < TEST_COUNT; caseId++) {
+                for (let caseId = 0; caseId < casesPerSize; caseId++) {
                     const A = sparseMatrix(n, density, caseId);
                     const x = denseVector(n, caseId);
 
@@ -705,14 +706,17 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
                     errSum += err;
                     gasSum += gasUsed;
 
-                    console.log(`Case ${caseId + 1}/${TEST_COUNT}`);
+                    expect(err, `n=${n}, density=${density}, case=${caseId}: sparse matvec infinity-norm error`)
+                        .to.be.lessThan(1e-8);
+
+                    console.log(`Case ${caseId + 1}/${casesPerSize}`);
                     console.log(`  E_inf     = ${err}`);
                     console.log(`  Gas Usage = ${gasUsed}`);
                     console.log("------------------------------------------------------------");
                 }
 
-                const avgError = errSum / TEST_COUNT;
-                const avgGas = gasSum / BigInt(TEST_COUNT);
+                const avgError = errSum / casesPerSize;
+                const avgGas = gasSum / BigInt(casesPerSize);
                 results.push({ n, density, avgError, avgGas });
 
                 console.log(`Average for n=${n}, density=${density}%`);
@@ -834,10 +838,12 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
     console.log("##################################################################");
 });
 
-    it.skip("measures inversion accuracy using ||A*A^{-1} - I||_inf", async function () {
+    it("checks bounded inversion accuracy using ||A*A^{-1} - I||_inf", async function () {
+        const boundedSizes = [2, 3];
+        const casesPerSize = 3;
         const results: { n: number; avgInverseError: number; avgGas: bigint }[] = [];
 
-        for (const n of INV_SIZES) {
+        for (const n of boundedSizes) {
             let errSum = 0;
             let gasSum = 0n;
 
@@ -845,7 +851,7 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
             console.log(`Inverse Accuracy Results for n=${n}`);
             console.log("============================================================");
 
-            for (let caseId = 0; caseId < TEST_COUNT; caseId++) {
+            for (let caseId = 0; caseId < casesPerSize; caseId++) {
                 const A = diagonalDominantMatrix(n, caseId);
                 const aQ = await qArrayFromNumbers(harness, flatten(A));
 
@@ -869,14 +875,16 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
                 errSum += err;
                 gasSum += gasUsed;
 
-                console.log(`Case ${caseId + 1}/${TEST_COUNT}`);
+                expect(err, `n=${n}, case=${caseId}: inverse reconstruction infinity-norm error`).to.be.lessThan(1e-7);
+
+                console.log(`Case ${caseId + 1}/${casesPerSize}`);
                 console.log(`  E_inverse = ${err}`);
                 console.log(`  Gas Usage = ${gasUsed}`);
                 console.log("------------------------------------------------------------");
             }
 
-            const avgInverseError = errSum / TEST_COUNT;
-            const avgGas = gasSum / BigInt(TEST_COUNT);
+            const avgInverseError = errSum / casesPerSize;
+            const avgGas = gasSum / BigInt(casesPerSize);
             results.push({ n, avgInverseError, avgGas });
 
             console.log(`Average for n=${n}`);
@@ -893,7 +901,9 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
         console.log("################################################################");
     });
 
-    it.skip("measures power iteration eigenvalue accuracy and residual consistency", async function () {
+    it("checks bounded power iteration eigenvalue accuracy, residual, and convergence", async function () {
+        const boundedSizes = [2, 3];
+        const casesPerSize = 3;
         const results: {
             n: number;
             avgEigenAbsError: number;
@@ -903,7 +913,7 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
 
         const tolQ = await qFromNumber(harness, TOL_EIGEN_NUM);
 
-        for (const n of POWER_SIZES) {
+        for (const n of boundedSizes) {
             let eigErrSum = 0;
             let residualSum = 0;
             let gasSum = 0n;
@@ -912,7 +922,7 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
             console.log(`Power Iteration Accuracy Results for n=${n}`);
             console.log("============================================================");
 
-            for (let caseId = 0; caseId < TEST_COUNT; caseId++) {
+            for (let caseId = 0; caseId < casesPerSize; caseId++) {
                 const A = symmetricDiagonalDominantMatrix(n, caseId);
                 const aQ = await qArrayFromNumbers(harness, flatten(A));
 
@@ -960,7 +970,11 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
                 residualSum += residualInf;
                 gasSum += gasUsed;
 
-                console.log(`Case ${caseId + 1}/${TEST_COUNT}`);
+                expect(converged, `n=${n}, case=${caseId}: power iteration must converge`).to.equal(true);
+                expect(eigenAbsErr, `n=${n}, case=${caseId}: dominant eigenvalue error`).to.be.lessThan(1e-3);
+                expect(residualInf, `n=${n}, case=${caseId}: eigenpair residual infinity norm`).to.be.lessThan(1e-3);
+
+                console.log(`Case ${caseId + 1}/${casesPerSize}`);
                 console.log(`  lambda_sol       = ${lambdaSol}`);
                 console.log(`  lambda_ref       = ${ref.lambda}`);
                 console.log(`  eigen abs error  = ${eigenAbsErr}`);
@@ -971,9 +985,9 @@ describe("MatrixMasterHarness - Mixed Fixed-Point/JS-Number Accuracy Tests", fun
                 console.log("------------------------------------------------------------");
             }
 
-            const avgEigenAbsError = eigErrSum / TEST_COUNT;
-            const avgResidualInf = residualSum / TEST_COUNT;
-            const avgGas = gasSum / BigInt(TEST_COUNT);
+            const avgEigenAbsError = eigErrSum / casesPerSize;
+            const avgResidualInf = residualSum / casesPerSize;
+            const avgGas = gasSum / BigInt(casesPerSize);
 
             results.push({
                 n,
