@@ -56,7 +56,7 @@ export function printExecutionFeasibilitySummary(args: {
  * `eth_call`, even when gas is obtained from a transaction or estimate.
  */
 export type BenchmarkExecutionMetadata = {
-    route: "harness_direct" | "diamond_routed";
+    route: "harness_direct" | "facet_direct" | "diamond_routed";
     gas: "estimateGas" | "transaction_receipt_gas";
     result: "eth_call_result";
     transactionPreflight?: boolean;
@@ -71,6 +71,13 @@ export const HARNESS_ESTIMATE_CALL: BenchmarkExecutionMetadata = {
 export const HARNESS_TRANSACTION_PLUS_CALL: BenchmarkExecutionMetadata = {
     route: "harness_direct",
     gas: "transaction_receipt_gas",
+    result: "eth_call_result",
+};
+
+/** Direct call to a production facet. This omits Diamond fallback and delegatecall. */
+export const FACET_ESTIMATE_CALL: BenchmarkExecutionMetadata = {
+    route: "facet_direct",
+    gas: "estimateGas",
     result: "eth_call_result",
 };
 
