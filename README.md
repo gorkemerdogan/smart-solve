@@ -1,6 +1,35 @@
 
 # Smart-Solve
-**SMART-SOLVE** is a high-precision numerical computing suite for the Ethereum Virtual Machine (EVM). It implements **IEEE-754 quadruple precision** arithmetic within a modular **Diamond Standard (EIP-2535)** architecture, enabling complex scientific, engineering, and deterministic simulations on-chain.
+
+**SmartSolve** is an experimental Solidity numerical-computation and
+benchmarking framework for the Ethereum Virtual Machine (EVM). It uses
+IEEE-754 binary128 (`bytes16`) arithmetic and a Diamond Standard (EIP-2535)
+production deployment to support deterministic numerical experiments on-chain.
+
+The repository contains both the production Diamond and focused benchmark
+harnesses. A harness measurement isolates a library or facet operation; a
+Diamond-routed measurement includes selector lookup, fallback, and delegatecall
+behaviour. These are intentionally reported as different execution models and
+should not be treated as interchangeable.
+
+## Getting started
+
+```sh
+npm install
+npm test
+```
+
+`npm test` is the practical bounded suite for ordinary local development and
+CI. For complete test, benchmark, result-export, and feasibility guidance, see
+[BENCHMARKS.md](BENCHMARKS.md). For local and Sepolia deployment instructions,
+see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+## Operational guides
+
+- [Benchmark and test guide](BENCHMARKS.md): bounded tests, heavy opt-in
+  feasibility suites, benchmark commands, and JSON exports.
+- [Deployment and verification guide](DEPLOYMENT.md): local workflow, Sepolia
+  prerequisites, deployment artifacts, and post-deploy verification.
 
 ---
 
@@ -77,8 +106,10 @@ The architecture separates core floating-point arithmetic, numerical constants, 
 This layer provides the numerical foundation for the entire system and is the only place where raw ABDK quad logic is directly referenced.
 
 * **`MathLib.sol`**  
-  Thin public-call wrapper around `ABDKMathQuad` exposing IEEE-754 binary128 (`bytes16`) operations such as add, sub, zero checks, absolute value, and integer <-> quad conversions.
-  All numerical libraries call `MathLib` instead of inlining ABDK logic, drastically reducing bytecode size and preventing EVM contract size limit violations.
+  Shared public-call wrapper around `ABDKMathQuad` exposing IEEE-754 binary128 (`bytes16`) operations such as add, sub, zero checks, absolute value, and integer <-> quad conversions.
+  Most numerical operations use the linked library to manage facet bytecode;
+  targeted hot-path experiments may use internal ABDK operations where measured
+  and documented separately.
 
 * **`QuadConstants.sol`**  
   Centralized repository of high-precision constants and tolerances including π, π/2, rational helpers (1/2, 1/6), and predefined epsilons (1e-6 → 1e-30).
