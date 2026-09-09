@@ -64,8 +64,9 @@ const REL_SCALE = 10n ** REL_SCALE_DECIMALS;
 const DENSE_SEED = ethers.keccak256(ethers.toUtf8Bytes("matrixmaster-part2-dense-fixed-seed"));
 const SPARSE_SEED = ethers.keccak256(ethers.toUtf8Bytes("matrixmaster-part2-sparse-fixed-seed"));
 
-// Full-band n=96 and n=128 CSR inputs characterize the 30M-gas feasibility
-// boundary. They remain reproducible behind this explicit opt-in flag.
+// The n=96 full-band plus n=128 half/full-band CSR inputs characterize the
+// 30M-gas feasibility boundary. They remain reproducible behind this explicit
+// opt-in flag.
 const RUN_HEAVY_MATRIX_SCALABILITY = process.env.RUN_HEAVY_MATRIX_SCALABILITY === "1";
 
 function formatScaledInt(v: bigint): string {
@@ -445,7 +446,9 @@ describe("MatrixMasterHarness - Gas Growth Tests (Multiplication)", function () 
             for (const bandwidth of BANDWIDTH_CASES) {
                 for (let caseNo = 1; caseNo <= 5; caseNo++) {
                     const sub = `2.${++localIdx}`;
-                    const isFeasibilityCase = n >= 96 && bandwidth === 64;
+                    const isFeasibilityCase =
+                        (n >= 96 && bandwidth === 64) ||
+                        (n === 128 && bandwidth === 32);
                     const titlePrefix = isFeasibilityCase ? "[opt-in feasibility] " : "";
 
                     it(`${titlePrefix}${sub} Sparse matvec gas vs nnz at n=${n}, bw=${bandwidth}, case=${caseNo}`, async function () {
