@@ -9,6 +9,7 @@
     "test:bytecode": "hardhat test test/bytecode-size.test.ts",
     "test:full": "hardhat test",
     "test:heavy": "RUN_HEAVY_SCALABILITY=1 hardhat test test/linear-solvers.gen.test.ts",
+    "test:heavy:matrix": "RUN_HEAVY_MATRIX_SCALABILITY=1 hardhat test test/matrixmaster.addsub.gas.test.ts test/matrixmaster.adv.gas.test.ts test/matrixmaster.mul.gas.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

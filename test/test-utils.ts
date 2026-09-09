@@ -12,6 +12,44 @@ export interface Harness extends Contract {
 
 export type ExecutionFailureKind = "revert" | "out-of-gas" | "failure";
 
+/** Counts retained by feasibility benchmarks; successful-case aggregates must
+ * never silently discard gas-limit, revert, or other execution outcomes. */
+export type ExecutionFailureCounts = Record<ExecutionFailureKind, number> & {
+    failed: number;
+};
+
+export function emptyExecutionFailureCounts(): ExecutionFailureCounts {
+    return { failed: 0, revert: 0, "out-of-gas": 0, failure: 0 };
+}
+
+export function countExecutionFailure(
+    counts: ExecutionFailureCounts,
+    error: unknown,
+): ExecutionFailureKind {
+    const kind = classifyExecutionFailure(error);
+    counts.failed++;
+    counts[kind]++;
+    return kind;
+}
+
+export function printExecutionFeasibilitySummary(args: {
+    label: string;
+    total: number;
+    successful: number;
+    failures: ExecutionFailureCounts;
+}): void {
+    const passRate = args.total === 0 ? 0 : args.successful / args.total;
+    console.log(`Feasibility Summary  : ${args.label}`);
+    console.log(`Total Cases          : ${args.total}`);
+    console.log(`Successful Cases     : ${args.successful}`);
+    console.log(`Execution Failures   : ${args.failures.failed}`);
+    console.log(`Reverted Cases       : ${args.failures.revert}`);
+    console.log(`Out-of-Gas Cases     : ${args.failures["out-of-gas"]}`);
+    console.log(`Other Failures       : ${args.failures.failure}`);
+    console.log(`Execution Pass Rate  : ${(passRate * 100).toFixed(2)}%`);
+    console.log("Averages             : successful executions only");
+}
+
 /**
  * Explicit benchmark execution metadata. Gas, returned data, and routing are
  * deliberately recorded separately because a view result is normally an
