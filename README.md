@@ -1,176 +1,131 @@
+# SmartSolve
 
-# Smart-Solve
+SmartSolve is an experimental Solidity numerical-computation and benchmarking
+framework for the EVM. It combines IEEE-754 binary128 (`bytes16`) arithmetic
+with a Diamond Standard (EIP-2535) deployment so numerical kernels can be
+tested both in isolation and through the production proxy path.
 
-**SmartSolve** is an experimental Solidity numerical-computation and
-benchmarking framework for the Ethereum Virtual Machine (EVM). It uses
-IEEE-754 binary128 (`bytes16`) arithmetic and a Diamond Standard (EIP-2535)
-production deployment to support deterministic numerical experiments on-chain.
+It is intended to make a difficult engineering question inspectable: which
+small, deterministic numerical workloads are correct, reproducible, and
+feasible under an explicitly defined EVM environment?
 
-The repository contains both the production Diamond and focused benchmark
-harnesses. A harness measurement isolates a library or facet operation; a
-Diamond-routed measurement includes selector lookup, fallback, and delegatecall
-behaviour. These are intentionally reported as different execution models and
-should not be treated as interchangeable.
+> **Status:** research and engineering prototype. The repository includes a
+> full SmartSolve Diamond deployer, post-deploy verification, bounded tests,
+> opt-in feasibility experiments, and structured benchmark exports. It is not
+> an audited mainnet product.
 
-## Getting started
+## At a glance
+
+| Area | Included capabilities |
+| --- | --- |
+| Numerical kernels | Integration, differentiation, ODE stepping, polynomial operations, root finding, matrix operations, linear solvers, and steepest descent. |
+| Arithmetic | Shared linked `MathLib` wrapper around ABDK binary128 operations, with narrowly documented hot-path experiments. |
+| Production route | A Diamond with numerical facets, selector routing, proxy-held numeric configuration, and deployment/verification helpers. |
+| Evidence | Accuracy tests, gas estimates, deployment gas, bytecode budgets, equal-accuracy comparisons, and opt-in scalability/OOG experiments. |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    caller[Caller]
+    caller -->|diamond_routed| diamond[SmartSolve Diamond]
+    diamond --> fallback[Fallback and selector lookup]
+    fallback --> facets[Numerical facets]
+    facets --> math[MathLib and binary128 arithmetic]
+    facets --> callback[Deterministic callback target when required]
+
+    caller -->|harness_direct| harness[Test harness]
+    harness --> library[Numerical library]
+```
+
+The Diamond route is the deployable-system path. Harnesses remain useful for
+isolating algorithm and arithmetic costs, but are deliberately reported as a
+separate execution model. See [BENCHMARKS.md](BENCHMARKS.md) for the exact
+comparison and current measurements.
+
+## Quickstart
 
 ```sh
 npm install
 npm test
+npm run test:bytecode
+npx tsc --noEmit
 ```
 
-`npm test` is the practical bounded suite for ordinary local development and
-CI. For complete test, benchmark, result-export, and feasibility guidance, see
-[BENCHMARKS.md](BENCHMARKS.md). For local and Sepolia deployment instructions,
-see [DEPLOYMENT.md](DEPLOYMENT.md).
+`npm test` is the practical bounded suite for local development and CI. It
+does not run the expensive feasibility corpora. Common next commands are:
 
-## Operational guides
+| Goal | Command |
+| --- | --- |
+| Run all tests, including non-heavy suites | `npm run test:full` |
+| Run opt-in linear-solver feasibility tests | `npm run test:heavy` |
+| Run opt-in MatrixMaster feasibility tests | `npm run test:heavy:matrix` |
+| Export representative benchmark JSON | `npm run benchmark:export:representative` |
+| Compare equal-accuracy configurations through the Diamond | `npm run benchmark:equal-accuracy:diamond` |
+| Run the fixed-point Horner baseline | `npm run benchmark:baseline:polynomial` |
+| Deploy and verify on ephemeral local Hardhat | `npm run deploy:local` |
 
-- [Benchmark and test guide](BENCHMARKS.md): bounded tests, heavy opt-in
-  feasibility suites, benchmark commands, and JSON exports.
-- [Deployment and verification guide](DEPLOYMENT.md): local workflow, Sepolia
-  prerequisites, deployment artifacts, and post-deploy verification.
+Detailed commands, outputs, and the meaning of these measurements are in
+[BENCHMARKS.md](BENCHMARKS.md). Local and Sepolia deployment procedures are in
+[DEPLOYMENT.md](DEPLOYMENT.md).
 
----
+## What this is / what this is not
 
-## Key Features
+**SmartSolve is:**
 
-* **Quadruple Precision:** Full IEEE-754 binary128 implementation using `bytes16` (~34 decimal digits).
-* **Deterministic Execution:** Identical results across all EVM-compatible nodes for verifiable research.
-* **Comprehensive Math Suite:** Advanced calculus, linear algebra, and iterative solvers.
-* **Stateless Libraries:** Optimized numerical logic decoupled from storage.
+- an experimental Solidity numerical-computation framework;
+- a benchmark and feasibility-study framework for numerical EVM kernels; and
+- a Diamond-based production-path demonstrator with reproducible deployment
+  and verification tooling.
 
----
+**SmartSolve is not:**
 
-## Feature Breakdown
+- an audited production DeFi math library;
+- a universal replacement for off-chain numerical computation;
+- evidence that every algorithm is economical for Ethereum mainnet use; or
+- a guarantee that every accuracy suite establishes empirical binary128-level
+  accuracy for every input family.
 
-### 1. Matrix Operations (`MatrixMaster.sol`)
-* **Creation:** Zeros, Ones, Identity, Diagonal, deterministic pseudo-random matrices (seeded).
-* **Sparse Support:** CSR matrices including zero, identity, diagonal, and COO-to-CSR conversion.
-* **Access & Manipulation:** Element access and mutation (row-major layout).
-* **Reshape & Slicing:** Contiguous submatrix extraction and shape-preserving reshape.
-* **Transformations:** Matrix transpose.
-* **Elementwise Arithmetic:** Addition, subtraction, scalar multiplication, scalar division.
-* **Multiplication:** Matrix–matrix, matrix–vector, sparse matrix–vector (CSR).
-* **Vector Ops:** Dot product, Euclidean norm, normalization, convergence checks.
-* **Determinant:** LU-based determinant with partial pivoting.
-* **Inversion:** Gauss–Jordan elimination for square matrices.
-* **Eigen Analysis:** Dominant eigenvalue and eigenvector via power iteration.
+## Practical uses
 
-### 2. Linear Solvers & Optimization (`LinearSolvers.sol`)
-* **Direct Solvers:** Gaussian elimination with partial pivoting.
-* **LU Decomposition:** Doolittle LU factorization (no pivoting).
-* **Iterative Solvers:** Jacobi and Gauss–Seidel methods.
-* **Least Squares:** Fixed-step gradient descent.
+- **Bounded on-chain verification and demonstrations.** Exercise small,
+  deterministic numerical checks where a verifiable result is more valuable
+  than inexpensive throughput.
+- **Solidity precision and gas experiments.** Compare arithmetic choices,
+  accumulation strategies, callback costs, and proxy-routing overhead for a
+  specific numerical kernel.
+- **Feasibility prototypes.** Evaluate small oracle, risk-model, or
+  research/grant workloads whose bounds, gas budget, and precision goals are
+  stated explicitly before deployment.
 
-### 3. Numerical Differentiation (`Differentiation.sol`)
-* **Methods:** Forward difference, backward difference, and centered difference schemes.
-* **Accuracy:** First-order O(h) for forward/backward differences, second-order O(h²) for centered difference.
-* **Step Size Control:** User-defined step size with global configuration fallback and safe default.
+These are suitable starting points for specialised DeFi, oracle, or risk-model
+experiments only when their problem sizes are small and their full
+application-level security review is separate from this repository.
 
-### 4. Numerical Integration (`Integration.sol`)
-* **Methods:** Composite trapezoidal rule, Simpson’s 1/3 rule, and Simpson’s 3/8 rule.
-* **Accuracy:** Second-order accuracy for trapezoidal rule, fourth-order accuracy for Simpson-based rules under smooth integrands.
-* **Validation:** Enforces method-specific constraints (even 'n' for Simpson 1/3, 'n % 3 == 0' for Simpson 3/8).
+## Current engineering limits
 
-### 5. Ordinary Differential Equation (ODE) Solvers (`ODESolver.sol`)
-* **Methods:** Euler’s method, RK2 (Midpoint), RK2 (Heun / Improved Euler), and classical RK4.
-* **Accuracy:** First-order accuracy for Euler, second-order accuracy for RK2 methods, and fourth-order accuracy for RK4.
-* **Design Scope:** Single-step integrators intended for deterministic on-chain simulation and controlled step advancement.
+- Binary128 computation and callback-driven algorithms are gas-intensive.
+  Reported callback benchmarks include target `STATICCALL` gas rather than
+  attempting to subtract it.
+- `MatrixMasterFacet` is currently 22,425 runtime bytes, leaving 2,151 bytes
+  of EIP-170 headroom. The project bytecode test enforces a tighter 23,000-byte
+  budget.
+- Large MatrixMaster and linear-solver workloads are preserved as opt-in
+  feasibility experiments. Explicit out-of-gas outcomes are reported instead
+  of being presented as normal correctness failures.
+- The Diamond owner controls upgrades and numeric configuration. Treat the
+  owner choice and key-management process as deployment-critical.
 
-### 6. Polynomial Utilities (`Polynomial.sol`)
-* **Evaluation:** Polynomial evaluation using Horner’s method, including optimized evaluation for monic polynomials.
-* **Derivatives:** Exact polynomial derivative computation and combined evaluation.
-* **Algebraic Operations:** Coefficient-wise addition, subtraction, scalar multiplication, and polynomial multiplication via convolution.
-* **Integration:** Exact computation of the indefinite integral polynomial with configurable constant of integration.
-* **Division:** Synthetic division by linear factors of the form \((x - r)\), returning quotient and remainder.
-* **Utilities:** Degree computation, trailing-zero trimming, and canonical zero-polynomial handling.
+## Documentation map
 
-### 7. Root Finding (`RootFinding.sol`)
-* **Methods:** Bisection, Newton–Raphson (analytic derivative), and Secant (derivative-free).
-  * Bisection enforces sign change on the initial interval.  
-  * Newton method guards against zero derivatives.  
-  * Secant method guards against zero slope between iterates.
-* **Convergence Control:** User-specified tolerance with global configuration fallback and enforced minimum tolerance.
----
-
-## System Architecture
-
-SMART-SOLVE is structured as a layered numerical stack designed to maximize code reuse, numerical precision, and EVM bytecode efficiency while enabling advanced scientific computation on-chain.
-The architecture separates core floating-point arithmetic, numerical constants, and high-level numerical algorithms, ensuring that heavy quad-precision logic is compiled once and reused across all modules.
-
----
-
-### Core Math Layer
-
-This layer provides the numerical foundation for the entire system and is the only place where raw ABDK quad logic is directly referenced.
-
-* **`MathLib.sol`**  
-  Shared public-call wrapper around `ABDKMathQuad` exposing IEEE-754 binary128 (`bytes16`) operations such as add, sub, zero checks, absolute value, and integer <-> quad conversions.
-  Most numerical operations use the linked library to manage facet bytecode;
-  targeted hot-path experiments may use internal ABDK operations where measured
-  and documented separately.
-
-* **`QuadConstants.sol`**  
-  Centralized repository of high-precision constants and tolerances including π, π/2, rational helpers (1/2, 1/6), and predefined epsilons (1e-6 → 1e-30).
-  Provides a single authoritative source for numerical thresholds and avoids duplicated or inconsistent constants.
-
----
-
-## Project Structure
-
-```text
-contracts/
-├── facets/
-│   ├── core/              # Diamond management (Cut, Loupe, Ownership)
-│   │   ...
-│   ├── numeric/
-│   │   ├── DifferentiationFacet.sol
-│   │   ├── IntegrationFacet.sol
-│   │   ├── LinearSolversFacet.sol
-│   │   ├── MatrixMasterFacet.sol
-│   │   ├── NumericConfigFacet.sol
-│   │   ├── ODESolverFacet.sol
-│   │   ├── PolynomialFacet.sol
-│   │   └── RootFindingFacet.sol
-│
-├── interfaces/
-│   │   ...                # EIP-2535 and Custom Interfaces
-├── libraries/
-│   ├── numeric/
-│   │   ├── Differentiation.sol
-│   │   ├── Integration.sol
-│   │   ├── LinearSolvers.sol
-│   │   ├── MatrixMaster.sol
-│   │   ├── ODESolver.sol
-│   │   ├── Polynomial.sol
-│   │   └── RootFinding.sol
-│   │
-│   ├── LibSmartSolve.sol
-│   ├── MathLib.sol        # Math library depends on ABDKMathQuad
-│   └── QuadConstants.sol  # Math constants
-│   │   ...
-```
-## Precision & Performance
-
-SMART-SOLVE is engineered for environments where standard `uint256` fixed-point math is insufficient. By implementing the IEEE-754 standard, we provide floating-point capabilities directly on the EVM.
-
-### Technical Specifications
-
-| Parameter | Specification | Details |
-| :--- | :--- | :--- |
-| **Standard** | IEEE-754 binary128 | Quadruple precision floating-point format |
-| **Storage Type** | `bytes16` | Compact representation for stack efficiency |
-| **Precision** | ~34 Decimal Digits | High-fidelity scientific significand |
-
-> [!WARNING]
-> **Gas Profile**: Computation in quad-precision is intensive. Operations like `Matrix Inversion` or `RK4 Integration` are optimized for **Correctness** and **Reproducibility** rather than low-cost DeFi swaps. Use this suite for high-value simulations, research, and engineering logic where accuracy is non-negotiable.
-
----
+- [BENCHMARKS.md](BENCHMARKS.md) — commands, execution models, result exports,
+  representative gas/footprint figures, and known feasibility boundaries.
+- [DEPLOYMENT.md](DEPLOYMENT.md) — local and Sepolia deployment, verification,
+  deployment artifacts, and operational cautions.
 
 ## License
 
-Distributed under the **MIT License**.
+Distributed under the MIT License.
 
 ```text
 Copyright (c) 2026 SMART-SOLVE
